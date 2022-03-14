@@ -1,0 +1,12 @@
+name: pointers-test
+
+data_pack:
+  load: [src]
+
+require:
+  - mecha.contrib.bolt
+
+pipeline:
+  - mecha
+
+output: dist
