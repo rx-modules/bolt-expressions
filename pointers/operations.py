@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Union, Dict, List
 from beet import Context
 
 GenericValue = Union["Score", int]
@@ -32,26 +32,162 @@ class ScoreSource(ExpressionNode):
     scoreholder: str
     objective: str
 
+    def __eq__(self, other: "ScoreSource"):
+        if not isinstance(other, ScoreSource): return False
+        return self.scoreholder == other.scoreholder and \
+               self.objective == other.objective
+
+    def __ne__(self, other: "ScoreSource"):
+        return not self.__eq__(other)
+
+@dataclass
+class ExpressionContext:
+    tempObjective: str
+    constObjective: str
+    outputSource: ScoreSource = None
+    canUseOutput: bool = False
+    constants: Dict[ScoreSource, int] = field(default_factory=dict)
+    commands: List[str] = field(default_factory=list)
+    prefix: str = '$temp'
+    current_id: int = 0
+
+    def __post_init__(self):
+        self.canUseOutput = self.outputSource != None
+
+    #def generateConstants(self):
+    #    commands = Array.from(self.commands);
+    #    self.commands = [];
+    #    for source, value in self.constants.items():
+    #        self.setLiteral(source, new Literal(value));
+    #    output = self.commands;
+    #    self.commands = commands;
+    #    return output;
+
+    def generateDummyName(self):
+        self.current_id += 1
+        return self.prefix + str(self.current_id)
+
+    def createNamedSource(self, scoreholder: str, objective: str):
+        return ScoreSource(scoreholder, objective)
+
+    def createDummySource(self):
+        name = self.generateDummyName()
+        return self.createNamedSource(name, self.tempObjective)
+
+    def createConstantSource(self, value: int):
+        name = f"#{value}"
+        source = self.createNamedSource(name, self.constObjective)
+        #FIXME ScoreSource not hashable, might use a Map
+        #self.constants[source] = value
+        return source
+
+    def createSource(self, reference: ScoreSource = None):
+        if self.canUseOutput:
+            self.canUseOutput = False # can use output only once
+            # if provided a reference, init output source with reference's value
+            # only if they're not equal (same scoreholder/objective)
+            if reference != None and reference != self.outputSource:
+                self.operateScore(self.outputSource, '=', reference)
+            return self.outputSource
+        # should create dummy source instead
+        dummy = self.createDummySource()
+        if reference != None: self.operateScore(dummy, '=', reference)
+        return dummy
+
+    def setLiteral(self, source: ScoreSource, value: int):
+        cmd = f"scoreboard players set {source.scoreholder} {source.objective} {value}"
+        self.commands.append(cmd)
+
+    def addLiteral(self, source: ScoreSource, value: int):
+        cmd = f"scoreboard players add {source.scoreholder} {source.objective} {value}"
+        self.commands.append(cmd)
+
+    def subtractLiteral(self, source: ScoreSource, value: int):
+        cmd = f"scoreboard players remove {source.scoreholder} {source.objective} {value}"
+        self.commands.append(cmd)
+
+    def operateScore(self, target: ScoreSource, operation: str, source: ScoreSource):
+        cmd = f"scoreboard players operation {target.scoreholder} {target.objective} {operation} {source.scoreholder} {source.objective}"
+        self.commands.append(cmd)
+
+    #def setScoreFromData(self, target: ScoreSource, source: DataSource):
+    #    { target: tgt, objective: obj} = target
+    #    cmd = f"execute store result score {tgt} {obj} run data get {source.type} {source.target} {source.path}"
+    #    this.commands.append(cmd)
+    #
+
+
 @dataclass
 class Operation(ExpressionNode):
     former: GenericValue
     latter: GenericValue
 
+    def resolveNode(self, term: ExpressionNode, exp: ExpressionContext, readOnly=False) -> ScoreSource:
+        if isinstance(term, int):
+            return exp.createConstantSource(term)
+        if isinstance(term, ScoreSource):
+            if readOnly: return term # doesnt need to create a dummy score
+            return exp.createSource(term)
+        return term.resolve(exp)
+
+    def resolve(self, exp: ExpressionContext, operator: str) -> ScoreSource:
+        result = self.resolveNode(self.former, exp)
+        latter = self.resolveNode(self.latter, exp, True)
+        exp.operateScore(result, operator, latter)
+        return result
 
 class Add(Operation):
-    pass
+    def resolve(self, exp: ExpressionContext):
+        if isinstance(self.former, int):
+            result = self.resolveNode(self.latter, exp)
+            exp.addLiteral(result, self.former)
+            return result
+        if isinstance(self.latter, int):
+            result = self.resolveNode(self.former, exp)
+            exp.addLiteral(result, self.latter)
+            return result
+        return super().resolve(exp, '+=')
 
 class Subtract(Operation):
-    pass
+    def resolve(self, exp: ExpressionContext):
+        if isinstance(self.former, int):
+            result = exp.createSource()
+            latter = self.resolveNode(self.latter, exp, True)
+            exp.setLiteral(result, self.former)
+            exp.operateScore(result, '-=', latter)
+            return result
+        if isinstance(self.latter, int):
+            result = self.resolveNode(self.former, exp)
+            exp.subtractLiteral(result, self.latter)
+            return result
+        return super().resolve(exp, '-=')
 
 class Multiply(Operation):
-    pass
-
+    def resolve(self, exp: ExpressionContext):
+        if isinstance(self.former, int):
+            result = self.resolveNode(self.latter, exp)
+            former = exp.createConstantSource(self.former)
+            exp.operateScore(result, '*=', former)
+            return result
+        return super().resolve(exp, '*=')
 class Divide(Operation):
-    pass
-
+    def resolve(self, exp: ExpressionContext):
+        if isinstance(self.former, int):
+            result = exp.createSource()
+            latter = self.resolveNode(self.latter, exp, True)
+            exp.setLiteral(result, self.former)
+            exp.operateScore(result, '/=', latter)
+            return result
+        return super().resolve(exp, '/=')
 class Modulus(Operation):
-    pass
+    def resolve(self, exp: ExpressionContext):
+        if isinstance(self.former, int):
+            result = exp.createSource()
+            latter = self.resolveNode(self.latter, exp, True)
+            exp.setLiteral(result, self.former)
+            exp.operateScore(result, '%=', latter)
+            return result
+        return super().resolve(exp, '/=')
 
 
 @dataclass
@@ -63,8 +199,16 @@ class Score:
         return ScoreSource(scoreholder, self.objective)
     
     def __setitem__(self, scoreholder: str, value: Union[ExpressionNode, GenericValue]):
-        ...
-
+        print(f"Setting {self[scoreholder]} to {value}")
+        output = self[scoreholder]
+        exp = ExpressionContext('temp', 'const', output)
+        if isinstance(value, Operation): value.resolve(exp)
+        elif isinstance(value, int): exp.setLiteral(output, value)
+        elif isinstance(value, ScoreSource): exp.operateScore(output, '=', value)
+        else: raise ValueError(f"Invalid expression argument of type {type(value)}.")
+        print("\nGENERATED:")
+        for cmd in exp.commands:
+            print(cmd)
 
 # myself = Score("@s", "temp")
 # value = Score("#value", "temp")
