@@ -88,16 +88,6 @@ class Operation(ExpressionNode):
         
 
     def unroll(self) -> Iterable["Operation"]:
-        """
-            uid["@s"] = uid["@s"] + uid["@a"] * 2
-
-            Set(former="temp $intermediate0", latter="@a rx.uid"),
-            Multiply(former="temp $intermediate0", latter="$2 int"),
-            Set(former="@a rx.uid", latter="temp $intermediate0"),
-            Set(former="temp $intermediate1", latter="@s rx.uid"),
-            Add(former="temp $intermediate1", latter=Multiply(former="@a rx.uid", latter="$2 int")),
-            Set(former="@s rx.uid", latter="temp $intermediate1")
-        """
         print(f"{type(self).__name__}")
         print(self)
         
