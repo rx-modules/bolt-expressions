@@ -44,7 +44,7 @@ class Score:
         return ScoreSource(scoreholder, self.objective)
 
     def __setitem__(self, scoreholder: str, value: Operation):
-        self.resolve(Set(self[scoreholder], value))
+        self.resolve(Set.create(self[scoreholder], value))
     
     def optimize(self, nodes: Iterable[Operation]) -> List[Operation]:
         ...

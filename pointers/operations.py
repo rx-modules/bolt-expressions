@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Iterable, List, Union
 
 from itertools import count
-from math import floor
 
 infinite = count()
 
@@ -55,7 +54,7 @@ class ExpressionNode:
         return Modulus.create(other, self)
     
     def unroll(self) -> Iterable["Operation"]:
-        yield from []
+        yield self
 
 @dataclass(frozen=True)
 class ScoreSource(ExpressionNode):
@@ -107,17 +106,18 @@ class Operation(ExpressionNode):
 
         temp_var = ScoreSource("temp", f"$i{next(infinite)}")
 
-        former = self.former if type(self.former) is ScoreSource else former_nodes[-1].latter
-        latter = self.latter if type(self.latter) is ScoreSource else latter_nodes[-1].former
+        former_temp_var = former_nodes.pop() if former_nodes else self.former
+        latter_temp_var = latter_nodes.pop() if latter_nodes else self.latter
 
         yield from former_nodes
         yield from latter_nodes
 
         if type(self) is not Set:
-            yield Set.create(temp_var, former)
-            yield self.__class__.create(temp_var, latter)
+            yield Set.create(temp_var, former_temp_var)
+            yield self.__class__.create(temp_var, latter_temp_var)
+            yield temp_var
         else:
-            yield Set.create(former, latter)
+            yield Set.create(former_temp_var, latter_temp_var)
 
 
     # def resolve_node(
