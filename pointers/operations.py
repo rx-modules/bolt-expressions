@@ -40,7 +40,7 @@ class ExpressionNode:
         return Divide.create(other, self)
     
     def __floordiv__(self, other: "ExpressionNode"):
-        return Divide.create(other, self)
+        return Divide.create(self, other)
     
     def __rfloordiv__(self, other: "ExpressionNode"):
         return Divide.create(other, self)
@@ -94,7 +94,7 @@ class Operation(ExpressionNode):
         former_nodes = list(self.former.unroll())
         latter_nodes = list(self.latter.unroll())
 
-        temp_var = ScoreSource("temp", f"$i{next(infinite)}")
+        temp_var = ScoreSource(f"$i{next(infinite)}", "temp")
 
         yield from former_nodes[:-1]
         yield from latter_nodes[:-1]
