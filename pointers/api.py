@@ -12,7 +12,6 @@ from rich.pretty import pprint
 from .operations import ScoreSource, ExpressionNode, Set, Operation
 
 
-
 @dataclass
 class Scoreboard:
     ctx: Context
@@ -41,25 +40,23 @@ class Score:
     objective: str
 
     def __getitem__(self, scoreholder: str) -> ExpressionNode:
-        return ScoreSource(scoreholder, self.objective)
+        return ScoreSource.create(scoreholder, self.objective)
 
     def __setitem__(self, scoreholder: str, value: Operation):
         self.resolve(Set.create(self[scoreholder], value))
-    
+
     def optimize(self, nodes: Iterable[Operation]) -> List[Operation]:
         ...
 
     def resolve(self, root: Operation):
         print("[bold]Tree[/bold]:")
-        print(root,"\n")
+        print(root, "\n")
         print("[bold]Unrolling[/bold]:")
         nodes = list(root.unroll())  # generator, not consumed
         print("\n", "[bold]Unrolled Nodes[/bold]:", sep="")
         pprint(nodes, expand_all=True)
         # for node in nodes:
         #     pprint(node)  # debug?
-    
-
 
     # def __setitem__(self, scoreholder: str, value: Union[ExpressionNode, GenericValue]):
     #     print(f"Setting {self[scoreholder]} to {value}")

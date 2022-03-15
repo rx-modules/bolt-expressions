@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Union
 
+from functools import cache
 from itertools import count
 
-infinite = count()
 
 @dataclass(frozen=True)
 class ExpressionNode:
     def __add__(self, other: "ExpressionNode"):
         # print(f"Adding {self} by {other}")
         return Add.create(self, other)
-    
+
     def __radd__(self, other: "ExpressionNode"):
         # print(f"Adding {self} by {other}")
         return Add.create(other, self)
@@ -26,7 +26,7 @@ class ExpressionNode:
     def __mul__(self, other: "ExpressionNode"):
         # print(f"Multiplying {self} by {other}")
         return Multiply.create(self, other)
-    
+
     def __rmul__(self, other: "ExpressionNode"):
         # print(f"Multiplying {self} by {other}")
         return Multiply.create(other, self)
@@ -38,10 +38,10 @@ class ExpressionNode:
     def __rtruediv__(self, other: "ExpressionNode"):
         # print(f"Dividing {self} by {other}")
         return Divide.create(other, self)
-    
+
     def __floordiv__(self, other: "ExpressionNode"):
         return Divide.create(self, other)
-    
+
     def __rfloordiv__(self, other: "ExpressionNode"):
         return Divide.create(other, self)
 
@@ -53,19 +53,43 @@ class ExpressionNode:
         # print(f"Modulus {self} by {other}")
         return Modulus.create(other, self)
     
+    @classmethod
+    def create(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
+
     def unroll(self) -> Iterable["Operation"]:
         yield self
 
 @dataclass(frozen=True)
-class ScoreSource(ExpressionNode):
+class Source(ExpressionNode):
+    ...
+
+@dataclass(frozen=True)
+class ScoreSource(Source):
     scoreholder: str
     objective: str
 
     def __str__(self):
-        return f'{self.scoreholder} {self.objective}'
-    
+        return f"{self.scoreholder} {self.objective}"
+
     def __repr__(self):
         return f'"{str(self)}"'
+
+class ConstantScoreSource(ScoreSource):
+    @classmethod
+    def create(cls, constant: Union[int, float]):
+        return super().create(f"${int(constant)}", "constant")
+
+class TempScoreSource(ScoreSource):
+    @classmethod
+    @property
+    @cache
+    def infinite(cls):
+        yield from count()
+
+    @classmethod
+    def create(cls):
+        return super().create(f"$i{next(cls.infinite)}", "temp")
 
 @dataclass(frozen=True)
 class Operation(ExpressionNode):
@@ -75,26 +99,25 @@ class Operation(ExpressionNode):
     @classmethod
     def create(cls, former, latter):
         """Factory method to create new operations"""
-        
+
         # TODO: int is hardcoded, we need to generate this stuff
-        if type(former) is float: former = int(former)
-        if type(latter) is float: latter = int(latter)
-        if type(former) is int:
-            former = ScoreSource(f"${former}", "int")
-        if type(latter) is int:
-            latter = ScoreSource(f"${latter}", "int")
-        
-        return cls(former, latter)
-        
+        if not isinstance(former, ExpressionNode):
+            print("former", type(former))
+            former = ConstantScoreSource.create(former)
+        if not isinstance(latter, ExpressionNode):
+            print("latter", type(latter))
+            latter = ConstantScoreSource.create(latter)
+
+        return super().create(former, latter)
 
     def unroll(self) -> Iterable["Operation"]:
         print(f"{type(self).__name__}")
         print(self)
-        
+
         former_nodes = list(self.former.unroll())
         latter_nodes = list(self.latter.unroll())
 
-        temp_var = ScoreSource(f"$i{next(infinite)}", "temp")
+        temp_var = TempScoreSource.create()
 
         yield from former_nodes[:-1]
         yield from latter_nodes[:-1]
@@ -107,97 +130,25 @@ class Operation(ExpressionNode):
             yield Set.create(former_nodes.pop(), latter_nodes.pop())
 
 
-    # def resolve_node(
-    #     self, term: ExpressionNode, exp: ExpressionContext, read_only=False
-    # ) -> ScoreSource:
-    #     if isinstance(term, int):
-    #         return exp.create_constant_source(term)
-    #     if isinstance(term, ScoreSource):
-    #         if read_only:
-    #             return term  # doesnt need to create a dummy score
-    #         return exp.create_source(term)
-    #     return term.resolve(exp)
-
-    # def resolve(self, exp: ExpressionContext, operator: str) -> ScoreSource:
-    #     result = self.resolve_node(self.former, exp)
-    #     latter = self.resolve_node(self.latter, exp, True)
-    #     exp.operate_score(result, operator, latter)
-    #     return result
-
-
 class Set(Operation):
-    def resolve(self, exp: "ExpressionContext"):
-        if isinstance(self.former, int):
-            result = self.resolve_node(self.latter, exp)
-            exp.add_literal(result, self.former)
-            return result
-        if isinstance(self.latter, int):
-            result = self.resolve_node(self.former, exp)
-            exp.add_literal(result, self.latter)
-            return result
-        return super().resolve(exp, "=")
+    ...
+
 
 class Add(Operation):
-    def resolve(self, exp: "ExpressionContext"):
-        if isinstance(self.former, int):
-            result = self.resolve_node(self.latter, exp)
-            exp.add_literal(result, self.former)
-            return result
-        if isinstance(self.latter, int):
-            result = self.resolve_node(self.former, exp)
-            exp.add_literal(result, self.latter)
-            return result
-        return super().resolve(exp, "+=")
+    ...
 
 
 class Subtract(Operation):
-    def resolve(self, exp: "ExpressionContext"):
-        if isinstance(self.former, int):
-            result = exp.create_source()
-            latter = self.resolve_node(self.latter, exp, True)
-            exp.set_literal(result, self.former)
-            exp.operate_score(result, "-=", latter)
-            return result
-        if isinstance(self.latter, int):
-            result = self.resolve_node(self.former, exp)
-            exp.subtract_literal(result, self.latter)
-            return result
-        return super().resolve(exp, "-=")
+    ...
 
 
 class Multiply(Operation):
-    def resolve(self, exp: "ExpressionContext"):
-        if isinstance(self.former, int):
-            result = self.resolve_node(self.latter, exp)
-            former = exp.create_constant_source(self.former)
-            exp.operate_score(result, "*=", former)
-            return result
-        return super().resolve(exp, "*=")
+    ...
 
 
 class Divide(Operation):
-    def resolve(self, exp: "ExpressionContext"):
-        if isinstance(self.former, int):
-            result = exp.create_source()
-            latter = self.resolve_node(self.latter, exp, True)
-            exp.set_literal(result, self.former)
-            exp.operate_score(result, "/=", latter)
-            return result
-        return super().resolve(exp, "/=")
+    ...
 
 
 class Modulus(Operation):
-    def resolve(self, exp: "ExpressionContext"):
-        if isinstance(self.former, int):
-            result = exp.create_source()
-            latter = self.resolve_node(self.latter, exp, True)
-            exp.set_literal(result, self.former)
-            exp.operate_score(result, "%=", latter)
-            return result
-        return super().resolve(exp, "/=")
-
-
-
-# myself = Score("@s", "temp")
-# value = Score("#value", "temp")
-# myself += value * 2 + (myself * 2)
+    ...

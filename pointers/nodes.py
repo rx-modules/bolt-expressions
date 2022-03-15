@@ -8,8 +8,6 @@ GenericValue = Union["ScoreSource", int]
 from .operations import Add, Subtract, Multiply, Divide, Modulus
 
 
-
-
 # @dataclass
 # class ExpressionContext:
 #     temp_objective: str
