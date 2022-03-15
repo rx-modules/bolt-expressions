@@ -1,5 +1,3 @@
-from .main import Scoreboard
+from .api import Scoreboard
 
-__all__ = [
-    'Scoreboard'
-]
+__all__ = ["Scoreboard"]
