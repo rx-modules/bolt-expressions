@@ -106,18 +106,15 @@ class Operation(ExpressionNode):
 
         temp_var = ScoreSource("temp", f"$i{next(infinite)}")
 
-        former_temp_var = former_nodes.pop() if former_nodes else self.former
-        latter_temp_var = latter_nodes.pop() if latter_nodes else self.latter
-
-        yield from former_nodes
-        yield from latter_nodes
+        yield from former_nodes[:-1]
+        yield from latter_nodes[:-1]
 
         if type(self) is not Set:
-            yield Set.create(temp_var, former_temp_var)
-            yield self.__class__.create(temp_var, latter_temp_var)
+            yield Set.create(temp_var, former_nodes.pop())
+            yield self.__class__.create(temp_var, latter_nodes.pop())
             yield temp_var
         else:
-            yield Set.create(former_temp_var, latter_temp_var)
+            yield Set.create(former_nodes.pop(), latter_nodes.pop())
 
 
     # def resolve_node(
