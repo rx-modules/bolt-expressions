@@ -45,14 +45,6 @@ class Score:
 
     def __setitem__(self, scoreholder: str, value: Operation):
         self.resolve(Set(self[scoreholder], value))
-
-    def unroll(self, root: Operation) -> Iterable[Operation]:
-        print(f"{type(root).__name__}")
-        if isinstance(root, Operation):
-            yield from self.unroll(root.former)
-            yield from self.unroll(root.latter)
-            
-            yield from root.unroll()
     
     def optimize(self, nodes: Iterable[Operation]) -> List[Operation]:
         ...
@@ -61,7 +53,7 @@ class Score:
         print("[bold]Tree[/bold]:")
         print(root,"\n")
         print("[bold]Unrolling[/bold]:")
-        nodes = list(self.unroll(root))  # generator, not consumed
+        nodes = list(root.unroll())  # generator, not consumed
         print("\n", "[bold]Unrolled Nodes[/bold]:", sep="")
         pprint(nodes, expand_all=True)
         # for node in nodes:

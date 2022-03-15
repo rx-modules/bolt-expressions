@@ -53,8 +53,9 @@ class ExpressionNode:
     def __rmod__(self, other: "ExpressionNode"):
         # print(f"Modulus {self} by {other}")
         return Modulus.create(other, self)
-
-
+    
+    def unroll(self) -> Iterable["Operation"]:
+        yield from []
 
 @dataclass(frozen=True)
 class ScoreSource(ExpressionNode):
@@ -77,15 +78,16 @@ class Operation(ExpressionNode):
         """Factory method to create new operations"""
         
         # TODO: int is hardcoded, we need to generate this stuff
-        if type(former) is float: former = floor(former)
-        if type(latter) is float: latter = floor(latter)
+        if type(former) is float: former = int(former)
+        if type(latter) is float: latter = int(latter)
         if type(former) is int:
             former = ScoreSource(f"${former}", "int")
         if type(latter) is int:
             latter = ScoreSource(f"${latter}", "int")
         
         return cls(former, latter)
-    
+        
+
     def unroll(self) -> Iterable["Operation"]:
         """
             uid["@s"] = uid["@s"] + uid["@a"] * 2
@@ -97,17 +99,26 @@ class Operation(ExpressionNode):
             Add(former="temp $intermediate1", latter=Multiply(former="@a rx.uid", latter="$2 int")),
             Set(former="@s rx.uid", latter="temp $intermediate1")
         """
-        if not isinstance(self.former, Operation) and not isinstance(self.latter, Operation):
-            if type(self) is not Set:
-                temp_var = ScoreSource("temp", f"$intermediate{next(infinite)}")
+        print(f"{type(self).__name__}")
+        print(self)
+        
+        former_nodes = list(self.former.unroll())
+        latter_nodes = list(self.latter.unroll())
 
-                yield Set(temp_var, self.former), 103
-                yield self.__class__(temp_var, self.latter), 104
-                yield Set(self.former, temp_var), 105
-            
-            else:
-                yield self
-    
+        temp_var = ScoreSource("temp", f"$i{next(infinite)}")
+
+        former = self.former if type(self.former) is ScoreSource else former_nodes[-1].latter
+        latter = self.latter if type(self.latter) is ScoreSource else latter_nodes[-1].former
+
+        yield from former_nodes
+        yield from latter_nodes
+
+        if type(self) is not Set:
+            yield Set.create(temp_var, former)
+            yield self.__class__.create(temp_var, latter)
+        else:
+            yield Set.create(former, latter)
+
 
     # def resolve_node(
     #     self, term: ExpressionNode, exp: ExpressionContext, read_only=False
