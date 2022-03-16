@@ -142,8 +142,8 @@ class Operation(ExpressionNode):
         return super().create(former, latter)
 
     def unroll(self) -> Iterable["Operation"]:
-        former_nodes = list(self.former.unroll())
-        latter_nodes = list(self.latter.unroll())
+        *former_nodes, former_var = self.former.unroll()
+        *latter_nodes, latter_var = self.latter.unroll()
 
         yield from former_nodes[:-1]
         yield from latter_nodes[:-1]
@@ -154,7 +154,7 @@ class Operation(ExpressionNode):
             yield self.__class__.create(temp_var, latter_nodes.pop())
             yield temp_var
         else:
-            yield Set.create(former_nodes.pop(), latter_nodes.pop())
+            yield Set.create(former_var, latter_var)
 
 
 class Set(Operation):
