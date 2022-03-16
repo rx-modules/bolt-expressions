@@ -1,5 +1,4 @@
-from typing import Dict, List, Iterable, TypeVar
-from dataclasses import dataclass, field
+from typing import Dict, Iterable, List
 
 from .operations import Operation
 

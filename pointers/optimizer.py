@@ -1,21 +1,10 @@
-from typing import Any, Dict, Iterable, TypeVar, Callable, List
-from functools import wraps
-from itertools import chain
+from typing import Any, Callable, Dict, Iterable, List
 
 from rich import print
 
-from .operations import (
-    Operation,
-    ScoreSource,
-    TempScoreSource,
-    ConstantScoreSource,
-    Set,
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulus,
-)
+from .operations import (Add, Divide, Modulus, Multiply, Operation, Set,
+                         Subtract)
+from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
 
 Rule = Callable[[Iterable[Operation]], None]
 
@@ -26,7 +15,6 @@ class Optimizer:
     @classmethod
     def rule(cls, f):
         cls.rules.append(f)
-        return f
 
     @classmethod
     def optimize(cls, nodes: Iterable[Operation]):

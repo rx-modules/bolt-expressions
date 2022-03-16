@@ -1,17 +1,17 @@
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Iterable, Union, List
+from typing import Iterable, List, Union
 
 from beet import Context
 from mecha import Mecha
 from mecha.contrib.bolt import Runtime
-
 from rich import print
 from rich.pretty import pprint
 
-from .operations import ScoreSource, ExpressionNode, Set, Operation
-from .optimizer import Optimizer
 from . import resolver
+from .operations import ExpressionNode, Operation, Set
+from .optimizer import Optimizer
+from .sources import ScoreSource
 
 
 @dataclass

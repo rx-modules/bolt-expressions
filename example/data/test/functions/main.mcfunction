@@ -4,7 +4,7 @@ tellraw @a "Hello World"
 
 Objective = ctx.inject(Scoreboard)
 
-#/ uid = Objective("rx.uid")
+uid = Objective("rx.uid")
 
 uid["@s"] += 10 * (2 * uid["value"] / 10)
 
