@@ -145,12 +145,11 @@ class Operation(ExpressionNode):
         former_nodes = list(self.former.unroll())
         latter_nodes = list(self.latter.unroll())
 
-        temp_var = TempScoreSource.create()
-
         yield from former_nodes[:-1]
         yield from latter_nodes[:-1]
 
         if type(self) is not Set:
+            temp_var = TempScoreSource.create()
             yield Set.create(temp_var, former_nodes.pop())
             yield self.__class__.create(temp_var, latter_nodes.pop())
             yield temp_var
