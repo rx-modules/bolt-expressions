@@ -32,12 +32,14 @@ class Optimizer:
     def optimize(cls, nodes: Iterable[Operation]):
         for rule in cls.rules:
             nodes = rule(nodes)
-        
+
         yield from nodes
+
 
 @Optimizer.rule
 def temp_var_collapsing(nodes: Iterable[Operation]):
     map: Dict[TempScoreSource, TempScoreSource] = {}
+
     def get_replaced(source):
         # get the very last source if they're chained
         replaced = map.get(source)
@@ -55,10 +57,7 @@ def temp_var_collapsing(nodes: Iterable[Operation]):
             map[node.former] = replaced_latter
             # yield peek.__class__(node.latter, peek.latter)
         else:
-            yield node.__class__(
-                get_replaced(node.former),
-                get_replaced(node.latter)
-            )
+            yield node.__class__(get_replaced(node.former), get_replaced(node.latter))
 
 
 @Optimizer.rule
@@ -74,8 +73,9 @@ def constant_to_literal_replacement(nodes: Iterable[Operation]) -> Iterable[Oper
         else:
             yield node
 
+
 @Optimizer.rule
 def print_empty(nodes: Iterable[Operation]) -> Iterable[Operation]:
     for node in nodes:
-       # print()
-       yield node
+        # print()
+        yield node
