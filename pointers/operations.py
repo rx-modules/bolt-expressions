@@ -54,6 +54,12 @@ class ExpressionNode:
     def __rmod__(self, other: "ExpressionNode"):
         # print(f"Modulus {self} by {other}")
         return Modulus.create(other, self)
+    
+    # def set(self, other: "ExpressionNode"):
+    #     ...
+    
+    # def get(self):
+    #     ...
 
     @classmethod
     def create(cls, *args, **kwargs):

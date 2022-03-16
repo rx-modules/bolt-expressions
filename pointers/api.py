@@ -10,7 +10,7 @@ from rich import print
 from rich.pretty import pprint
 
 from .operations import ScoreSource, ExpressionNode, Set, Operation
-
+from . import resolver
 
 @dataclass
 class Scoreboard:
@@ -24,11 +24,11 @@ class Scoreboard:
     def _mc(self) -> Mecha:
         return self.ctx.inject(Mecha)
 
-    def _inject_command(self, cmd: str):
+    def inject_command(self, cmd: str):
         self._runtime.commands.append(self._mc.parse(cmd, using="command"))
 
     def __call__(self, scoreholder):
-        return Score(self.ctx, scoreholder)
+        return Score(self, scoreholder)
 
     def test(self):
         print(self.ctx)
@@ -36,7 +36,7 @@ class Scoreboard:
 
 @dataclass
 class Score:
-    ctx: Context = field(repr=False)
+    ref: Scoreboard = field(repr=False)
     objective: str
 
     def __getitem__(self, scoreholder: str) -> ExpressionNode:
@@ -55,6 +55,11 @@ class Score:
         nodes = list(root.unroll())  # generator, not consumed
         print("\n", "[bold]Unrolled Nodes[/bold]:", sep="")
         pprint(nodes, expand_all=True)
+        print("\n", "[bold]Resolved Cmds[/bold]:", sep="")
+        cmds = list(resolver.resolve(nodes))
+        pprint(cmds, expand_all=True)
+
+        list(map(self.ref.inject_command, cmds))
         # for node in nodes:
         #     pprint(node)  # debug?
 
