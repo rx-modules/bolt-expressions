@@ -112,20 +112,20 @@ class Operation(ExpressionNode):
         return super().create(former, latter)
 
     def unroll(self) -> Iterable["Operation"]:
-        former_nodes = list(self.former.unroll())
-        latter_nodes = list(self.latter.unroll())
+        *former_nodes, former_var = self.former.unroll()
+        *latter_nodes, latter_var = self.latter.unroll()
 
-        temp_var = TempScoreSource.create()
+        current_var = TempScoreSource.create()
 
-        yield from former_nodes[:-1]
-        yield from latter_nodes[:-1]
+        yield from former_nodes
+        yield from latter_nodes
 
         if type(self) is not Set:
-            yield Set.create(temp_var, former_nodes.pop())
-            yield self.__class__.create(temp_var, latter_nodes.pop())
-            yield temp_var
+            yield Set.create(current_var, former_var)
+            yield self.__class__.create(current_var, latter_var)
+            yield current_var
         else:
-            yield Set.create(former_nodes.pop(), latter_nodes.pop())
+            yield Set.create(former_var, latter_var)
 
 
 class Set(Operation):
