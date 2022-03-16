@@ -10,7 +10,9 @@ from rich import print
 from rich.pretty import pprint
 
 from .operations import ScoreSource, ExpressionNode, Set, Operation
+from .optimizer import Optimizer
 from . import resolver
+
 
 @dataclass
 class Scoreboard:
@@ -49,14 +51,10 @@ class Score:
         ...
 
     def resolve(self, root: Operation):
-        print("[bold]Tree[/bold]:")
-        print(root, "\n")
-        print("[bold]Unrolling[/bold]:")
-        nodes = list(root.unroll())  # generator, not consumed
-        print("\n", "[bold]Unrolled Nodes[/bold]:", sep="")
-        pprint(nodes, expand_all=True)
-        print("\n", "[bold]Resolved Cmds[/bold]:", sep="")
-        cmds = list(resolver.resolve(nodes))
+        nodes = root.unroll()
+        optimized = list(Optimizer.optimize(nodes))
+        pprint(optimized)
+        cmds = list(resolver.resolve(optimized))
         pprint(cmds, expand_all=True)
 
         list(map(self.ref.inject_command, cmds))
