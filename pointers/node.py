@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, overload
 
 
 @dataclass(unsafe_hash=True, order=False, eq=False)
@@ -22,5 +22,5 @@ class ExpressionNode:
     def create(cls, *args, **kwargs):
         return cls(*args, **kwargs)
 
-    def unroll(self) -> Iterable["Operation"]:
+    def unroll(self):
         yield self

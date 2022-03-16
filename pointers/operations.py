@@ -105,4 +105,21 @@ class LessThanOrEqualTo(Operation): ...
 
 @ExpressionNode.link("ge")
 class GreaterThanOrEqualTo(Operation): ...
+
+@ExpressionNode.link("abs")
+class Abs(Operation):
+    @classmethod
+    def create(cls, former: GenericValue):
+        return If.create(LessThan.create(former, 0), Multiply.create(former, -1))
+
+# def __neg__(self):
+    #     return Multiply.create(self, -1)
+
+    # def __pos__(self):
+    #     return self
+
+    # def __abs__(self):
+    #     return If.create(LessThan.create(self, 0), Multiply.create(self, -1))
+
+
 # fmt: on

@@ -9,7 +9,8 @@ from rich import print
 from rich.pretty import pprint
 
 from . import resolver
-from .operations import ExpressionNode, Operation, Set
+from .node import ExpressionNode
+from .operations import Operation, Set
 from .optimizer import Optimizer
 from .sources import ScoreSource
 
