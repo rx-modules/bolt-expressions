@@ -45,11 +45,35 @@ class ExpressionNode:
     def __rmod__(self, other: "ExpressionNode"):
         return Modulus.create(other, self)
 
-    # def set(self, other: "ExpressionNode"):
-    #     ...
+    def __neg__(self):
+        return Multiply.create(self, -1)
 
-    # def get(self):
-    #     ...
+    def __pos__(self):
+        return self
+
+    def __abs__(self):
+        return If.create(LessThan.create(self, 0), Multiply.create(self, -1))
+
+    def __eq__(self, other: "ExpressionNode"):
+        return Equal.create(self, other)
+    
+    def __ne__(self, other: "ExpressionNode"):
+        return NotEqual.create(self, other)
+
+    def __lt__(self, other: "ExpressionNode"):
+        return LessThan.create(self, other)
+    
+    def __gt__(self, other: "ExpressionNode"):
+        return GreaterThan.create(self, other)
+    
+    def __le__(self, other: "ExpressionNode"):
+        return LessThanOrEqualTo.create(self, other)
+    
+    def __ge__(self, other: "ExpressionNode"):
+        return GreaterThanOrEqualTo.create(self, other)
+    
+    def __rebind__(self, other: "ExpressionNode"):
+        return Set.create(self, other)
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -92,6 +116,12 @@ class TempScoreSource(ScoreSource):
     @classmethod
     def create(cls):
         return super().create(f"$i{next(cls.infinite)}", "temp")
+
+
+@dataclass(frozen=True)
+class DataSource(Source):
+    target: str
+    path: str  # TODO: pointers >_<
 
 
 @dataclass(frozen=True)
@@ -162,4 +192,32 @@ class Divide(Operation):
 
 
 class Modulus(Operation):
+    ...
+
+
+class If(Operation):
+    ...
+
+
+class Equal(Operation):
+    ...
+
+
+class NotEqual(Operation):
+    ...
+
+
+class LessThan(Operation):
+    ...
+
+
+class GreaterThan(Operation):
+    ...
+
+
+class LessThanOrEqualTo(Operation):
+    ...
+
+
+class GreaterThanOrEqualTo(Operation):
     ...
