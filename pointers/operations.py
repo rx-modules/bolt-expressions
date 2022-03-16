@@ -163,7 +163,13 @@ class Set(Operation):
 
 
 class Add(Operation):
-    ...
+    @classmethod
+    def create(cls, former: GenericValue, latter: GenericValue):
+        if (
+            not isinstance(former, Operation)
+            and isinstance(latter, Operation)
+        ): return super().create(latter, former)
+        return super().create(former, latter)
 
 
 class Subtract(Operation):
@@ -171,7 +177,14 @@ class Subtract(Operation):
 
 
 class Multiply(Operation):
-    ...
+    @classmethod
+    def create(cls, former: GenericValue, latter: GenericValue):
+        if (
+            not isinstance(former, Operation)
+            and isinstance(latter, Operation)
+        ): return super().create(latter, former)
+        return super().create(former, latter)
+
 
 
 class Divide(Operation):
