@@ -51,10 +51,11 @@ class Score:
         ...
 
     def resolve(self, root: Operation):
-        nodes = root.unroll()
+        nodes = list(root.unroll())
+        pprint(nodes)
         optimized = list(Optimizer.optimize(nodes))
         pprint(optimized)
         cmds = list(resolver.resolve(optimized))
-        pprint(cmds, expand_all=True)
+        # pprint(cmds, expand_all=True)
 
         list(map(self.ref.inject_command, cmds))

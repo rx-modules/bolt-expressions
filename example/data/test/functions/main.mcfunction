@@ -5,7 +5,7 @@ Objective = ctx.inject(Scoreboard)
 
 uid = Objective("rx.uid")
 
-uid["@s"] += 10 * (2 * uid["#value"] / (1 + 2 + 3 + 4))
+uid["@s"] += 10 * (2 * uid["#value"] / 10)
 
 # # normal set
 # uid["@s"] = 5

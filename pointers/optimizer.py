@@ -38,30 +38,33 @@ class Optimizer:
 @Optimizer.rule
 def temp_var_collapsing(nodes: Iterable[Operation]):
     map: Dict[TempScoreSource, TempScoreSource] = {}
+    def get_replaced(source):
+        # get the very last source if they're chained
+        replaced = map.get(source)
+        return get_replaced(replaced) if replaced else source
 
     for node in nodes:
-        print("[bold]temp_var_collapsing[/bold]", node)
+        # print("[bold]temp_var_collapsing[/bold]", node)
         if (
             type(node) is Set
             and type(node.former) is TempScoreSource
             and type(node.latter) is TempScoreSource
         ):
-            peek: Operation = next(nodes)  # deletes current node
-            new = peek.__class__(node.latter, peek.latter)
-            print("DELETING", node, "AND", peek, "WITH", new)
-            map[node.former] = node.latter
-            yield new
+            # peek: Operation = next(nodes)  # deletes current node
+            replaced_latter = get_replaced(node.latter)
+            map[node.former] = replaced_latter
+            # yield peek.__class__(node.latter, peek.latter)
         else:
             yield node.__class__(
-                map.get(node.former, node.former),
-                map.get(node.latter, node.latter)
+                get_replaced(node.former),
+                get_replaced(node.latter)
             )
 
 
 @Optimizer.rule
 def constant_to_literal_replacement(nodes: Iterable[Operation]) -> Iterable[Operation]:
     for node in nodes:
-        print("[bold]constant_to_literal_replacement[/bold]", node)
+        # print("[bold]constant_to_literal_replacement[/bold]", node)
         if (
             isinstance(node, (Set, Add, Subtract))
             and type(node.latter) is ConstantScoreSource
@@ -74,5 +77,5 @@ def constant_to_literal_replacement(nodes: Iterable[Operation]) -> Iterable[Oper
 @Optimizer.rule
 def print_empty(nodes: Iterable[Operation]) -> Iterable[Operation]:
     for node in nodes:
-       print()
+       # print()
        yield node
