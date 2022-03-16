@@ -6,6 +6,7 @@ from itertools import count
 
 GenericValue = Union["Operation", "Source", int]
 
+
 @dataclass(frozen=True)
 class ExpressionNode:
     def __add__(self, other: "ExpressionNode"):
@@ -53,7 +54,7 @@ class ExpressionNode:
     def __rmod__(self, other: "ExpressionNode"):
         # print(f"Modulus {self} by {other}")
         return Modulus.create(other, self)
-    
+
     @classmethod
     def create(cls, *args, **kwargs):
         return cls(*args, **kwargs)
@@ -61,9 +62,11 @@ class ExpressionNode:
     def unroll(self) -> Iterable["Operation"]:
         yield self
 
+
 @dataclass(frozen=True)
 class Source(ExpressionNode):
     ...
+
 
 @dataclass(frozen=True)
 class ScoreSource(Source):
@@ -76,10 +79,12 @@ class ScoreSource(Source):
     def __repr__(self):
         return f'"{str(self)}"'
 
+
 class ConstantScoreSource(ScoreSource):
     @classmethod
     def create(cls, value: Union[int, float]):
         return super().create(f"${int(value)}", "constant")
+
 
 class TempScoreSource(ScoreSource):
     @classmethod
@@ -91,6 +96,7 @@ class TempScoreSource(ScoreSource):
     @classmethod
     def create(cls):
         return super().create(f"$i{next(cls.infinite)}", "temp")
+
 
 @dataclass(frozen=True)
 class Operation(ExpressionNode):
