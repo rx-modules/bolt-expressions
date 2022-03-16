@@ -60,21 +60,3 @@ class Score:
         pprint(cmds, expand_all=True)
 
         list(map(self.ref.inject_command, cmds))
-        # for node in nodes:
-        #     pprint(node)  # debug?
-
-    # def __setitem__(self, scoreholder: str, value: Union[ExpressionNode, GenericValue]):
-    #     print(f"Setting {self[scoreholder]} to {value}")
-    #     output = self[scoreholder]
-    #     exp = ExpressionContext("temp", "const", output)
-    #     if isinstance(value, Operation):
-    #         value.resolve(exp)
-    #     elif isinstance(value, int):
-    #         exp.set_literal(output, value)
-    #     elif isinstance(value, ScoreSource):
-    #         exp.operate_score(output, "=", value)
-    #     else:
-    #         raise ValueError(f"Invalid expression argument of type {type(value)}.")
-    #     print("\nGENERATED:")
-    #     for cmd in exp.commands:
-    #         print(cmd)

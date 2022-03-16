@@ -1,7 +1,7 @@
 name: pointers-test
 
 data_pack:
-  load: [src]
+  load: [example]
 
 require:
   - mecha.contrib.bolt
