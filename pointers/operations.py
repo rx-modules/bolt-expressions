@@ -4,6 +4,7 @@ from typing import Iterable, List, Union
 from functools import cache
 from itertools import count
 
+GenericValue = Union["Operation", "Source", int]
 
 @dataclass(frozen=True)
 class ExpressionNode:
@@ -77,8 +78,8 @@ class ScoreSource(Source):
 
 class ConstantScoreSource(ScoreSource):
     @classmethod
-    def create(cls, constant: Union[int, float]):
-        return super().create(f"${int(constant)}", "constant")
+    def create(cls, value: Union[int, float]):
+        return super().create(f"${int(value)}", "constant")
 
 class TempScoreSource(ScoreSource):
     @classmethod
@@ -93,19 +94,17 @@ class TempScoreSource(ScoreSource):
 
 @dataclass(frozen=True)
 class Operation(ExpressionNode):
-    former: Union["Operation", ScoreSource]
-    latter: Union["Operation", ScoreSource, int]
+    former: GenericValue
+    latter: GenericValue
 
     @classmethod
-    def create(cls, former, latter):
+    def create(cls, former: GenericValue, latter: GenericValue):
         """Factory method to create new operations"""
 
         # TODO: int is hardcoded, we need to generate this stuff
         if not isinstance(former, ExpressionNode):
-            print("former", type(former))
             former = ConstantScoreSource.create(former)
         if not isinstance(latter, ExpressionNode):
-            print("latter", type(latter))
             latter = ConstantScoreSource.create(latter)
 
         return super().create(former, latter)
