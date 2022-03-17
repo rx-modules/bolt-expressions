@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Iterable, overload
+from dataclasses import dataclass, field
+from typing import Iterable, overload, Callable, Optional
 
 
 @dataclass(unsafe_hash=True, order=False, eq=False)

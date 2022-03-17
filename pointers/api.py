@@ -5,15 +5,17 @@ from typing import Iterable, List, Union
 from beet import Context
 from mecha import Mecha
 from mecha.contrib.bolt import Runtime
-from rich import print
-from rich.pretty import pprint
 
-from . import resolver
+
 from .node import ExpressionNode
 from .operations import Operation, Set
-from .optimizer import Optimizer
 from .sources import ScoreSource
 
+def minn(arg1: ExpressionNode, arg2: ExpressionNode):
+    return arg1 < arg2
+
+def maxx(arg1: ExpressionNode, arg2: ExpressionNode):
+    return arg1 > arg2
 
 @dataclass
 class Scoreboard:
@@ -31,10 +33,10 @@ class Scoreboard:
         self._runtime.commands.append(self._mc.parse(cmd, using="command"))
 
     def __call__(self, scoreholder):
+        ExpressionNode.inject_command = self.inject_command
+        # self._runtime.expose("minn", min)
+        # self._runtime.expose("maxx", max)
         return Score(self, scoreholder)
-
-    def test(self):
-        print(self.ctx)
 
 
 @dataclass
@@ -46,17 +48,4 @@ class Score:
         return ScoreSource.create(scoreholder, self.objective)
 
     def __setitem__(self, scoreholder: str, value: Operation):
-        self.resolve(Set.create(self[scoreholder], value))
-
-    def optimize(self, nodes: Iterable[Operation]) -> List[Operation]:
-        ...
-
-    def resolve(self, root: Operation):
-        nodes = list(root.unroll())
-        pprint(nodes)
-        optimized = list(Optimizer.optimize(nodes))
-        pprint(optimized)
-        cmds = list(resolver.resolve(optimized))
-        # pprint(cmds, expand_all=True)
-
-        list(map(self.ref.inject_command, cmds))
+        Set.create(self[scoreholder], value).resolve()

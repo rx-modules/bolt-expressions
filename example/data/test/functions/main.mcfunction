@@ -1,23 +1,35 @@
 from pointers import Scoreboard
 
-tellraw @a "Hello World"
+tellraw @a "Smithed"
 
 Objective = ctx.inject(Scoreboard)
 
-uid = Objective("rx.uid")
+# uid = Objective("rx.uid")
 
-uid["@s"] += 10 * (2 * uid["value"] / 10)
+# uid["@s"] += 10 * (2 * uid["value"] / 10)
+
+
+def minn(arg1, arg2):
+    return arg1 < arg2
+
+def maxx(arg1, arg2):
+    return arg1 > arg2
+
+smithed_damage = Objective("smithed.damage")
+
+# smithed_damage["max"] = maxx(smithed_damage["@s"], 10)
 
 # smithed_damage = Objective("smithed.damage")
-# damage = smithed_damage["damage"]
-# toughness = smithed_damage["toughness"]
-# armor = smithed_damage["armor"]
+damage = smithed_damage["damage"]
+toughness = smithed_damage["toughness"]
+armor = smithed_damage["armor"]
 
-# atf = (10 * armor - (400 * damage / (80 + 10 * toughness)))
-# maxxed = max((10 * armor) / 5, atf)
-# damage = damage * (250 - (min(200, maxxed))) / 25
+atf = (10 * armor - (400 * damage / (80 + 10 * toughness)))
+maxxed = maxx((10 * armor) / 5, atf)
+damage = damage * (250 - (minn(200, maxxed))) / 25
 
-# smithed_damage = Objective("smithed.damage")
+smithed_damage = Objective("smithed.damage")
+
 
 # atf = (10 * smithed_damage["armor"] - (400 * smithed_damage["damage"] / (80 + 10 * smithed_damage["toughness"])))
 # maxxed = max((10 * smithed_damage["armor"]) / 5, atf)

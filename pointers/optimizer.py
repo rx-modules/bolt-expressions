@@ -1,23 +1,23 @@
-from typing import Any, Callable, Dict, Iterable, List
+from typing import Any, Callable, Dict, Iterable, List, TYPE_CHECKING
 
 from rich import print
 
-from .operations import (Add, Divide, Modulus, Multiply, Operation, Set,
-                         Subtract)
 from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
+from . import operations as op
 
-Rule = Callable[[Iterable[Operation]], None]
+if TYPE_CHECKING:
+    Rule = Callable[[Iterable[op.Operation]], None]
 
 
 class Optimizer:
-    rules: List[Rule] = []
+    rules: List["Rule"] = []
 
     @classmethod
     def rule(cls, f):
         cls.rules.append(f)
 
     @classmethod
-    def optimize(cls, nodes: Iterable[Operation]):
+    def optimize(cls, nodes: Iterable["op.Operation"]):
         for rule in cls.rules:
             nodes = rule(nodes)
 
@@ -25,7 +25,7 @@ class Optimizer:
 
 
 @Optimizer.rule
-def temp_var_collapsing(nodes: Iterable[Operation]):
+def temp_var_collapsing(nodes: Iterable["op.Operation"]):
     map: Dict[TempScoreSource, TempScoreSource] = {}
 
     def get_replaced(source):
@@ -36,7 +36,7 @@ def temp_var_collapsing(nodes: Iterable[Operation]):
     for node in nodes:
         # print("[bold]temp_var_collapsing[/bold]", node)
         if (
-            type(node) is Set
+            type(node) is op.Set
             and type(node.former) is TempScoreSource
             and type(node.latter) is TempScoreSource
         ):
@@ -49,11 +49,11 @@ def temp_var_collapsing(nodes: Iterable[Operation]):
 
 
 @Optimizer.rule
-def constant_to_literal_replacement(nodes: Iterable[Operation]) -> Iterable[Operation]:
+def constant_to_literal_replacement(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
     for node in nodes:
         # print("[bold]constant_to_literal_replacement[/bold]", node)
         if (
-            isinstance(node, (Set, Add, Subtract))
+            isinstance(node, (op.Set, op.Add, op.Subtract))
             and type(node.latter) is ConstantScoreSource
         ):
             literal = node.latter.scoreholder[1:]
@@ -63,7 +63,7 @@ def constant_to_literal_replacement(nodes: Iterable[Operation]) -> Iterable[Oper
 
 
 @Optimizer.rule
-def print_empty(nodes: Iterable[Operation]) -> Iterable[Operation]:
+def print_empty(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
     for node in nodes:
         # print()
         yield node

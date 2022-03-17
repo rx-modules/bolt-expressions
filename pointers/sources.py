@@ -4,6 +4,7 @@ from itertools import count
 from typing import Union
 
 from .node import ExpressionNode
+from . import operations as op
 
 
 class Source(ExpressionNode): ...
@@ -13,6 +14,9 @@ class Source(ExpressionNode): ...
 class ScoreSource(Source):
     scoreholder: str
     objective: str
+
+    def __rebind__(self, other: ExpressionNode):
+        op.Set.create(self, other).resolve()
 
     def __str__(self):
         return f"{self.scoreholder} {self.objective}"
