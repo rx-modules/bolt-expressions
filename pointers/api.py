@@ -34,8 +34,8 @@ class Scoreboard:
 
     def __call__(self, scoreholder):
         ExpressionNode.inject_command = self.inject_command
-        # self._runtime.expose("minn", min)
-        # self._runtime.expose("maxx", max)
+        self._runtime.expose("minn", min)
+        self._runtime.expose("maxx", max)
         return Score(self, scoreholder)
 
 

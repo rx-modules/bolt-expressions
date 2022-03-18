@@ -1,7 +1,10 @@
-from typing import Any, Callable, Dict, Iterable, List, TYPE_CHECKING
+from typing import Any, Callable, Dict, Generator, Iterable, List, TYPE_CHECKING, TypeVar, Union
 
 from rich import print
 from rich.pretty import pprint
+
+from itertools import chain
+from functools import wraps
 
 from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
 from . import operations as op
@@ -9,15 +12,49 @@ from . import operations as op
 if TYPE_CHECKING:
     Rule = Callable[[Iterable[op.Operation]], None]
 
+T = TypeVar("T")
+
+DefaultValue = object()
+
+class SmartGenerator(Generator):
+    def __init__(self, gen):
+        self._gen: Generator[T] = gen
+
+    def __iter__(self):
+        self._pre: List[T] = []
+        return self
+    
+    def __next__(self) -> T:
+        if self._pre:
+            return self._pre.pop()
+        
+        return next(self._values)  # raises StopIteration for us
+    
+    def __call__(self, values) -> Iterable[T]:
+        self._values: Iterable[T] = self._gen(values)
+        return self
+    
+    def push(self, val: T):
+        self._pre.append(val)
+    
+    def send(self, val: T):
+        return self._gen.send(val)
+    
+    def throw(self, val: T):
+        raise self._gen.throw(val)
+
+
 class Optimizer:
     rules: List["Rule"] = []
 
     @classmethod
-    def rule(cls, f):
-        cls.rules.append(f)
+    def rule(cls, f: Iterable["op.Operation"]):
+        cls.rules.append(SmartGenerator(f))
 
     @classmethod
     def optimize(cls, nodes: Iterable["op.Operation"]):
+        nodes = (node for node in nodes) # temp
+
         for rule in cls.rules:
             nodes = rule(nodes)
 
@@ -74,30 +111,59 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
 
         scoreboard players operation $i0 temp += $i1 temp
     """
-    collapsed_last = False
-    prev_node = next(nodes)
     for node in nodes:
-        #print(f"\nPrevious node is {prev_node}")
-        #print(f"Current nodes is {node}")
+        next_node: Union["op.Operation", None] = next(nodes, None)
+        print("node", node)
+        print("next_node", next_node)
+
         if (
-            type(prev_node) in (op.Add, op.Multiply)
-            and type(node) is op.Set
-            and prev_node.former == node.latter
-            and prev_node.latter == node.former
+            type(node) in (op.Add, op.Multiply)
+            and type(next_node) is op.Set
+            and node.former == next_node.latter
+            and node.latter == next_node.former
         ):
-            #print("Commutative set collapsing matched!")
-            yield prev_node.__class__(
-                node.former, node.latter
+            out = node.__class__(
+                next_node.former, next_node.latter
             )
-            collapsed_last = True
+            print("new", out)
+            yield out
         else:
-            yield prev_node
-            collapsed_last = False
-        prev_node = node
-    # If not collapsed in the last loop: yield last node
-    if not collapsed_last: yield prev_node
+            print("old", node)
+            nodes.push(next_node)
+            yield node
+
+# @Optimizer.rule
+def set_to_self_removal(nodes: Iterable["op.Operation"]):
+    """ Removes Set operations that have the same former and latter source"""
+    for node in nodes:
+        if type(node) is op.Set:
+            if node.former != node.latter: yield node
+        else:
+            yield node
+            
+
+# Optimizer.rule
+def constant_to_literal_replacement(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
+    for node in nodes:
+        # print("[bold]constant_to_literal_replacement[/bold]", node)
+        if (
+            isinstance(node, (op.Set, op.Add, op.Subtract))
+            and type(node.latter) is ConstantScoreSource
+        ):
+            literal = node.latter.scoreholder[1:]
+            yield node.__class__(node.former, int(literal))
+        else:
+            yield node
+
 
 @Optimizer.rule
+def print_node(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
+    for node in nodes:
+        print("end", node)
+        print()
+        yield node
+
+# @Optimizer.rule
 def output_score_replacement(nodes: Iterable["op.Operation"]):
     """
         Replace the outermost temp score by the output score.
@@ -128,33 +194,3 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
                 replace(node.latter)
             )
     else: yield from all_nodes
-
-@Optimizer.rule
-def set_to_self_removal(nodes: Iterable["op.Operation"]):
-    """ Removes Set operations that have the same former and latter source"""
-    for node in nodes:
-        if type(node) is op.Set:
-            if node.former != node.latter: yield node
-        else:
-            yield node
-            
-
-@Optimizer.rule
-def constant_to_literal_replacement(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
-    for node in nodes:
-        # print("[bold]constant_to_literal_replacement[/bold]", node)
-        if (
-            isinstance(node, (op.Set, op.Add, op.Subtract))
-            and type(node.latter) is ConstantScoreSource
-        ):
-            literal = node.latter.scoreholder[1:]
-            yield node.__class__(node.former, int(literal))
-        else:
-            yield node
-
-
-@Optimizer.rule
-def print_empty(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
-    for node in nodes:
-        # print()
-        yield node
