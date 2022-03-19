@@ -56,8 +56,7 @@ class Set(Operation):
         list(map(self.inject_command, cmds))
 
 
-@ExpressionNode.link("add")
-@ExpressionNode.link("radd", reverse=True)
+@ExpressionNode.link("add", reverse=True)
 class Add(Operation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
@@ -66,13 +65,11 @@ class Add(Operation):
         return super().create(former, latter)
 
 
-@ExpressionNode.link("sub")
-@ExpressionNode.link("rsub", reverse=True)
+@ExpressionNode.link("sub", reverse=True)
 class Subtract(Operation): ...
 
 
-@ExpressionNode.link("mul")
-@ExpressionNode.link("rmul", reverse=True)
+@ExpressionNode.link("mul", reverse=True)
 class Multiply(Operation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
@@ -81,13 +78,11 @@ class Multiply(Operation):
         return super().create(former, latter)
 
 
-@ExpressionNode.link("truediv")
-@ExpressionNode.link("rtruediv", reverse=True)
+@ExpressionNode.link("truediv", reverse=True)
 class Divide(Operation): ...
 
 
-@ExpressionNode.link("mod")
-@ExpressionNode.link("rmod", reverse=True)
+@ExpressionNode.link("mod", reverse=True)
 class Modulus(Operation): ...
 
 

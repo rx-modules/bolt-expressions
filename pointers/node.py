@@ -13,7 +13,8 @@ class ExpressionNode:
             def reversed(self, other: "ExpressionNode"):
                 return operation_class.create(other, self)
 
-            setattr(cls, f"__{magic_method}__", normal if not reverse else reversed)
+            setattr(cls, f"__{magic_method}__", normal)
+            if reverse: setattr(cls, f"__r{magic_method}__", reversed)
             return operation_class
 
         return decorator
