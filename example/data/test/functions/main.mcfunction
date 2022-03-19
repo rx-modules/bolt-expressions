@@ -19,6 +19,10 @@ abc = Objective("abc.main")
 #abc["@s"] = 2 + 3 * (4 * (abc["@s"] + abc["#val"]))
 
 
+#abc["#value"] = 2 + (5 * abc["#value"]) / 2
+#abc["#value"] -= (1 + abc["@s"])
+
+abc["@s"] *= abc["@s"]
 
 #abc["@s"] *= abc["@s"]
 
@@ -32,7 +36,7 @@ abc = Objective("abc.main")
 #abc["@s"] -= abc["#val"] + 1
 
 # Also here (Accidentaly heh)
-abc["@s"] *= abc["@s"]
+#abc["@s"] *= abc["@s"]
 
 # Here it falls back to Commutative set collapsing
 #abc["@s"] *= (abc["@s"] + 1)

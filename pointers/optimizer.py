@@ -35,7 +35,7 @@ class SmartGenerator(Generator):
         return self
     
     def push(self, val: T):
-        self._pre.append(val)
+        if val != None: self._pre.append(val)
     
     def send(self, val: T):
         return self._gen.send(val)
@@ -83,7 +83,7 @@ def temp_var_collapsing(nodes: Iterable["op.Operation"]):
         else:
             yield node.__class__(get_replaced(node.former), get_replaced(node.latter))
 
-#@Optimizer.rule
+@Optimizer.rule
 def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
     """
         For noncommutative operations:
@@ -96,8 +96,30 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
 
         scoreboard players operation @s rx.uid -= $i0 temp
 
+        Examples:
+        abc["#value"] -= (1 + abc["@s"])
+        abc["@s"] *= abc["@s"]
+
     """
-    ...
+    for node in nodes:
+        next_node = next(nodes, None)
+        further_node = next(nodes, None)
+        if (
+            type(node) is op.Set
+            and type(next_node) is not op.Set
+            and type(further_node) is op.Set
+            and node.latter == further_node.former
+            and node.former == next_node.former
+            and node.former == further_node.latter
+        ):
+            out = next_node.__class__(
+                further_node.former, next_node.latter
+            )
+            yield out
+        else:
+            nodes.push(further_node)
+            nodes.push(next_node)
+            yield node
 
 @Optimizer.rule
 def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
@@ -113,8 +135,8 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
     """
     for node in nodes:
         next_node: Union["op.Operation", None] = next(nodes, None)
-        print("node", node)
-        print("next_node", next_node)
+        #print("node", node)
+        #print("next_node", next_node)
 
         if (
             type(node) in (op.Add, op.Multiply)
@@ -125,24 +147,14 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
             out = node.__class__(
                 next_node.former, next_node.latter
             )
-            print("new", out)
+            #print("new", out)
             yield out
         else:
-            print("old", node)
+            #print("old", node)
             nodes.push(next_node)
             yield node
 
-# @Optimizer.rule
-def set_to_self_removal(nodes: Iterable["op.Operation"]):
-    """ Removes Set operations that have the same former and latter source"""
-    for node in nodes:
-        if type(node) is op.Set:
-            if node.former != node.latter: yield node
-        else:
-            yield node
-            
-
-# Optimizer.rule
+@Optimizer.rule
 def constant_to_literal_replacement(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
     for node in nodes:
         # print("[bold]constant_to_literal_replacement[/bold]", node)
@@ -155,15 +167,14 @@ def constant_to_literal_replacement(nodes: Iterable["op.Operation"]) -> Iterable
         else:
             yield node
 
-
-@Optimizer.rule
+#@Optimizer.rule
 def print_node(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
     for node in nodes:
         print("end", node)
         print()
         yield node
 
-# @Optimizer.rule
+@Optimizer.rule
 def output_score_replacement(nodes: Iterable["op.Operation"]):
     """
         Replace the outermost temp score by the output score.
@@ -194,3 +205,16 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
                 replace(node.latter)
             )
     else: yield from all_nodes
+
+@Optimizer.rule
+def set_to_self_removal(nodes: Iterable["op.Operation"]):
+    """
+        Removes Set operations that have the same former and latter source.
+        Should run after "output_score_replacement" is applied to clean up
+        all the reduntant Sets created by the previous rule.
+    """
+    for node in nodes:
+        if type(node) is op.Set:
+            if node.former != node.latter: yield node
+        else:
+            yield node
