@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from functools import cache
 from itertools import count
-from typing import Union
+from typing import Callable, Union
 
 from .node import ExpressionNode
-from . import operations as op
 
 
 class Source(ExpressionNode): ...
@@ -15,8 +14,12 @@ class ScoreSource(Source):
     scoreholder: str
     objective: str
 
+    @classmethod
+    def on_rebind(cls, callback: Callable):
+        setattr(cls, '_rebind', callback)
+    
     def __rebind__(self, other: ExpressionNode):
-        op.Set.create(self, other).resolve()
+        self._rebind(self, other)
         return self
 
     def __str__(self):

@@ -4,8 +4,6 @@ from rich import print
 from rich.pretty import pprint
 from .node import ExpressionNode
 from .sources import ConstantScoreSource, Source, TempScoreSource
-from . import resolver
-from .optimizer import Optimizer
 GenericValue = Union["Operation", "Source", int]
 
 
@@ -45,15 +43,12 @@ class Operation(ExpressionNode):
 # fmt: off
 # @ExpressionNode.link("rebind")
 class Set(Operation):
+    @classmethod
+    def on_resolve(cls, callback: Callable):
+        setattr(cls, '_resolve', callback)
+    
     def resolve(self):
-        nodes = list(self.unroll())
-        pprint(nodes)
-        optimized = list(Optimizer.optimize(nodes))
-        pprint(optimized)
-        cmds = list(resolver.resolve(optimized))
-        # pprint(cmds, expand_all=True)
-
-        list(map(self.inject_command, cmds))
+        return self._resolve(self)
 
 
 @ExpressionNode.link("add", reverse=True)
