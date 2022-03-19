@@ -49,3 +49,6 @@ class Score:
 
     def __setitem__(self, scoreholder: str, value: Operation):
         Set.create(self[scoreholder], value).resolve()
+    
+    def __str__(self):
+        return self.objective
