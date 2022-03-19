@@ -17,6 +17,7 @@ class ScoreSource(Source):
 
     def __rebind__(self, other: ExpressionNode):
         op.Set.create(self, other).resolve()
+        return self
 
     def __str__(self):
         return f"{self.scoreholder} {self.objective}"
