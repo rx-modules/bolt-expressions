@@ -10,3 +10,7 @@ pipeline:
   - mecha
 
 output: dist
+
+meta:
+  temp_objective: boltexp.temp
+  const_objective: boltexp.const

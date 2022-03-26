@@ -30,12 +30,22 @@ class ScoreSource(Source):
 
 
 class ConstantScoreSource(ScoreSource):
+    objective: str = "const"
+
+    @classmethod
+    def on_created(cls, callback: Callable):
+        setattr(cls, '_created', callback)
+
     @classmethod
     def create(cls, value: Union[int, float]):
-        return super().create(f"${int(value)}", "constant")
+        node = super().create(f"${int(value)}", cls.objective)
+        cls._created(node)
+        return node
 
 
 class TempScoreSource(ScoreSource):
+    objective: str = "temp"
+
     @classmethod
     @property
     @cache
@@ -44,7 +54,7 @@ class TempScoreSource(ScoreSource):
 
     @classmethod
     def create(cls):
-        return super().create(f"$i{next(cls.infinite)}", "temp")
+        return super().create(f"$i{next(cls.infinite)}", cls.objective)
 
 
 @dataclass(unsafe_hash=False, order=False)
