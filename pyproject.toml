@@ -36,8 +36,8 @@ pytest-insta = "^0.1.11"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "tests bolt_expressions --doctest-modules"
-doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
+addopts = "tests"
+# doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
 
 [tool.black]
 target-version = ["py310"]

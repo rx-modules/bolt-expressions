@@ -5,13 +5,14 @@ from typing import Iterable, List, Union
 from beet import Context
 from mecha import Mecha
 from mecha.contrib.bolt import Runtime
-# from rich.pretty import pprint
 
 from . import resolver
 from .node import ExpressionNode
 from .operations import Operation, Set
 from .optimizer import Optimizer
 from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
+
+# from rich.pretty import pprint
 
 
 def minn(arg1: ExpressionNode, arg2: ExpressionNode):
