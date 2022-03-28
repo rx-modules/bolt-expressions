@@ -12,11 +12,11 @@
   "python.linting.pylamaEnabled": false,
   "[python]": {
     "editor.tabSize": 4,
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "editor.formatOnType": false,
     "editor.formatOnPaste": false,
     "editor.codeActionsOnSave": {
-      "source.organizeImports": true
+      "source.organizeImports": false
     }
   }
 }
