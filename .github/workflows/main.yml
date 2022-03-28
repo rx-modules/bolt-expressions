@@ -42,7 +42,7 @@ jobs:
         run: poetry run black --check bolt_expressions examples tests
       - name: Release
         if: |
-          github.repository == 'rx-modules/bolt_expressions'
+          github.repository == 'rx-modules/bolt-expressions'
           && github.event_name == 'push'
           && github.ref == 'refs/heads/main'
         env:
