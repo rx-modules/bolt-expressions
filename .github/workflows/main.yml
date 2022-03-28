@@ -36,13 +36,13 @@ jobs:
         run: poetry install
       - name: Run tests
         run: poetry run pytest -v
-      - name: Run type-checking
-        run: npm run check
+      # - name: Run type-checking
+      #   run: npm run check
       - name: Check formatting
-        run: poetry run black --check FIXME examples tests
+        run: poetry run black --check bolt_expressions examples tests
       - name: Release
         if: |
-          github.repository == 'FIXME/FIXME'
+          github.repository == 'rx-modules/bolt_expressions'
           && github.event_name == 'push'
           && github.ref == 'refs/heads/main'
         env:
