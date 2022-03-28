@@ -8,20 +8,9 @@ from mecha.contrib.bolt import Runtime
 
 from . import resolver
 from .node import ExpressionNode
-from .operations import Operation, Set
+from .operations import Operation, Set, wrapped_min, wrapped_max
 from .optimizer import Optimizer
 from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
-
-# from rich.pretty import pprint
-
-
-def minn(arg1: ExpressionNode, arg2: ExpressionNode):
-    return arg1 < arg2
-
-
-def maxx(arg1: ExpressionNode, arg2: ExpressionNode):
-    return arg1 > arg2
-
 
 @dataclass
 class Scoreboard:
@@ -49,8 +38,8 @@ class Scoreboard:
         return self.ctx.inject(Mecha)
 
     def __post_init__(self):
-        self._runtime.expose("min", min)
-        self._runtime.expose("max", max)
+        self._runtime.expose("min", wrapped_min)
+        self._runtime.expose("max", wrapped_max)
         Set.on_resolve(self.resolve)
         ScoreSource.on_rebind(self.set_score)
         ConstantScoreSource.on_created(self.add_constant)

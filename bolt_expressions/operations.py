@@ -11,7 +11,19 @@ GenericValue = Union["Operation", "Source", int]
 
 
 def wrapped_min(*args, **kwargs):
-    ...
+    if isinstance(args[0], ExpressionNode):
+        return args[0].__min__(args[1])
+    elif isinstance(args[1], ExpressionNode):
+        return args[0].__rmin__(args[1])
+    return min(*args, *kwargs)
+
+
+def wrapped_max(*args, **kwargs):
+    if isinstance(args[0], ExpressionNode):
+        return args[0].__max__(args[1])
+    elif isinstance(args[1], ExpressionNode):
+        return args[0].__rmax__(args[1])
+    return min(*args, *kwargs)
 
 
 @dataclass(unsafe_hash=False, order=False)
@@ -87,10 +99,10 @@ class Divide(Operation): ...
 @ExpressionNode.link("mod", reverse=True)
 class Modulus(Operation): ...
 
-@ExpressionNode.link("min")
+@ExpressionNode.link("min", reverse=True)
 class Min(Operation): ...
 
-@ExpressionNode.link("max")
+@ExpressionNode.link("max", reverse=True)
 class Max(Operation): ...
 
 @ExpressionNode.link("if")

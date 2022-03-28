@@ -1,0 +1,16 @@
+name: bolt-expressions-minmax
+
+data_pack:
+  load: [src]
+
+require:
+  - mecha.contrib.bolt
+
+pipeline:
+  - mecha
+
+output: dist
+
+meta:
+  temp_objective: boltexp.temp
+  const_objective: boltexp.const

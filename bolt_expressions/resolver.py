@@ -17,8 +17,8 @@ def get_templates() -> Dict[str, str]:
         "multiply:score": "scoreboard players operation {former} *= {latter}",
         "divide:score": "scoreboard players operation {former} /= {latter}",
         "modulus:score": "scoreboard players operation {former} %= {latter}",
-        "greaterthan:score": "scoreboard players operation {former} > {latter}",
-        "lessthan:score": "scoreboard players operation {former} < {latter}",
+        "min:score": "scoreboard players operation {former} < {latter}",
+        "max:score": "scoreboard players operation {former} > {latter}",
     }
 
 
