@@ -15,7 +15,7 @@ def wrapped_min(*args, **kwargs):
     if isinstance(args[0], ExpressionNode):
         return args[0].__min__(args[1])
     elif isinstance(args[1], ExpressionNode):
-        return args[0].__rmin__(args[1])
+        return args[1].__rmin__(args[0])
     return min(*args, *kwargs)
 
 
@@ -23,7 +23,7 @@ def wrapped_max(*args, **kwargs):
     if isinstance(args[0], ExpressionNode):
         return args[0].__max__(args[1])
     elif isinstance(args[1], ExpressionNode):
-        return args[0].__rmax__(args[1])
+        return args[1].__rmax__(args[0])
     return min(*args, *kwargs)
 
 
