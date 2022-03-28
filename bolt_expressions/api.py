@@ -5,12 +5,66 @@ from typing import Iterable, List, Union
 from beet import Context
 from mecha import Mecha
 from mecha.contrib.bolt import Runtime
+from pydantic import BaseModel
 
 from . import resolver
 from .node import ExpressionNode
-from .operations import Operation, Set, wrapped_max, wrapped_min
+from .operations import GenericValue, Operation, Set, wrapped_max, wrapped_min
+
+
 from .optimizer import Optimizer
-from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
+from .sources import ConstantScoreSource, ScoreSource, Source, TempScoreSource
+
+
+class ExpressionOptions(BaseModel):
+    """Bolt Expressions Options"""
+
+    temp_objective: str = "bolt.expr.temp"
+    const_objective: str = "bolt.expr.const"
+
+
+@dataclass
+class Expression:
+    ctx: Context
+
+    def __post_init__(self):
+        if not self.activated:
+            self.opts = self.ctx.validate("bolt_expressions", ExpressionOptions)
+            self._runtime.expose("min", wrapped_min)
+            self._runtime.expose("max", wrapped_max)
+            self.activated = True
+
+        Set.on_resolve(self.resolve)
+        TempScoreSource.objective = self.opts.temp_objective
+        ConstantScoreSource.objective = self.opts.const_objective
+
+    @cached_property
+    def _runtime(self) -> Runtime:
+        return self.ctx.inject(Runtime)
+
+    @cached_property
+    def _mc(self) -> Mecha:
+        return self.ctx.inject(Mecha)
+
+    def _inject_command(self, cmd: str):
+        self._runtime.commands.append(self._mc.parse(cmd, using="command"))
+
+    def resolve(self, value: Operation):
+        nodes = list(value.unroll())
+        # pprint(nodes)
+        optimized = list(Optimizer.optimize(nodes))
+        # pprint(optimized)
+        cmds = list(resolver.resolve(optimized))
+        # pprint(cmds, expand_all=True)
+        for cmd in cmds:
+            self._inject_command(cmd)
+
+    def set(self, source: Source, value: GenericValue):
+        Set.create(source, value).resolve()
+
+    def objective(self, name: str):
+        """Get a Score instance through the Scoreboard API"""
+        return self.ctx.inject(Scoreboard)(name)
 
 
 @dataclass
@@ -31,47 +85,15 @@ class Scoreboard:
     ctx: Context
     runtime_exposed: bool = False
 
-    @cached_property
-    def _runtime(self) -> Runtime:
-        return self.ctx.inject(Runtime)
-
-    @cached_property
-    def _mc(self) -> Mecha:
-        return self.ctx.inject(Mecha)
-
     def __post_init__(self):
-        if not self.runtime_exposed:
-            self._runtime.expose("min", wrapped_min)
-            self._runtime.expose("max", wrapped_max)
-            self.runtime_exposed = True
-
-        Set.on_resolve(self.resolve)
-        ScoreSource.on_rebind(self.set_score)
-        ConstantScoreSource.on_created(self.add_constant)
-        if temp_obj := self.ctx.meta.get("temp_objective"):
-            TempScoreSource.objective = temp_obj
-        if const_obj := self.ctx.meta.get("const_objective"):
-            ConstantScoreSource.objective = const_obj
-
-    def inject_command(self, cmd: str):
-        self._runtime.commands.append(self._mc.parse(cmd, using="command"))
+        self._expr = self.ctx.inject(Expression)
 
     def add_constant(self, node: ConstantScoreSource):
         path = self.ctx.generate.path("init_expressions")
         # TODO append scoreboard set command to function path
 
-    def resolve(self, value: Operation):
-        nodes = list(value.unroll())
-        # pprint(nodes)
-        optimized = list(Optimizer.optimize(nodes))
-        # pprint(optimized)
-        cmds = list(resolver.resolve(optimized))
-        # pprint(cmds, expand_all=True)
-        for cmd in cmds:
-            self.inject_command(cmd)
-
-    def set_score(self, score: ScoreSource, value: ExpressionNode):
-        Set.create(score, value).resolve()
+    def set_score(self, score: ScoreSource, value: GenericValue):
+        return self._expr.set(score, value)
 
     def __call__(self, objective: str):
         return Score(self, objective)
@@ -82,7 +104,7 @@ class Score:
     ref: Scoreboard = field(repr=False)
     objective: str
 
-    def __getitem__(self, scoreholder: str) -> ExpressionNode:
+    def __getitem__(self, scoreholder: str) -> ScoreSource:
         return ScoreSource.create(scoreholder, self.objective)
 
     def __setitem__(self, scoreholder: str, value: Operation):
