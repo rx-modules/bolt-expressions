@@ -1,7 +1,7 @@
-name: beet-expressions-test
+name: bolt-expressions-basic
 
 data_pack:
-  load: [example]
+  load: [src]
 
 require:
   - mecha.contrib.bolt

@@ -30,11 +30,11 @@ class SmartGenerator(Generator):
     """Implements `.push(val)` which allows you to 'prepend' values to a generator.
     Allows you to peek values in the future, and return them to be consumed later.
 
-    >>> gen = SmartGenerator(i for i in range(10))
-    >>> val = next(gen)
-    >>> gen.push(val)
-    >>> next(gen)
-    0
+    # >>> gen = SmartGenerator(i for i in range(10))
+    # >>> val = next(gen)
+    # >>> gen.push(val)
+    # >>> next(gen)
+    # 0
     """
 
     def __init__(self, gen):
@@ -127,18 +127,20 @@ def temp_var_collapsing(nodes: Iterable["op.Operation"]):
 @Optimizer.rule
 def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
     """For noncommutative operations:
-
+    ```
     scoreboard players operation $i1 temp = @s rx.uid
     scoreboard players operation $i1 temp -= $i0 temp
     scoreboard players operation @s rx.uid = $i1 temp
+    ```
 
-    Becomes:
-
+    ->
+    ```
     scoreboard players operation @s rx.uid -= $i0 temp
+    ```
 
-    Examples:
-    abc["#value"] -= (1 + abc["@s"])
-    abc["@s"] *= abc["@s"]
+    Examples to try:
+    >>> abc["#value"] -= (1 + abc["@s"])    # doctest: +SKIP
+    >>> abc["@s"] *= abc["@s"]              # doctest: +SKIP
     """
     for node in nodes:
         next_node = next(nodes, None)
@@ -162,13 +164,14 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
 @Optimizer.rule
 def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
     """For commutative operations:
-
+    ```
     scoreboard players operation $i1 temp += $i0 temp
     scoreboard players operation $i0 temp = $i1 temp
-
+    ```
     Becomes:
-
+    ```
     scoreboard players operation $i0 temp += $i1 temp
+    ```
     """
     for node in nodes:
         next_node: Union["op.Operation", None] = next(nodes, None)

@@ -28,14 +28,14 @@ class Scoreboard:
     """API for manipulating scoreboards.
 
     To use, inject the current `Context` and construct an `Score` instance.
-    >>> Objective = ctx.inject(Scoreboard)
-    >>> my_obj = Objective["my_obj"]
+    >>> Objective = ctx.inject(Scoreboard)  # doctest: +SKIP
+    >>> my_obj = Objective["my_obj"]        # doctest: +SKIP
 
     Now you can perform the API manipulation via the operators:
-    >>> my_obj["@s"] += 10
-    >>> my_obj["temp"] = my_obj["@s"] * 10
-    >>> player = my_obj["@s"]
-    >>> player += 10 * my_obj["temp"]
+    >>> my_obj["@s"] += 10                  # doctest: +SKIP
+    >>> my_obj["temp"] = my_obj["@s"] * 10  # doctest: +SKIP
+    >>> player = my_obj["@s"]               # doctest: +SKIP
+    >>> player += 10 * my_obj["temp"]       # doctest: +SKIP
     """
 
     ctx: Context

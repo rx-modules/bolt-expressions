@@ -6,9 +6,9 @@ from typing import Callable, Union
 from .node import ExpressionNode
 
 
-class Source(ExpressionNode):
-    ...
-
+# fmt: off
+class Source(ExpressionNode): ...
+# fmt: on
 
 @dataclass(unsafe_hash=True, order=False)
 class ScoreSource(Source):

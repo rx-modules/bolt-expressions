@@ -31,12 +31,15 @@ black = "^22.1.0"
 isort = "^5.10.1"
 python-semantic-release = "^7.27.0"
 mudkip = ">=0.5.1"
-pytest-insta = "^0.1.11"
+pytest-insta = ">=0.1.11"
 
+
+[tool.poetry.plugins.pytest11]
+bolt_expressions = "beet.pytest_plugin"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "tests"
+addopts = "tests bolt_expressions"# --doctest-modules"
 # doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
 
 [tool.black]

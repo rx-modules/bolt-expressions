@@ -1,10 +1,9 @@
 from bolt_expressions import Scoreboard
 
-tellraw @a "Smithed"
-
 Objective = ctx.inject(Scoreboard)
-
 abc = Objective("abc.main")
+
+abc["@s"] += 10
 
 # "output_score_replacement" ignores the first line
 # scoreboard players operation $i0 temp = @s abc.main
