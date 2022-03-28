@@ -1,8 +1,4 @@
-from bolt_expressions import Scoreboard, wrapped_min, wrapped_max
-
-#/ TEMP SOLUTION
-min = wrapped_min
-max = wrapped_max
+from bolt_expressions import Scoreboard
 
 Objective = ctx.inject(Scoreboard)
 abc = Objective("abc.main")

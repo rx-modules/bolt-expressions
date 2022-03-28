@@ -1,6 +1,6 @@
 __version__ = "0.2.0"
 
 from .api import Scoreboard
-from .operations import wrapped_max, wrapped_min
+from .plugin import beet_default
 
-__all__ = ["Scoreboard", "wrapped_min", "wrapped_max"]
+__all__ = ["Scoreboard", "beet_default"]
