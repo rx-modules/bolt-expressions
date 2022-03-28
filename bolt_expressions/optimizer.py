@@ -8,6 +8,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Optional,
     TypeVar,
     Union,
 )
@@ -31,11 +32,11 @@ class SmartGenerator(Generator):
     """Implements `.push(val)` which allows you to 'prepend' values to a generator.
     Allows you to peek values in the future, and return them to be consumed later.
 
-    # >>> gen = SmartGenerator(i for i in range(10))
-    # >>> val = next(gen)
-    # >>> gen.push(val)
-    # >>> next(gen)
-    # 0
+    >>> gen = SmartGenerator(i for i in range(10))
+    >>> val = next(gen)
+    >>> gen.push(val)
+    >>> next(gen)
+    0
     """
 
     def __init__(self, gen):
@@ -213,8 +214,7 @@ def constant_to_literal_replacement(
 @Optimizer.rule
 def output_score_replacement(nodes: Iterable["op.Operation"]):
     """Replace the outermost temp score by the output score.
-    If expression tree uses the output score, this rule
-    won't be applied.
+    If expression tree uses the output score, this rule won't be applied.
     """
     all_nodes = list(nodes)
     # print("[bold]Applying output score replacement on tree:[/bold]")
