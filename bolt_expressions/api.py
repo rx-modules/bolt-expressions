@@ -26,6 +26,7 @@ class ExpressionOptions(BaseModel):
 @dataclass
 class Expression:
     ctx: Context
+    activated: bool = False
 
     def __post_init__(self):
         if not self.activated:
@@ -83,10 +84,10 @@ class Scoreboard:
     """
 
     ctx: Context
-    runtime_exposed: bool = False
 
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
+        ConstantScoreSource.on_created(self.add_constant)
 
     def add_constant(self, node: ConstantScoreSource):
         path = self.ctx.generate.path("init_expressions")
