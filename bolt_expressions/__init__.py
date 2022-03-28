@@ -1,4 +1,4 @@
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .api import Scoreboard
 from .operations import wrapped_max, wrapped_min
