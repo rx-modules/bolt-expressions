@@ -60,13 +60,11 @@ class Operation(ExpressionNode):
             yield Set.create(former_var, latter_var)
 
 
-# fmt: off
-# @ExpressionNode.link("rebind")
 class Set(Operation):
     @classmethod
     def on_resolve(cls, callback: Callable):
         cls._resolve = callback
-    
+
     def resolve(self):
         return self._resolve(self)
 
@@ -81,7 +79,8 @@ class Add(Operation):
 
 
 @ExpressionNode.link("sub", reverse=True)
-class Subtract(Operation): ...
+class Subtract(Operation):
+    ...  # fmt: skip
 
 
 @ExpressionNode.link("mul", reverse=True)
@@ -94,50 +93,64 @@ class Multiply(Operation):
 
 
 @ExpressionNode.link("truediv", reverse=True)
-class Divide(Operation): ...
+class Divide(Operation):
+    ...
 
 
 @ExpressionNode.link("mod", reverse=True)
-class Modulus(Operation): ...
+class Modulus(Operation):
+    ...
+
 
 @ExpressionNode.link("min", reverse=True)
-class Min(Operation): ...
+class Min(Operation):
+    ...
+
 
 @ExpressionNode.link("max", reverse=True)
-class Max(Operation): ...
+class Max(Operation):
+    ...
+
 
 @ExpressionNode.link("if")
-class If(Operation): ...
+class If(Operation):
+    ...
 
 
-#@ExpressionNode.link("eq")
-#class Equal(Operation): ...
+# @ExpressionNode.link("eq")
+# class Equal(Operation): ...
 
 
-#@ExpressionNode.link("ne")
-#class NotEqual(Operation): ...
+# @ExpressionNode.link("ne")
+# class NotEqual(Operation): ...
 
 
 @ExpressionNode.link("lt")
-class LessThan(Operation): ...
+class LessThan(Operation):
+    ...
 
 
 @ExpressionNode.link("gt")
-class GreaterThan(Operation): ...
+class GreaterThan(Operation):
+    ...
 
 
 @ExpressionNode.link("le")
-class LessThanOrEqualTo(Operation): ...
+class LessThanOrEqualTo(Operation):
+    ...
 
 
 @ExpressionNode.link("ge")
-class GreaterThanOrEqualTo(Operation): ...
+class GreaterThanOrEqualTo(Operation):
+    ...
+
 
 @ExpressionNode.link("abs")
 class Abs(Operation):
     @classmethod
     def create(cls, former: GenericValue):
         return If.create(LessThan.create(former, 0), Multiply.create(former, -1))
+
 
 # def __neg__(self):
 #     return Multiply.create(self, -1)
@@ -147,6 +160,3 @@ class Abs(Operation):
 
 # def __abs__(self):
 #     return If.create(LessThan.create(self, 0), Multiply.create(self, -1))
-
-
-# fmt: on
