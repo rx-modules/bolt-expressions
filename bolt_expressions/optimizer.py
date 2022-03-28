@@ -12,11 +12,12 @@ from typing import (
     Union,
 )
 
+from . import operations as op
+from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
+
 # from rich import print
 # from rich.pretty import pprint
 
-from . import operations as op
-from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
 
 if TYPE_CHECKING:
     Rule = Callable[[Iterable[op.Operation]], None]

@@ -4,7 +4,11 @@ import pytest
 from beet import run_beet
 from pytest_insta import SnapshotFixture
 
-EXAMPLES = [f for f in os.listdir("examples") if not f.startswith("nosnap_") and not f.startswith('.DS_Store')]
+EXAMPLES = [
+    f
+    for f in os.listdir("examples")
+    if not f.startswith("nosnap_") and not f.startswith(".DS_Store")
+]
 
 
 @pytest.mark.parametrize("directory", EXAMPLES)

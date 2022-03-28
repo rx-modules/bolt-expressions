@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from typing import Callable, Iterable, List, Union
 
+from .node import ExpressionNode
+from .sources import ConstantScoreSource, Source, TempScoreSource
+
 # from rich import print
 # from rich.pretty import pprint
 
-from .node import ExpressionNode
-from .sources import ConstantScoreSource, Source, TempScoreSource
 
 GenericValue = Union["Operation", "Source", int]
 

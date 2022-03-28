@@ -1,11 +1,10 @@
 import json
 from pathlib import Path
 
-from pytest_insta import Fmt
-
 from beet import DataPack, ProjectConfig, ResourcePack
 from beet.core.utils import dump_json
 from beet.library.test_utils import ignore_name
+from pytest_insta import Fmt
 
 
 class FmtResourcePack(Fmt[ResourcePack]):

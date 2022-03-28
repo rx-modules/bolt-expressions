@@ -8,9 +8,10 @@ from mecha.contrib.bolt import Runtime
 
 from . import resolver
 from .node import ExpressionNode
-from .operations import Operation, Set, wrapped_min, wrapped_max
+from .operations import Operation, Set, wrapped_max, wrapped_min
 from .optimizer import Optimizer
 from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
+
 
 @dataclass
 class Scoreboard:
