@@ -33,9 +33,8 @@ python-semantic-release = "^7.27.0"
 mudkip = ">=0.5.1"
 pytest-insta = ">=0.1.11"
 
-
 [tool.poetry.plugins.pytest11]
-bolt_expressions = "beet.pytest_plugin"
+beet = "beet.pytest_plugin"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
