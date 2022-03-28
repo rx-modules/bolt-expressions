@@ -1,10 +1,17 @@
 from dataclasses import dataclass
 from typing import Callable, Iterable, List, Union
+
 from rich import print
 from rich.pretty import pprint
+
 from .node import ExpressionNode
 from .sources import ConstantScoreSource, Source, TempScoreSource
+
 GenericValue = Union["Operation", "Source", int]
+
+
+def wrapped_min(*args, **kwargs):
+    ...
 
 
 @dataclass(unsafe_hash=False, order=False)
@@ -80,7 +87,13 @@ class Divide(Operation): ...
 @ExpressionNode.link("mod", reverse=True)
 class Modulus(Operation): ...
 
+@ExpressionNode.link("min")
+class Min(Operation): ...
 
+@ExpressionNode.link("max")
+class Max(Operation): ...
+
+@ExpressionNode.link("if")
 class If(Operation): ...
 
 
@@ -114,13 +127,13 @@ class Abs(Operation):
         return If.create(LessThan.create(former, 0), Multiply.create(former, -1))
 
 # def __neg__(self):
-    #     return Multiply.create(self, -1)
+#     return Multiply.create(self, -1)
 
-    # def __pos__(self):
-    #     return self
+# def __pos__(self):
+#     return self
 
-    # def __abs__(self):
-    #     return If.create(LessThan.create(self, 0), Multiply.create(self, -1))
+# def __abs__(self):
+#     return If.create(LessThan.create(self, 0), Multiply.create(self, -1))
 
 
 # fmt: on

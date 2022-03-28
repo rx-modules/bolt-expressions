@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Iterable, overload, Callable, Optional
+from typing import Callable, Iterable, Optional, overload
 
 
 @dataclass(unsafe_hash=True, order=False, eq=False)
@@ -14,7 +14,8 @@ class ExpressionNode:
                 return operation_class.create(other, self)
 
             setattr(cls, f"__{magic_method}__", normal)
-            if reverse: setattr(cls, f"__r{magic_method}__", reversed)
+            if reverse:
+                setattr(cls, f"__r{magic_method}__", reversed)
             return operation_class
 
         return decorator

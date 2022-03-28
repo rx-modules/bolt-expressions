@@ -1,4 +1,4 @@
-name: pointers-test
+name: beet-expressions-test
 
 data_pack:
   load: [example]

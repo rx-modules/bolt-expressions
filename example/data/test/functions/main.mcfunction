@@ -1,4 +1,4 @@
-from pointers import Scoreboard
+from bolt_expressions import Scoreboard
 
 tellraw @a "Smithed"
 

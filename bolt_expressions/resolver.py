@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Iterable, List
 
 if TYPE_CHECKING:
     from .operations import Operation
@@ -23,7 +23,7 @@ def get_templates() -> Dict[str, str]:
 
 
 def resolve(nodes: List["Operation"]) -> Iterable[Command]:
-    """ Transforms a list of operation nodes into command strings. """
+    """Transforms a list of operation nodes into command strings."""
     yield from map(generate_node, nodes)
 
 

@@ -1,0 +1,65 @@
+[tool.poetry]
+name = "bolt-expressions"
+version = "0.1.0"
+description = "Provides pandas-like expressions capabilities to the bolt extension of mecha"
+authors = ["rx97", "TheWii"]
+license = "MIT"
+
+homepage = "https://github.com/rx-modules/bolt-expressions"
+repository = "https://github.com/rx-modules/bolt-expressions"
+documentation = "https://rx-modules.github.io/bolt-expressions/"
+
+readme = "README.md"
+
+keywords = [
+  "beet",
+  "minecraft",
+  "bolt",
+  "mecha",
+  "expressions"
+]
+
+# include = ["FIXME/py.typed"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+beet = ">=0.55.0"
+mecha = ">=0.43.1"
+
+[tool.poetry.dev-dependencies]
+black = "^22.1.0"
+isort = "^5.10.1"
+python-semantic-release = "^7.27.0"
+mudkip = ">=0.5.1"
+pytest-insta = ">=0.1.11"
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "tests bolt_expressions --doctest-modules"
+doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
+
+[tool.black]
+target-version = ["py310"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+
+[tool.semantic_release]
+branch = "main"
+version_variable = ["bolt-expressions/__init__.py:__version__"]
+version_toml = "pyproject.toml:tool.poetry.version"
+major_on_zero = false
+build_command = "poetry build && poetry run mudkip build --update-gh-pages --repository https://x-access-token:${GH_TOKEN}@github.com/rx-modules/bolt-expressions"
+
+[tool.mudkip]
+preset = "furo"
+
+[tool.mudkip.override]
+html_title = "bolt-expressions"
+suppress_warnings = ["myst.header"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

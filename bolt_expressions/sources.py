@@ -6,7 +6,8 @@ from typing import Callable, Union
 from .node import ExpressionNode
 
 
-class Source(ExpressionNode): ...
+class Source(ExpressionNode):
+    ...
 
 
 @dataclass(unsafe_hash=True, order=False)
@@ -16,8 +17,8 @@ class ScoreSource(Source):
 
     @classmethod
     def on_rebind(cls, callback: Callable):
-        setattr(cls, '_rebind', callback)
-    
+        setattr(cls, "_rebind", callback)
+
     def __rebind__(self, other: ExpressionNode):
         self._rebind(self, other)
         return self
@@ -34,7 +35,7 @@ class ConstantScoreSource(ScoreSource):
 
     @classmethod
     def on_created(cls, callback: Callable):
-        setattr(cls, '_created', callback)
+        setattr(cls, "_created", callback)
 
     @classmethod
     def create(cls, value: Union[int, float]):
