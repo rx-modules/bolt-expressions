@@ -10,7 +10,7 @@
 
 ## Introduction
 
-Bolt is a scripting language which mixes both python and mcfunction. This package amplifies this language by adding an API for creating fluent expressions losely based off of the `pandas` syntax. These expressions are use for simplifying large bits of scoreboard and storage operation allowing you to swiftly create complex operations with the ease of normal programming.
+Bolt is a scripting language which mixes both python and mcfunction. This package amplifies this language by adding an API for creating fluent expressions loosely based off of the `pandas` syntax. These expressions are use for simplifying large bits of scoreboard and storage operation allowing you to swiftly create complex operations with the ease of normal programming.
 
 ```py
 from bolt_expressions import Scoreboard
