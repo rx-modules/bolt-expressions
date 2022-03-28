@@ -31,7 +31,7 @@ black = "^22.1.0"
 isort = "^5.10.1"
 python-semantic-release = "^7.27.0"
 mudkip = ">=0.5.1"
-pytest-insta = ">=0.1.11"
+pytest-insta = "^0.1.11"
 
 
 [tool.pytest.ini_options]
