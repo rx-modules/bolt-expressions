@@ -18,7 +18,7 @@ class ScoreSource(Source):
 
     @classmethod
     def on_rebind(cls, callback: Callable):
-        setattr(cls, "_rebind", callback)
+        cls._rebind = callback
 
     def __rebind__(self, other: ExpressionNode):
         self._rebind(self, other)
@@ -36,7 +36,7 @@ class ConstantScoreSource(ScoreSource):
 
     @classmethod
     def on_created(cls, callback: Callable):
-        setattr(cls, "_created", callback)
+        cls._created = callback
 
     @classmethod
     def create(cls, value: Union[int, float]):

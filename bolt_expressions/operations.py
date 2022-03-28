@@ -65,7 +65,7 @@ class Operation(ExpressionNode):
 class Set(Operation):
     @classmethod
     def on_resolve(cls, callback: Callable):
-        setattr(cls, '_resolve', callback)
+        cls._resolve = callback
     
     def resolve(self):
         return self._resolve(self)

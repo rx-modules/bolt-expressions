@@ -88,6 +88,7 @@ class Scoreboard:
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
         ConstantScoreSource.on_created(self.add_constant)
+        ScoreSource.on_rebind(self.set_score)
 
     def add_constant(self, node: ConstantScoreSource):
         path = self.ctx.generate.path("init_expressions")
