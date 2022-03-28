@@ -1,0 +1,13 @@
+name: bolt-expressions-complex
+
+data_pack:
+  load: [src]
+
+require:
+  - mecha.contrib.bolt
+  - bolt_expressions
+
+pipeline:
+  - mecha
+
+output: dist
