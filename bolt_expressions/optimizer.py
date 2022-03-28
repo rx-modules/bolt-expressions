@@ -12,8 +12,8 @@ from typing import (
     Union,
 )
 
-from rich import print
-from rich.pretty import pprint
+# from rich import print
+# from rich.pretty import pprint
 
 from . import operations as op
 from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
@@ -204,14 +204,6 @@ def constant_to_literal_replacement(
             yield node.__class__(node.former, int(literal))
         else:
             yield node
-
-
-# @Optimizer.rule
-def print_node(nodes: Iterable["op.Operation"]) -> Iterable["op.Operation"]:
-    for node in nodes:
-        print("end", node)
-        print()
-        yield node
 
 
 @Optimizer.rule

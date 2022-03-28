@@ -5,7 +5,7 @@ from typing import Iterable, List, Union
 from beet import Context
 from mecha import Mecha
 from mecha.contrib.bolt import Runtime
-from rich.pretty import pprint
+# from rich.pretty import pprint
 
 from . import resolver
 from .node import ExpressionNode
@@ -67,9 +67,9 @@ class Scoreboard:
 
     def resolve(self, value: Operation):
         nodes = list(value.unroll())
-        pprint(nodes)
+        # pprint(nodes)
         optimized = list(Optimizer.optimize(nodes))
-        pprint(optimized)
+        # pprint(optimized)
         cmds = list(resolver.resolve(optimized))
         # pprint(cmds, expand_all=True)
         for cmd in cmds:
