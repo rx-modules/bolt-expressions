@@ -11,3 +11,6 @@ pipeline:
   - mecha
 
 output: dist
+
+meta:
+  generate_namespace: test

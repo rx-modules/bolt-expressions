@@ -14,3 +14,6 @@ output: dist
 meta:
   temp_objective: boltexp.temp
   const_objective: boltexp.const
+
+meta:
+  generate_namespace: test
