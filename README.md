@@ -15,8 +15,8 @@ Bolt is a scripting language which mixes both python and mcfunction. This packag
 ```py
 from bolt_expressions import Scoreboard
 
-Objective = ctx.inject(Scoreboard)
-math = Objective("math")
+math = Scoreboard.objective("math")
+# or `math = Scoreboard("math")`
 
 math["@s"] = math["@r"] * 10 + math["@r"] + 100
 ```
