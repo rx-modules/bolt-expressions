@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from functools import cache
 from itertools import count
-from typing import Callable, Union
+from typing import Callable, Union, ClassVar
 
 from nbtlib import Compound, Path
 
@@ -55,16 +55,12 @@ class ConstantScoreSource(ScoreSource):
 
 class TempScoreSource(ScoreSource):
     objective: str = "temp"
-
-    @classmethod
-    @property
-    @cache
-    def infinite(cls):
-        yield from count()
+    count: ClassVar[int] = -1
 
     @classmethod
     def create(cls):
-        return super().create(f"$i{next(cls.infinite)}", cls.objective)
+        cls.count += 1
+        return super().create(f"$i{cls.count}", cls.objective)
 
 
 def parse_compound(value: Union[str, dict, Path, Compound]):

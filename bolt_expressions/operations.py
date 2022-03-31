@@ -72,6 +72,8 @@ class Set(Operation):
         cls._resolve = callback
 
     def unroll(self) -> Iterable["Operation"]:
+        TempScoreSource.count = -1
+
         if type(self.latter) is DataSource:
             yield Set.create(self.former, self.latter)
         else:
