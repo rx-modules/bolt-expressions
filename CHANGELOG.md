@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.4.1 (2022-03-31)
+### Fix
+* Scoreboard.objective now works and is preferred ([`e292d99`](https://github.com/rx-modules/bolt-expressions/commit/e292d994a3e7e913655ed31610693deeabc434a5))
+
 ## v0.4.0 (2022-03-31)
 ### Feature
 * Ctx.inject is now implicit ([`f29406f`](https://github.com/rx-modules/bolt-expressions/commit/f29406f3672b6a47779faf7a3ef2767dfa2d5402))
