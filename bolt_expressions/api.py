@@ -83,7 +83,8 @@ class Expression:
 
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
-        self._inject_command(f"function {self.opts.const_objective}")
+        path = self.ctx.generate.path(self.opts.init_path)
+        self._inject_command(f"function {path}")
         self.called_init = True
 
     def generate_init(self):
