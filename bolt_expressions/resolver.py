@@ -1,40 +1,51 @@
-from typing import TYPE_CHECKING, Dict, Iterable, List
+from typing import Dict, Iterable, List
 
-if TYPE_CHECKING:
-    from .operations import Operation
+from .operations import GenericValue, Operation
+from .sources import DataSource, ScoreSource
 
 Command: type = str
 
 
 def get_templates() -> Dict[str, str]:
     return {
-        "set:literal": "scoreboard players set {former} {latter}",
-        "add:literal": "scoreboard players add {former} {latter}",
-        "subtract:literal": "scoreboard players remove {former} {latter}",
-        "set:score": "scoreboard players operation {former} = {latter}",
-        "add:score": "scoreboard players operation {former} += {latter}",
-        "subtract:score": "scoreboard players operation {former} -= {latter}",
-        "multiply:score": "scoreboard players operation {former} *= {latter}",
-        "divide:score": "scoreboard players operation {former} /= {latter}",
-        "modulus:score": "scoreboard players operation {former} %= {latter}",
-        "min:score": "scoreboard players operation {former} < {latter}",
-        "max:score": "scoreboard players operation {former} > {latter}",
+        "set:score:literal": "scoreboard players set {former} {latter}",
+        "add:score:literal": "scoreboard players add {former} {latter}",
+        "subtract:score:literal": "scoreboard players remove {former} {latter}",
+        "set:score:score": "scoreboard players operation {former} = {latter}",
+        "add:score:score": "scoreboard players operation {former} += {latter}",
+        "subtract:score:score": "scoreboard players operation {former} -= {latter}",
+        "multiply:score:score": "scoreboard players operation {former} *= {latter}",
+        "divide:score:score": "scoreboard players operation {former} /= {latter}",
+        "modulus:score:score": "scoreboard players operation {former} %= {latter}",
+        "min:score:score": "scoreboard players operation {former} < {latter}",
+        "max:score:score": "scoreboard players operation {former} > {latter}",
+        "set:data:literal": "data modify {former} set value {latter}",
+        "set:data:data": "data modify {former} set from {latter}",
+        "set:data:score": lambda f, l: f"execute store result {f} {f._number_type} {f._scale} run scoreboard players get {l}",
+        "set:score:data": lambda f, l: f"execute store result score {f} run data get {l} {l._scale}",
     }
 
 
-def resolve(nodes: List["Operation"]) -> Iterable[Command]:
+def resolve(nodes: List[Operation]) -> Iterable[Command]:
     """Transforms a list of operation nodes into command strings."""
     yield from map(generate_node, nodes)
 
 
-def get_type(node: "Operation"):
+def get_type(node: GenericValue):
     # optimizer might convert an int score back to a literal int
     # for operations like Set, Add and Subtract
-    return "literal" if type(node.latter) is int else "score"
+    if isinstance(node, ScoreSource):
+        return "score"
+    if isinstance(node, DataSource):
+        return "data"
+    return "literal"
 
 
-def generate_node(node: "Operation") -> Command:
+def generate_node(node: Operation) -> Command:
     id = node.__class__.__name__.lower()  # TODO Operation should have an id property
-    node_type = get_type(node)
-    template = get_templates()[f"{id}:{node_type}"]
+    former_type = get_type(node.former)
+    latter_type = get_type(node.latter)
+    template = get_templates()[f"{id}:{former_type}:{latter_type}"]
+    if callable(template):
+        return template(node.former, node.latter)
     return template.format(former=node.former, latter=node.latter)

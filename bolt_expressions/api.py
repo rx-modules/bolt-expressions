@@ -11,7 +11,16 @@ from . import resolver
 from .node import ExpressionNode
 from .operations import GenericValue, Operation, Set, wrapped_max, wrapped_min
 from .optimizer import Optimizer
-from .sources import ConstantScoreSource, ScoreSource, Source, TempScoreSource
+from .sources import (
+    ConstantScoreSource,
+    DataSource,
+    ScoreSource,
+    Source,
+    TempScoreSource,
+)
+
+# from rich import print
+# from rich.pretty import pprint
 
 
 class ExpressionOptions(BaseModel):
@@ -58,12 +67,13 @@ class Expression:
     def _inject_command(self, cmd: str):
         self._runtime.commands.append(self._mc.parse(cmd, using="command"))
 
-    def resolve(self, value: Operation):
-        nodes = list(value.unroll())
+    def resolve(self, nodes: Operation):
         # pprint(nodes)
-        optimized = list(Optimizer.optimize(nodes))
-        # pprint(optimized)
-        cmds = list(resolver.resolve(optimized))
+        nodes = list(nodes.unroll())
+        # pprint(nodes)
+        nodes = list(Optimizer.optimize(nodes))
+        # pprint(nodes)
+        cmds = list(resolver.resolve(nodes))
         # pprint(cmds, expand_all=True)
         for cmd in cmds:
             self._inject_command(cmd)
@@ -144,3 +154,28 @@ class Score:
 
     def __str__(self):
         return self.objective
+
+
+@dataclass
+class Data:
+    ctx: Context
+
+    def __post_init__(self):
+        self._expr = self.ctx.inject(Expression)
+        DataSource.on_rebind(self.set_data)
+
+    def __call__(self, target: str):
+        """Guess target type and return a data source."""
+        ...
+
+    def set_data(self, source: DataSource, value: GenericValue):
+        return self._expr.set(source, value)
+
+    def storage(self, resource_location: str):
+        return DataSource.create("storage", resource_location)
+
+    def entity(self, entity: str):
+        return DataSource.create("entity", entity)
+
+    def block(self, position: str):
+        return DataSource.create("block", position)

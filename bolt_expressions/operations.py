@@ -1,14 +1,17 @@
 from dataclasses import dataclass
-from typing import Callable, Iterable, List, Union
+from typing import Any, Callable, Iterable, List, Union
 
+from nbtlib import Int
+
+from .literals import Literal
 from .node import ExpressionNode
-from .sources import ConstantScoreSource, Source, TempScoreSource
+from .sources import ConstantScoreSource, DataSource, Source, TempScoreSource
 
 # from rich import print
 # from rich.pretty import pprint
 
 
-GenericValue = Union["Operation", "Source", int]
+GenericValue = Union["Operation", "Source", int, str]
 
 
 def wrapped_min(*args, **kwargs):
@@ -36,13 +39,19 @@ class Operation(ExpressionNode):
     def create(cls, former: GenericValue, latter: GenericValue):
         """Factory method to create new operations"""
 
-        # TODO: int is hardcoded, we need to generate this stuff
         if not isinstance(former, ExpressionNode):
-            former = ConstantScoreSource.create(former)
+            former = cls._handle_literal(former)
         if not isinstance(latter, ExpressionNode):
-            latter = ConstantScoreSource.create(latter)
+            latter = cls._handle_literal(latter)
 
         return super().create(former, latter)
+
+    @classmethod
+    def _handle_literal(cls, value: Any):
+        literal = Literal.create(value)
+        if type(literal.value) is Int:
+            return ConstantScoreSource.create(literal.value.real)
+        return literal
 
     def unroll(self) -> Iterable["Operation"]:
         *former_nodes, former_var = self.former.unroll()
@@ -51,19 +60,24 @@ class Operation(ExpressionNode):
         yield from former_nodes
         yield from latter_nodes
 
-        if type(self) is not Set:
-            temp_var = TempScoreSource.create()
-            yield Set.create(temp_var, former_var)
-            yield self.__class__.create(temp_var, latter_var)
-            yield temp_var
-        else:
-            yield Set.create(former_var, latter_var)
+        temp_var = TempScoreSource.create()
+        yield Set.create(temp_var, former_var)
+        yield self.__class__.create(temp_var, latter_var)
+        yield temp_var
 
 
 class Set(Operation):
     @classmethod
     def on_resolve(cls, callback: Callable):
         cls._resolve = callback
+
+    def unroll(self) -> Iterable["Operation"]:
+        if type(self.latter) is DataSource:
+            yield Set.create(self.former, self.latter)
+        else:
+            *latter_nodes, latter_var = self.latter.unroll()
+            yield from latter_nodes
+            yield Set.create(self.former, latter_var)
 
     def resolve(self):
         return self._resolve(self)

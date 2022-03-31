@@ -1,0 +1,27 @@
+data modify entity @s Health set value 10
+execute store result score $i64 bolt.expr.temp run data get entity @s Health 1
+scoreboard players add $i64 bolt.expr.temp 20
+execute store result entity @s Health int 1 run scoreboard players get $i64 bolt.expr.temp
+execute store result score $i66 bolt.expr.temp run data get entity rx97 Health 1
+scoreboard players remove $i66 bolt.expr.temp 30
+execute store result entity rx97 Health int 1 run scoreboard players get $i66 bolt.expr.temp
+execute store result score $i68 bolt.expr.temp run data get block 0 0 0 data.ur_mom 1
+scoreboard players operation $i68 bolt.expr.temp *= $40 bolt.expr.const
+execute store result block 0 0 0 data.ur_mom int 1 run scoreboard players get $i68 bolt.expr.temp
+execute store result score $i70 bolt.expr.temp run data get block ~1 ~2 ~3 Items[0].Count 1
+scoreboard players operation $i70 bolt.expr.temp /= $50 bolt.expr.const
+execute store result block ~1 ~2 ~3 Items[0].Count int 1 run scoreboard players get $i70 bolt.expr.temp
+execute store result score $i72 bolt.expr.temp run data get entity TheWii Inventory[{Slot: -103b}].tag.data.bolt 1
+scoreboard players operation $i72 bolt.expr.temp %= $60 bolt.expr.const
+execute store result entity TheWii Inventory[{Slot: -103b}].tag.data.bolt int 1 run scoreboard players get $i72 bolt.expr.temp
+data modify entity @s Inventory[].tag.string set value "your mom"
+data modify entity @s Inventory[].tag.int set value 10
+data modify entity @s Inventory[].tag.float set value 10.0f
+data modify entity @s Inventory[].tag.double set value 10.0d
+data modify entity @s Inventory[].tag.list set value []
+data modify entity @s Inventory[].tag.list set value [1, 2, 3]
+data modify entity @s Inventory[].tag.list set value [1, 2, 3, 4, 5, 6]
+data modify entity @s Inventory[].tag.list set value [{}, {}, {}]
+data modify entity @s Inventory[].tag.list set value [{bar: 2.5f}, {baz: 0b}]
+data modify entity @s Inventory[].tag.list set value {}
+data modify entity @s Inventory[].tag.list set value {foo: 2, baz: -1s}

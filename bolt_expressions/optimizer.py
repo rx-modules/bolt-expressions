@@ -14,7 +14,8 @@ from typing import (
 )
 
 from . import operations as op
-from .sources import ConstantScoreSource, ScoreSource, TempScoreSource
+from .literals import Literal
+from .sources import ConstantScoreSource, DataSource, ScoreSource, TempScoreSource
 
 # from rich import print
 # from rich.pretty import pprint
@@ -24,8 +25,6 @@ if TYPE_CHECKING:
     Rule = Callable[[Iterable[op.Operation]], None]
 
 T = TypeVar("T")
-
-DefaultValue = object()
 
 
 class SmartGenerator(Generator):
@@ -39,8 +38,8 @@ class SmartGenerator(Generator):
     0
     """
 
-    def __init__(self, gen):
-        self._gen: Generator[T] = gen
+    def __init__(self, func):
+        self._func: Callable[..., Generator] = func
 
     def __iter__(self):
         self._pre: List[T] = []
@@ -53,7 +52,7 @@ class SmartGenerator(Generator):
         return next(self._values)  # raises StopIteration for us
 
     def __call__(self, values) -> Iterable[T]:
-        self._values: Iterable[T] = self._gen(values)
+        self._values: Iterable[T] = self._func(values)
         return self
 
     def push(self, val: T):
@@ -61,10 +60,10 @@ class SmartGenerator(Generator):
             self._pre.append(val)
 
     def send(self, val: T):
-        return self._gen.send(val)
+        return self._values.send(val)
 
     def throw(self, val: T):
-        raise self._gen.throw(val)
+        raise self._values.throw(val)
 
 
 class Optimizer:
@@ -94,12 +93,15 @@ class Optimizer:
     @classmethod
     def optimize(cls, nodes: Iterable["op.Operation"]):
         """Performs the optimization by sending all nodes through the rules."""
-        nodes = (node for node in nodes)  # temp
-
         for rule in cls.rules:
             nodes = rule(nodes)
 
         yield from nodes
+
+
+@Optimizer.rule
+def dummy(nodes: Iterable["op.Operation"]):
+    yield from nodes
 
 
 @Optimizer.rule
@@ -151,6 +153,7 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
             type(node) is op.Set
             and type(next_node) is not op.Set
             and type(further_node) is op.Set
+            and isinstance(further_node.former, ScoreSource)
             and node.latter == further_node.former
             and node.former == next_node.former
             and node.former == further_node.latter
@@ -183,6 +186,7 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
         if (
             type(node) in (op.Add, op.Multiply)
             and type(next_node) is op.Set
+            and isinstance(next_node.former, ScoreSource)
             and node.former == next_node.latter
             and node.latter == next_node.former
         ):
@@ -205,8 +209,8 @@ def constant_to_literal_replacement(
             isinstance(node, (op.Set, op.Add, op.Subtract))
             and type(node.latter) is ConstantScoreSource
         ):
-            literal = node.latter.scoreholder[1:]
-            yield node.__class__(node.former, int(literal))
+            literal = int(node.latter.scoreholder[1:])
+            yield node.__class__(node.former, Literal.create(literal))
         else:
             yield node
 
@@ -224,7 +228,11 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
     output_var = last_node.former
     can_replace = False
     # print(f"Last node is {last_node}")
-    if len(all_nodes) > 1 and type(last_node) is op.Set:
+    if (
+        isinstance(output_var, ScoreSource)
+        and type(last_node) is op.Set
+        and len(all_nodes) > 1
+    ):
         for node in all_nodes[1:]:  # Ignore the first Set operation
             # print(f"Is {node.latter} equal to {output_var}? {node.latter == output_var}")
             if node.latter == output_var:
