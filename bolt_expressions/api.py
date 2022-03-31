@@ -90,7 +90,11 @@ class Expression:
     def generate_init(self):
         self.ctx.generate(
             self.opts.init_path,
-            Function(self.init_commands, prepend_tags=["minecraft:load"]),
+            Function(
+                self.init_commands,
+                prepend_tags=["minecraft:load"]
+                if not self.called_init else None
+            )
         )
 
 
