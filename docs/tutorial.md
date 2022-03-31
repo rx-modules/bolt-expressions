@@ -1,4 +1,8 @@
-# Intro
+---
+hide-toc: true
+---
+
+# Tutorial
 
 `bolt_expressions` provides some psuedo pointers which allow you to interopt between normal minecraft (or bolt) commands and our robust interface for generating expressions. The main endpoints for the logic lay in the specialized `Scoreboard` and `Data` objects.
 
@@ -28,7 +32,7 @@ my_obj = Scoreboard.objective("my_obj")
 my_obj["@s"] += 25
 ```
 
-# Common Use Cases
+## Common Use Cases
 
 The `Scoreboard` and `Data` objects provides you a *rich* API for you to interact within your bolt landscape. Most numerical operations (such as `+`, `*`, `%`) will produce sequential `scoreboard operation` commands for you to work with. Longer expressions will benefit from an optimization system which will help shorten the size of the resulting commands. Feel free to use various pointers together, our library will chunk through anything!
 
@@ -59,7 +63,7 @@ maxxed = max((10 * armor) / 5, atf)                                           # 
 output = damage * (250 - (min(200, maxxed))) / 25                             # ✨ special behavior | generates commands ✨
 ```
 
-# Advanced Use Cases 🔥
+## Advanced Use Cases 🔥
 
 This library sits very nicely in the `bolt` workspace as it can integrate with python functions. This leads naturally to a popular *callback* pattern which allows you to encapsulate repeated and popular patterns. Here are just a couple of examples to get you inspired ✨!
 
