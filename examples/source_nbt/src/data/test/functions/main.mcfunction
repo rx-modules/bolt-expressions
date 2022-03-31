@@ -1,8 +1,7 @@
 from nbtlib import Compound, Path, Byte
 from bolt_expressions import Data
-Nbt = ctx.inject(Data)
 
-temp = Nbt.storage(demo:temp)
+temp = Data.storage(demo:temp)
 
 function ./paths:
     #> Root

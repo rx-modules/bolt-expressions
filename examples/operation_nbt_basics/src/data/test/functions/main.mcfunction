@@ -1,21 +1,18 @@
 from bolt_expressions import Scoreboard, Data
 from nbtlib import Short, Double, List, Compound, Int
 
-Objective = ctx.inject(Scoreboard)
-Nbt = ctx.inject(Data)
+obj = Scoreboard("abc.main")
 
-obj = Objective("abc.main")
+temp = Data.storage("demo:prefix/temp")
 
-temp = Nbt.storage("demo:prefix/temp")
+this_block = Data.block("~1 ~2 ~3")
+origin_block = Data.block("0 0 0")
+facing_block = Data.block("^ ^ ^5")
 
-this_block = Nbt.block("~1 ~2 ~3")
-origin_block = Nbt.block("0 0 0")
-facing_block = Nbt.block("^ ^ ^5")
-
-player = Nbt.entity("@s")
-entity = Nbt.entity("@s")
-rx = Nbt.entity("rx97")
-thewii = Nbt.entity("TheWii")
+player = Data.entity("@s")
+entity = Data.entity("@s")
+rx = Data.entity("rx97")
+thewii = Data.entity("TheWii")
 
 function ./operations:
     obj["@s"] += player.Health

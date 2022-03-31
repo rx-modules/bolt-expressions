@@ -5,6 +5,7 @@ data_pack:
 
 require:
   - mecha.contrib.bolt
+  - bolt_expressions
 
 pipeline:
   - mecha

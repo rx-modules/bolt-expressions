@@ -1,8 +1,6 @@
 from bolt_expressions import Scoreboard
 
-Objective = ctx.inject(Scoreboard)
-
-smithed_damage = Objective("smithed.damage")
+smithed_damage = Scoreboard("smithed.damage")
 damage = smithed_damage["damage"]
 toughness = smithed_damage["toughness"]
 armor = smithed_damage["armor"]

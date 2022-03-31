@@ -1,8 +1,7 @@
 from bolt_expressions import Scoreboard
-Objective = ctx.inject(Scoreboard)
 
-abc = Objective("abc.main")
-temp = Objective("abc.temp")
+abc = Scoreboard("abc.main")
+temp = Scoreboard("abc.temp")
 
 function ./operations:
     abc["@s"] += temp["@s"]

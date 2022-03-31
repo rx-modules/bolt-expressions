@@ -1,4 +1,4 @@
-# FIXME
+# bolt-expressions
 
 ```{toctree}
 :hidden:
@@ -10,8 +10,8 @@ changelog
 :caption: Project links
 :hidden:
 
-GitHub repository <https://github.com/FIXME/FIXME>
-PyPI package <https://pypi.org/project/FIXME>
+GitHub repository <https://github.com/rx-modules/bolt-expressions>
+PyPI package <https://pypi.org/project/bolt-expressions>
 ```
 
 ```{eval-rst}

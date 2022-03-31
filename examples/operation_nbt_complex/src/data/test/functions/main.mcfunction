@@ -1,14 +1,9 @@
 from bolt_expressions import Scoreboard, Data
 from nbtlib import Short, Double, List, Compound, Int
 
-Objective = ctx.inject(Scoreboard)
-Nbt = ctx.inject(Data)
-
-obj = Objective("abc.main")
-
-temp = Nbt.storage("demo:prefix/temp")
-
-player = Nbt.entity("@s")
+obj = Scoreboard("abc.main")
+temp = Data.storage("demo:prefix/temp")
+player = Data.entity("@s")
 
 player.Inventory[:].tag.list = {
     "items": [
