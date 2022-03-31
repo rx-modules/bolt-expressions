@@ -1,4 +1,4 @@
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 from .api import Data, Expression, Scoreboard
 from .plugin import beet_default
