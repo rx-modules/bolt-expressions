@@ -92,9 +92,8 @@ class Expression:
             self.opts.init_path,
             Function(
                 self.init_commands,
-                prepend_tags=["minecraft:load"]
-                if not self.called_init else None
-            )
+                prepend_tags=["minecraft:load"] if not self.called_init else None,
+            ),
         )
 
 
