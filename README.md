@@ -59,35 +59,19 @@ from bolt_expressions import Scoreboard, Storage
 Any usage of the `bolt_expressions` package will require you to inject the current beet context into the API objects. Then, you can create an objective and start creating expressions.
 
 ```py
-Objective = ctx.inject(Scoreboard)
-
-math = Objective("math")
-entity_id = Objective("entity_id")
+math = Scoreboard.objective("math")
+entity_id = Scoreboard.objective("entity_id")
 
 math["@s"] += 10
 ```
 
 ## Features
 
-The `Scoreboard` object provides a rich API for you to interact within your bolt landscape. Most numerical operations (such as `+`, `*`, `%`) will produce correct `scoreboard operation` commands for you to work with.
+- Robust API supporting Scoreboards, Storage, Blocks, and Entities
+- Provides an interface to manipulate large, complex mathematical expressions simplily
+- Allows you to interopt custom variables with normal commands *(soon)*
 
-```
-CONSTANT = 60 * 60 * 24
-math["@s"] *= (entity_id["current_id"] / 200) + CONSTANT
-```
-
-You can also utilize local variables to simplify readability with longer operations. This is due to the unique `__rebind__` operator provided only in the `bolt` context which allows us provide custom behavior with the `=` operation. We also have defined helper functions such as `min` and `max`, alongside `sqrt` and `**` (for `pow`).
-
-```py
-dmg_obj = Objective("damage")
-damage = dmg_obj["damage"]
-toughness = dmg_obj["toughness"]
-armor = dmg_obj["armor"]
-
-atf = (10 * armor - (400 * damage / (80 + 10 * toughness)))  # local variable
-maxxed = max((10 * armor) / 5, atf)                          # still local variable
-damage = damage * (250 - (min(200, maxxed))) / 25            # calls __rebind__!
-```
+Checkout some examples over at our [docs](https://rx-modules.github.io/bolt-expressions/)!
 
 ## Contributing
 
