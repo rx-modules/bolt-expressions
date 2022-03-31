@@ -81,10 +81,6 @@ class Expression:
     def set(self, source: Source, value: GenericValue):
         Set.create(source, value).resolve()
 
-    def objective(self, name: str):
-        """Get a Score instance through the Scoreboard API"""
-        return self.ctx.inject(Scoreboard)(name)
-
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
         self._inject_command(f"function {self.opts.const_objective}")
@@ -137,8 +133,11 @@ class Scoreboard:
     def set_score(self, score: ScoreSource, value: GenericValue):
         return self._expr.set(score, value)
 
-    def __call__(self, objective: str):
-        return Score(self, objective)
+    def objective(self, name: str):
+        """Get a Score instance through the Scoreboard API"""
+        return Score(self, name)
+
+    __call__ = objective
 
 
 @dataclass
