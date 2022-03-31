@@ -113,3 +113,5 @@ In this example, we wrote a wrapper for a tiny `randint` function which will gen
 
 This section is still in progress. Stay tuned!
 ```
+
+*If you have any cool examples, please let us know! Just open an issue :)*
