@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from functools import cache
 from itertools import count
-from typing import Callable, Union, ClassVar
+from typing import Callable, ClassVar, Union
 
 from nbtlib import Compound, Path
 

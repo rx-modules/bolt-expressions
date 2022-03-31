@@ -6,7 +6,7 @@ import bolt_expressions as expr
 def beet_default(ctx: Context):
     expr.Expression = ctx.inject(expr._Expression)  # type: ignore
     expr.Scoreboard = ctx.inject(expr._Scoreboard)  # type: ignore
-    expr.Data = ctx.inject(expr._Data)              # type: ignore
+    expr.Data = ctx.inject(expr._Data)  # type: ignore
 
     yield
 
