@@ -2,6 +2,14 @@
 
 <!--next-version-placeholder-->
 
+## v0.4.5 (2022-03-31)
+### Fix
+* Init function would be prepended to load tag even if `Expression.init` was called ([`34080fe`](https://github.com/rx-modules/bolt-expressions/commit/34080fe170b2a43148917d635f95602a9f52e57e))
+
+### Documentation
+* Adjust tutorial ([`4077a70`](https://github.com/rx-modules/bolt-expressions/commit/4077a7059393771318431b20ea1810846f05543d))
+* Fix table of contents ([`2fb5935`](https://github.com/rx-modules/bolt-expressions/commit/2fb5935c4a8cf48bbe89947c6a147a4414bea70d))
+
 ## v0.4.4 (2022-03-31)
 ### Fix
 * Expression.init() creates function with incorrect init path ([`665edcc`](https://github.com/rx-modules/bolt-expressions/commit/665edccefb89b669cb72a5d6e1d27dcdfd990380))
