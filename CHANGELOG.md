@@ -2,6 +2,24 @@
 
 <!--next-version-placeholder-->
 
+## v0.4.4 (2022-03-31)
+### Fix
+* Expression.init() creates function with incorrect init path ([`665edcc`](https://github.com/rx-modules/bolt-expressions/commit/665edccefb89b669cb72a5d6e1d27dcdfd990380))
+
+## v0.4.3 (2022-03-31)
+### Fix
+* Generate_init error ([`65f8b5a`](https://github.com/rx-modules/bolt-expressions/commit/65f8b5aa67f75fb1eeb5674e68c9a9f42a4e9215))
+
+## v0.4.2 (2022-03-31)
+### Fix
+* Forcing a release to build new docs ffs ([`e30adf7`](https://github.com/rx-modules/bolt-expressions/commit/e30adf7d2ddd2137a5e13921e5a405046b94ee09))
+
+### Documentation
+* Fix workflow (3.10 versus "3.10") ([`9cbc582`](https://github.com/rx-modules/bolt-expressions/commit/9cbc582b463c352fb0a5c34662205c2e6fdf8220))
+* Auto build and deploy docs ([`3f8bf8e`](https://github.com/rx-modules/bolt-expressions/commit/3f8bf8e6602d4b584a28ef1832f102f50babed2b))
+* Old usage on README.md fixed ([`60808b1`](https://github.com/rx-modules/bolt-expressions/commit/60808b1b41bb3dba5bb70afdc4c59eec0c3fbcfc))
+* Added tutorial and cleaned README.md ([`b786052`](https://github.com/rx-modules/bolt-expressions/commit/b78605200aff225dc838b82141dd466cf3f82904))
+
 ## v0.4.1 (2022-03-31)
 ### Fix
 * Scoreboard.objective now works and is preferred ([`e292d99`](https://github.com/rx-modules/bolt-expressions/commit/e292d994a3e7e913655ed31610693deeabc434a5))

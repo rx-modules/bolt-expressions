@@ -1,4 +1,4 @@
-name: bolt-expressions-init-function
+name: bolt-expressions-init-function-call
 
 data_pack:
   load: [src]

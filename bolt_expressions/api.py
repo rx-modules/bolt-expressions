@@ -83,20 +83,19 @@ class Expression:
 
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
-        self._inject_command(f"function {self.opts.const_objective}")
+        path = self.ctx.generate.path(self.opts.init_path)
+        self._inject_command(f"function {path}")
         self.called_init = True
 
     def generate_init(self):
-        scoreboard = self.ctx.inject(Scoreboard)
-        path = self.ctx.generate.path(self.opts.init_path)
-        self.ctx.data[path] = Function(self.init_commands)
-        if not self.called_init:
-            if tag := self.ctx.data.function_tags.get("minecraft:load", None):
-                tag["values"].insert(0, path)
-            else:
-                self.ctx.data.function_tags["minecraft:load"] = FunctionTag(
-                    {"values": [path]}
-                )
+        self.ctx.generate(
+            self.opts.init_path,
+            Function(
+                self.init_commands,
+                prepend_tags=["minecraft:load"]
+                if not self.called_init else None
+            )
+        )
 
 
 @dataclass

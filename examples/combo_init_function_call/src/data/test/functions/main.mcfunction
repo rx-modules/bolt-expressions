@@ -9,7 +9,9 @@ merge function_tag minecraft:load {
 abc = Scoreboard("abc.main")
 
 function ./load:
-    say Pack is loaded.
+    if score #dependency load.status matches 1.. function ./install:
+        say Installing pack...
+        Expression.init()
 
 abc["@s"] = (abc["#value"] * 2 + 1) / (abc["#denom"] * 5)
 abc["@s"] = abc["#value"] * 3 * 4 * 6 * 7 * 8
