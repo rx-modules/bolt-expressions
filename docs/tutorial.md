@@ -1,3 +1,7 @@
+---
+hide-toc: true
+---
+
 # Intro
 
 `bolt_expressions` provides some psuedo pointers which allow you to interopt between normal minecraft (or bolt) commands and our robust interface for generating expressions. The main endpoints for the logic lay in the specialized `Scoreboard` and `Data` objects.
