@@ -1,13 +1,13 @@
 from beet import Context, Function
 
-import bolt_expressions
+import bolt_expressions as expr
 
 
 def beet_default(ctx: Context):
-    bolt_expressions.Expression = ctx.inject(bolt_expressions._Expression)  # type: ignore
-    bolt_expressions.Scoreboard = ctx.inject(bolt_expressions._Scoreboard)  # type: ignore
-    bolt_expressions.Data = ctx.inject(bolt_expressions._Data)              # type: ignore
+    expr.Expression = ctx.inject(expr._Expression)  # type: ignore
+    expr.Scoreboard = ctx.inject(expr._Scoreboard)  # type: ignore
+    expr.Data = ctx.inject(expr._Data)              # type: ignore
 
     yield
 
-    bolt_expressions.Expression.generate_init()
+    expr.Expression.generate_init()
