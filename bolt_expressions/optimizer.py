@@ -105,30 +105,6 @@ def dummy(nodes: Iterable["op.Operation"]):
 
 
 @Optimizer.rule
-def temp_var_collapsing(nodes: Iterable["op.Operation"]):
-    map: Dict[TempScoreSource, TempScoreSource] = {}
-
-    def get_replaced(source):
-        # get the very last source if they're chained
-        replaced = map.get(source)
-        return get_replaced(replaced) if replaced else source
-
-    for node in nodes:
-        # print("[bold]temp_var_collapsing[/bold]", node)
-        if (
-            type(node) is op.Set
-            and type(node.former) is TempScoreSource
-            and type(node.latter) is TempScoreSource
-        ):
-            # peek: Operation = next(nodes)  # deletes current node
-            replaced_latter = get_replaced(node.latter)
-            map[node.former] = replaced_latter
-            # yield peek.__class__(node.latter, peek.latter)
-        else:
-            yield node.__class__(get_replaced(node.former), get_replaced(node.latter))
-
-
-@Optimizer.rule
 def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
     """For noncommutative operations:
     ```

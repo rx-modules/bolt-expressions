@@ -60,8 +60,11 @@ class Operation(ExpressionNode):
         yield from former_nodes
         yield from latter_nodes
 
-        temp_var = TempScoreSource.create()
-        yield Set.create(temp_var, former_var)
+        if type(former_var) is TempScoreSource:
+            temp_var = former_var
+        else:
+            temp_var = TempScoreSource.create()
+            yield Set.create(temp_var, former_var)
         yield self.__class__.create(temp_var, latter_var)
         yield temp_var
 
