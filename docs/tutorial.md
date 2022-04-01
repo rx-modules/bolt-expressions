@@ -45,23 +45,71 @@ math["@s"] *= (entity_id["current_id"] / 200) + CONSTANT
 math["@a[sort=random, limit=1]"] = player.Health + (player.SelectedSlot * 9) / 5
 ```
 
+<details>
+
+<summary>Generated Commands</summary>
+
+```mcfunction
+scoreboard players operation $i0 bolt.expr.temp = current_id entity.id
+scoreboard players operation $i0 bolt.expr.temp /= $200 bolt.expr.const
+scoreboard players add $i0 bolt.expr.temp 86400
+scoreboard players operation @s math *= $i0 bolt.expr.temp
+
+execute store result score @a[sort=random, limit=1] math run data get entity @s SelectedSlot 1
+scoreboard players operation @a[sort=random, limit=1] math *= $9 bolt.expr.const
+scoreboard players operation @a[sort=random, limit=1] math /= $5 bolt.expr.const
+execute store result score $i3 bolt.expr.temp run data get entity @s Health 1
+scoreboard players operation @a[sort=random, limit=1] math += $i3 bolt.expr.temp
+```
+
+</details>
+
 You can also utilize local variables to simplify readability with longer operations. This is due to the unique `__rebind__` operator provided only in the `bolt` context which allows us provide custom behavior with the `=` operation. We also have defined helper functions such as `min` and `max`, alongside `sqrt` and `**` (for `pow`).
 
 ```py
 damage = Scoreboard.objective("damage")
 input = {
     "damage": damage["damage"],
-    "toughness" = damage["toughness"],
-    "armor" = damage["armor"]
+    "toughness": damage["toughness"],
+    "armor": damage["armor"]
 }
-output = damage["output]
+value = damage["value"]
+output = damage["output"]
 
 # This example is split up onto 3 lines to help with readability 📖
 #  The library will consider this one long expression when optimizing 🔥
-atf = (10 * input.armor - (400 * input.armor / (80 + 10 * input.toughness)))  # python local variable
-maxxed = max((10 * armor) / 5, atf)                                           # still local variable
-output = damage * (250 - (min(200, maxxed))) / 25                             # ✨ special behavior | generates commands ✨
+atf = (10 * input.armor - (400 * input.armor / (80 + 10 * input.toughness))) # python local variable
+maxxed = max((10 * input.armor) / 5, atf)                                    # still local variable
+output = value * (250 - (min(200, maxxed))) / 25                             # ✨ special behavior | generates commands ✨
 ```
+
+<details>
+
+<summary>Generated Commands</summary>
+
+```mcfunction
+scoreboard players set $i0 bolt.expr.temp 10
+scoreboard players operation $i0 bolt.expr.temp *= armor damage
+scoreboard players operation $i0 bolt.expr.temp /= $5 bolt.expr.const
+scoreboard players set $i2 bolt.expr.temp 10
+scoreboard players operation $i2 bolt.expr.temp *= armor damage
+scoreboard players set $i3 bolt.expr.temp 400
+scoreboard players operation $i3 bolt.expr.temp *= armor damage
+scoreboard players set $i4 bolt.expr.temp 10
+scoreboard players operation $i4 bolt.expr.temp *= toughness damage
+scoreboard players add $i4 bolt.expr.temp 80
+scoreboard players operation $i3 bolt.expr.temp /= $i4 bolt.expr.temp
+scoreboard players operation $i2 bolt.expr.temp -= $i3 bolt.expr.temp
+scoreboard players operation $i0 bolt.expr.temp > $i2 bolt.expr.temp
+scoreboard players set $i9 bolt.expr.temp 200
+scoreboard players operation $i9 bolt.expr.temp < $i0 bolt.expr.temp
+scoreboard players set output damage 250
+scoreboard players operation output damage -= $i9 bolt.expr.temp
+scoreboard players operation output damage *= value damage
+scoreboard players operation output damage /= $25 bolt.expr.const
+```
+
+</details>
 
 ## Advanced Use Cases 🔥
 
