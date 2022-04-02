@@ -38,6 +38,13 @@ class ScoreSource(Source):
     def __repr__(self):
         return f'"{str(self)}"'
 
+    @property
+    def holder(self):
+        return self.scoreholder
+
+    @property
+    def obj(self):
+        return self.objective
 
 class ConstantScoreSource(ScoreSource):
     objective: str = "const"
