@@ -49,7 +49,7 @@ math["@a[sort=random, limit=1]"] = player.Health + (player.SelectedSlot * 9) / 5
 
 <summary>Generated Commands</summary>
 
-```mcfunction
+```
 scoreboard players operation $i0 bolt.expr.temp = current_id entity.id
 scoreboard players operation $i0 bolt.expr.temp /= $200 bolt.expr.const
 scoreboard players add $i0 bolt.expr.temp 86400
@@ -87,7 +87,7 @@ output = value * (250 - (min(200, maxxed))) / 25                             # â
 
 <summary>Generated Commands</summary>
 
-```mcfunction
+```
 scoreboard players set $i0 bolt.expr.temp 10
 scoreboard players operation $i0 bolt.expr.temp *= armor damage
 scoreboard players operation $i0 bolt.expr.temp /= $5 bolt.expr.const
