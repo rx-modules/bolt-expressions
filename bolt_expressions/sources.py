@@ -46,6 +46,7 @@ class ScoreSource(Source):
     def obj(self):
         return self.objective
 
+
 class ConstantScoreSource(ScoreSource):
     objective: str = "const"
 

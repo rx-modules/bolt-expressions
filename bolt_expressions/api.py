@@ -29,6 +29,7 @@ class ExpressionOptions(BaseModel):
     temp_objective: str = "bolt.expr.temp"
     const_objective: str = "bolt.expr.const"
     init_path: str = "init_expressions"
+    objective_prefix: str = ""
 
 
 @dataclass
@@ -131,8 +132,10 @@ class Scoreboard:
     def set_score(self, score: ScoreSource, value: GenericValue):
         return self._expr.set(score, value)
 
-    def objective(self, name: str):
+    def objective(self, name: str, prefixed=True):
         """Get a Score instance through the Scoreboard API"""
+        if prefixed:
+            name = self._expr.opts.objective_prefix + name
         return Score(self, name)
 
     __call__ = objective
