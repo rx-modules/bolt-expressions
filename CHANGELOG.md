@@ -2,6 +2,15 @@
 
 <!--next-version-placeholder-->
 
+## v0.5.0 (2022-04-02)
+### Feature
+* `objective_prefix` config, optional `prefixed` flag when creating an objective. ([`6c43d51`](https://github.com/rx-modules/bolt-expressions/commit/6c43d51dd78b0c0da5cb239766bbeabd4359b84f))
+* `holder` and `obj` property aliases for score sources. ([`e6bfdb8`](https://github.com/rx-modules/bolt-expressions/commit/e6bfdb8b5cc3919104a1ef532a2365df4324ca84))
+
+### Documentation
+* Fix docs for now ([`8a0f02a`](https://github.com/rx-modules/bolt-expressions/commit/8a0f02adbd6028ae13f5f146c80a3ae326a9c36e))
+* Add generated commands to `tutorial.md` ([`8711845`](https://github.com/rx-modules/bolt-expressions/commit/8711845d32176c43224f3ed1e169e7380e413bcf))
+
 ## v0.4.5 (2022-03-31)
 ### Fix
 * Init function would be prepended to load tag even if `Expression.init` was called ([`34080fe`](https://github.com/rx-modules/bolt-expressions/commit/34080fe170b2a43148917d635f95602a9f52e57e))
