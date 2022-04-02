@@ -104,6 +104,17 @@ def dummy(nodes: Iterable["op.Operation"]):
     yield from nodes
 
 
+ScoreOperations = {
+    op.Add,
+    op.Subtract,
+    op.Multiply,
+    op.Divide,
+    op.Modulus,
+    op.Min,
+    op.Max,
+}
+
+
 @Optimizer.rule
 def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
     """For noncommutative operations:
@@ -127,7 +138,7 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
         further_node = next(nodes, None)
         if (
             type(node) is op.Set
-            and type(next_node) is not op.Set
+            and type(next_node) in ScoreOperations
             and type(further_node) is op.Set
             and isinstance(further_node.former, ScoreSource)
             and node.latter == further_node.former

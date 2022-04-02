@@ -9,7 +9,18 @@ from pydantic import BaseModel
 
 from . import resolver
 from .node import ExpressionNode
-from .operations import GenericValue, Operation, Set, wrapped_max, wrapped_min
+from .operations import (
+    Append,
+    GenericValue,
+    Insert,
+    Merge,
+    MergeRoot,
+    Operation,
+    Prepend,
+    Set,
+    wrapped_max,
+    wrapped_min,
+)
 from .optimizer import Optimizer
 from .sources import (
     ConstantScoreSource,
@@ -123,6 +134,8 @@ class Scoreboard:
         self._expr = self.ctx.inject(Expression)
         ConstantScoreSource.on_created(self.add_constant)
         ScoreSource.on_rebind(self.set_score)
+        ScoreSource.attach("reset", self.reset)
+        ScoreSource.attach("enable", self.enable)
 
     def add_constant(self, node: ConstantScoreSource):
         self._expr.init_commands.append(
@@ -139,6 +152,14 @@ class Scoreboard:
         return Score(self, name)
 
     __call__ = objective
+
+    def reset(self, source: ScoreSource):
+        cmd = resolver.generate("reset:score", source)
+        self._expr._inject_command(cmd)
+
+    def enable(self, source: ScoreSource):
+        cmd = resolver.generate("enable:score", source)
+        self._expr._inject_command(cmd)
 
 
 @dataclass
@@ -163,6 +184,11 @@ class Data:
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
         DataSource.on_rebind(self.set_data)
+        DataSource.attach("remove", self.remove)
+        DataSource.attach("append", self.append)
+        DataSource.attach("prepend", self.prepend)
+        DataSource.attach("insert", self.insert)
+        DataSource.attach("merge", self.merge)
 
     def __call__(self, target: str):
         """Guess target type and return a data source."""
@@ -179,3 +205,25 @@ class Data:
 
     def block(self, position: str):
         return DataSource.create("block", position)
+
+    def remove(self, source: DataSource, value: Union[str, int] = None):
+        node = source if value is None else source[value]
+        if not len(node._path):
+            raise ValueError(
+                f'Cannot remove the root of {node._type} "{node._target}".'
+            )
+        cmd = resolver.generate("remove:data", value=node)
+        self._expr._inject_command(cmd)
+
+    def append(self, source: DataSource, value: GenericValue):
+        self._expr.resolve(Append.create(source, value))
+
+    def prepend(self, source: DataSource, value: GenericValue):
+        self._expr.resolve(Prepend.create(source, value))
+
+    def insert(self, source: DataSource, index: int, value: GenericValue):
+        self._expr.resolve(Insert.create(source, value, index))
+
+    def merge(self, source: DataSource, value: GenericValue):
+        Operation = Merge if len(source._path) else MergeRoot
+        self._expr.resolve(Operation.create(source, value))
