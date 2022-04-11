@@ -134,21 +134,21 @@ lxml = ["lxml"]
 
 [[package]]
 name = "beet"
-version = "0.55.0"
+version = "0.56.0"
 description = "The Minecraft pack development kit"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-click = ">=8.0.1,<9.0.0"
+click = ">=8.1.2,<9.0.0"
 click-help-colors = ">=0.9.1,<0.10.0"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-Jinja2 = ">=3.0.1,<4.0.0"
+Jinja2 = ">=3.1.1,<4.0.0"
 nbtlib = ">=1.12.1,<2.0.0"
 pathspec = ">=0.9.0,<0.10.0"
 pydantic = ">=1.9.0,<2.0.0"
-PyYAML = ">=5.4.1,<7.0.0"
+PyYAML = ">=6.0,<7.0"
 toml = ">=0.10.2,<0.11.0"
 
 [package.extras]
@@ -221,11 +221,11 @@ unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
-version = "8.0.4"
+version = "8.1.2"
 description = "Composable command line interface toolkit"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
@@ -2055,8 +2055,8 @@ beautifulsoup4 = [
     {file = "beautifulsoup4-4.10.0.tar.gz", hash = "sha256:c23ad23c521d818955a4151a67d81580319d4bf548d3d49f4223ae041ff98891"},
 ]
 beet = [
-    {file = "beet-0.55.0-py3-none-any.whl", hash = "sha256:ccd814fe1e8c4fd75be7364980fb265a181f13000a3364f9b05b619d78d27d68"},
-    {file = "beet-0.55.0.tar.gz", hash = "sha256:fb65ae3514263c16abe7c68023dc1c6dbda800ff8566f9dbb29c522af58b1b06"},
+    {file = "beet-0.56.0-py3-none-any.whl", hash = "sha256:cb254b55b9cef6b2c66f27124b22d3531275c242a3f639b555a26d341d37e084"},
+    {file = "beet-0.56.0.tar.gz", hash = "sha256:8641083690692ce76387d0f1c0b6f7270fe53fe26f2aecd46f8012fcddbac69d"},
 ]
 black = [
     {file = "black-22.1.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:1297c63b9e1b96a3d0da2d85d11cd9bf8664251fd69ddac068b98dc4f34f73b6"},
@@ -2148,8 +2148,8 @@ charset-normalizer = [
     {file = "charset_normalizer-2.0.12-py3-none-any.whl", hash = "sha256:6881edbebdb17b39b4eaaa821b438bf6eddffb4468cf344f09f89def34a8b1df"},
 ]
 click = [
-    {file = "click-8.0.4-py3-none-any.whl", hash = "sha256:6a7a62563bbfabfda3a38f3023a1db4a35978c0abd76f6c9605ecd6554d6d9b1"},
-    {file = "click-8.0.4.tar.gz", hash = "sha256:8458d7b1287c5fb128c90e23381cf99dcde74beaf6c7ff6384ce84d6fe090adb"},
+    {file = "click-8.1.2-py3-none-any.whl", hash = "sha256:24e1a4a9ec5bf6299411369b208c1df2188d9eb8d916302fe6bf03faed227f1e"},
+    {file = "click-8.1.2.tar.gz", hash = "sha256:479707fe14d9ec9a0757618b7a100a0ae4c4e236fac5b7f80ca68028141a1a72"},
 ]
 click-help-colors = [
     {file = "click-help-colors-0.9.1.tar.gz", hash = "sha256:78cbcf30cfa81c5fc2a52f49220121e1a8190cd19197d9245997605d3405824d"},
