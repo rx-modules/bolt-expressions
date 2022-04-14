@@ -221,11 +221,11 @@ unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
-version = "8.0.4"
+version = "8.1.2"
 description = "Composable command line interface toolkit"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
@@ -875,24 +875,24 @@ python-versions = "*"
 
 [[package]]
 name = "mudkip"
-version = "0.5.1"
+version = "0.5.3"
 description = "A friendly Sphinx wrapper"
 category = "dev"
 optional = false
 python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-click = ">=8.0.4,<9.0.0"
+click = ">=8.1.2,<9.0.0"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-furo = ">=2022.2.14,<2023.0.0"
+furo = ">=2022.3.4,<2023.0.0"
 jupyter_nbextensions_configurator = ">=0.4.1,<0.5.0"
 livereload = ">=2.6.3,<3.0.0"
-myst-nb = ">=0.13.2,<0.14.0"
-notebook = ">=6.4.8,<7.0.0"
-Sphinx = ">=4.4.0,<5.0.0"
+myst-nb = ">=0.13.2"
+notebook = ">=6.4.10,<7.0.0"
+Sphinx = ">=4.5.0,<5.0.0"
 sphinx-rtd-theme = ">=1.0.0,<2.0.0"
-tomlkit = ">=0.7.0,<0.8.0"
-watchdog = ">=2.1.6,<3.0.0"
+tomlkit = ">=0.7.0"
+watchdog = ">=2.1.7,<3.0.0"
 
 [[package]]
 name = "mypy-extensions"
@@ -2148,8 +2148,8 @@ charset-normalizer = [
     {file = "charset_normalizer-2.0.12-py3-none-any.whl", hash = "sha256:6881edbebdb17b39b4eaaa821b438bf6eddffb4468cf344f09f89def34a8b1df"},
 ]
 click = [
-    {file = "click-8.0.4-py3-none-any.whl", hash = "sha256:6a7a62563bbfabfda3a38f3023a1db4a35978c0abd76f6c9605ecd6554d6d9b1"},
-    {file = "click-8.0.4.tar.gz", hash = "sha256:8458d7b1287c5fb128c90e23381cf99dcde74beaf6c7ff6384ce84d6fe090adb"},
+    {file = "click-8.1.2-py3-none-any.whl", hash = "sha256:24e1a4a9ec5bf6299411369b208c1df2188d9eb8d916302fe6bf03faed227f1e"},
+    {file = "click-8.1.2.tar.gz", hash = "sha256:479707fe14d9ec9a0757618b7a100a0ae4c4e236fac5b7f80ca68028141a1a72"},
 ]
 click-help-colors = [
     {file = "click-help-colors-0.9.1.tar.gz", hash = "sha256:78cbcf30cfa81c5fc2a52f49220121e1a8190cd19197d9245997605d3405824d"},
@@ -2466,8 +2466,8 @@ mistune = [
     {file = "mistune-0.8.4.tar.gz", hash = "sha256:59a3429db53c50b5c6bcc8a07f8848cb00d7dc8bdb431a4ab41920d201d4756e"},
 ]
 mudkip = [
-    {file = "mudkip-0.5.1-py3-none-any.whl", hash = "sha256:cc6fbd132abf1dc47e23c0d9fbd48d3c4fa926caaac3c73b5351dbb598e78eed"},
-    {file = "mudkip-0.5.1.tar.gz", hash = "sha256:413e0705466b9e4a3df5700b77504b861e2e5b39948738486e4011d7a2527a27"},
+    {file = "mudkip-0.5.3-py3-none-any.whl", hash = "sha256:61523c72b8934b9a4c1c97fcf036cf3444a0f320502741708954aa017681055e"},
+    {file = "mudkip-0.5.3.tar.gz", hash = "sha256:20d6baeeb132c43005376987001635bf462e7d3cabc8ffc0ddb03efe5244b4d4"},
 ]
 mypy-extensions = [
     {file = "mypy_extensions-0.4.3-py2.py3-none-any.whl", hash = "sha256:090fedd75945a69ae91ce1303b5824f428daf5a028d2f6ab8a299250a846f15d"},
