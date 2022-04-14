@@ -34,6 +34,7 @@ python-semantic-release = "^7.27.0"
 mudkip = ">=0.5.1"
 pytest-insta = ">=0.1.11"
 rich = "^12.2.0"
+pygments = {git = "https://github.com/rx-modules/pygments", rev = "master"}
 
 [tool.pytest.ini_options]
 minversion = "6.0"
