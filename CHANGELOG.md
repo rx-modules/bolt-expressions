@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.6.0 (2022-04-14)
+### Feature
+* Add expression node methods ([`97b5a44`](https://github.com/rx-modules/bolt-expressions/commit/97b5a44253370aeaef5d9c820e4ef93c4f4950c9))
+
 ## v0.5.0 (2022-04-02)
 ### Feature
 * `objective_prefix` config, optional `prefixed` flag when creating an objective. ([`6c43d51`](https://github.com/rx-modules/bolt-expressions/commit/6c43d51dd78b0c0da5cb239766bbeabd4359b84f))

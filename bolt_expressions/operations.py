@@ -36,7 +36,7 @@ class Operation(ExpressionNode):
     latter: GenericValue
 
     @classmethod
-    def create(cls, former: GenericValue, latter: GenericValue):
+    def create(cls, former: GenericValue, latter: GenericValue, *args, **kwargs):
         """Factory method to create new operations"""
 
         if not isinstance(former, ExpressionNode):
@@ -44,7 +44,7 @@ class Operation(ExpressionNode):
         if not isinstance(latter, ExpressionNode):
             latter = cls._handle_literal(latter)
 
-        return super().create(former, latter)
+        return super().create(former, latter, *args, **kwargs)
 
     @classmethod
     def _handle_literal(cls, value: Any):
@@ -67,6 +67,49 @@ class Operation(ExpressionNode):
             yield Set.create(temp_var, former_var)
         yield self.__class__.create(temp_var, latter_var)
         yield temp_var
+
+
+class DataOperation(Operation):
+    @classmethod
+    def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
+        if not isinstance(latter, ExpressionNode):
+            latter = Literal.create(latter)
+        return super().create(former, latter, *args, **kwargs)
+
+
+class Merge(DataOperation):
+    def unroll(self):
+        yield self
+
+
+class MergeRoot(Merge):
+    ...
+
+
+@dataclass(unsafe_hash=False, order=False)
+class Insert(DataOperation):
+    index: int
+
+    def unroll(self):
+        if type(self.latter) in (DataSource, Literal):
+            yield self
+        else:
+            *latter_nodes, latter_var = self.latter.unroll()
+            yield from latter_nodes
+            yield self.__class__.create(self.former, 0, self.index)
+            yield Set.create(self.former[self.index], latter_var)
+
+
+class Append(Insert):
+    @classmethod
+    def create(cls, former: DataSource, latter: GenericValue, *args):
+        return super().create(former, latter, -1)
+
+
+class Prepend(Insert):
+    @classmethod
+    def create(cls, former: DataSource, latter: GenericValue, *args):
+        return super().create(former, latter, 0)
 
 
 class Set(Operation):

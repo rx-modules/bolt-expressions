@@ -1,0 +1,16 @@
+name: bolt-expressions-node-methods
+
+data_pack:
+  load: [src]
+
+require:
+  - mecha.contrib.bolt
+  - bolt_expressions
+
+pipeline:
+  - mecha
+
+output: dist
+
+meta:
+  generate_namespace: test

@@ -855,7 +855,7 @@ testing = ["coverage", "pytest (>=3.6,<4)", "pytest-cov", "pytest-regressions"]
 
 [[package]]
 name = "mecha"
-version = "0.43.1"
+version = "0.43.3"
 description = "A powerful Minecraft command library"
 category = "main"
 optional = false
@@ -1496,11 +1496,11 @@ idna2008 = ["idna"]
 
 [[package]]
 name = "rich"
-version = "12.0.1"
+version = "12.2.0"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 category = "dev"
 optional = false
-python-versions = ">=3.6.2,<4.0.0"
+python-versions = ">=3.6.3,<4.0.0"
 
 [package.dependencies]
 commonmark = ">=0.9.0,<0.10.0"
@@ -2458,8 +2458,8 @@ mdit-py-plugins = [
     {file = "mdit_py_plugins-0.2.8-py3-none-any.whl", hash = "sha256:1833bf738e038e35d89cb3a07eb0d227ed647ce7dd357579b65343740c6d249c"},
 ]
 mecha = [
-    {file = "mecha-0.43.1-py3-none-any.whl", hash = "sha256:064a717b78ab4b6af848840609ba79208f319e2a0a56905ada3ddd19a79dfb5d"},
-    {file = "mecha-0.43.1.tar.gz", hash = "sha256:65d026b18c50435aa4cb1c6c179645e9216579f96209316985ec4541b6fdd278"},
+    {file = "mecha-0.43.3-py3-none-any.whl", hash = "sha256:c3cbbcd8e8788736e78f82505181398a1a3d53e2741ade0756722acad7faff27"},
+    {file = "mecha-0.43.3.tar.gz", hash = "sha256:80397b175888d3cd1a2f10c932fceb979792d73ae15d53aa85de14e559c0c6a1"},
 ]
 mistune = [
     {file = "mistune-0.8.4-py2.py3-none-any.whl", hash = "sha256:88a1051873018da288eee8538d476dffe1262495144b33ecb586c4ab266bb8d4"},
@@ -2843,8 +2843,8 @@ rfc3986 = [
     {file = "rfc3986-2.0.0.tar.gz", hash = "sha256:97aacf9dbd4bfd829baad6e6309fa6573aaf1be3f6fa735c8ab05e46cecb261c"},
 ]
 rich = [
-    {file = "rich-12.0.1-py3-none-any.whl", hash = "sha256:ce5c714e984a2d185399e4e1dd1f8b2feacb7cecfc576f1522425643a36a57ea"},
-    {file = "rich-12.0.1.tar.gz", hash = "sha256:3fba9dd15ebe048e2795a02ac19baee79dc12cc50b074ef70f2958cd651b59a9"},
+    {file = "rich-12.2.0-py3-none-any.whl", hash = "sha256:c50f3d253bc6a9bb9c79d61a26d510d74abdf1b16881260fab5edfc3edfb082f"},
+    {file = "rich-12.2.0.tar.gz", hash = "sha256:ea74bc9dad9589d8eea3e3fd0b136d8bf6e428888955f215824c2894f0da8b47"},
 ]
 secretstorage = [
     {file = "SecretStorage-3.3.1-py3-none-any.whl", hash = "sha256:422d82c36172d88d6a0ed5afdec956514b189ddbfb72fefab0c8a1cee4eaf71f"},

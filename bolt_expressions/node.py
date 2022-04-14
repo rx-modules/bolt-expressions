@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Callable, Iterable, Optional, overload
+from typing import Callable, Iterable, Optional, Set, overload
 
 
 @dataclass(unsafe_hash=True, order=False, eq=False)
 class ExpressionNode:
+    attached_methods = set()
+
     @classmethod
     def link(cls, magic_method: str, reverse=False):
         def decorator(operation_class):
@@ -19,6 +21,18 @@ class ExpressionNode:
             return operation_class
 
         return decorator
+
+    @classmethod
+    def attach(cls, method_name: str, function: Callable):
+        """Attach a method to an expression node."""
+        if getattr(cls, method_name, None) and method_name not in cls.attached_methods:
+            return
+
+        def method(self, *args, **kwargs):
+            return function(self, *args, **kwargs)
+
+        setattr(cls, method_name, method)
+        cls.attached_methods.add(method_name)
 
     @classmethod
     def create(cls, *args, **kwargs):
