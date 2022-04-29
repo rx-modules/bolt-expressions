@@ -4,7 +4,7 @@ data_pack:
   load: [src]
 
 require:
-  - mecha.contrib.bolt
+  - bolt
   - bolt_expressions
 
 pipeline:
