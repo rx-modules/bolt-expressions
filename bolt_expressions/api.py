@@ -4,7 +4,7 @@ from typing import Iterable, List, Union
 
 from beet import Context, Function, FunctionTag
 from mecha import Mecha
-from mecha.contrib.bolt import Runtime
+from bolt import Runtime
 from pydantic import BaseModel
 
 from . import resolver
