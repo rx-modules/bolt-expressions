@@ -134,7 +134,7 @@ lxml = ["lxml"]
 
 [[package]]
 name = "beet"
-version = "0.57.0"
+version = "0.63.1"
 description = "The Minecraft pack development kit"
 category = "main"
 optional = false
@@ -191,6 +191,18 @@ webencodings = "*"
 [package.extras]
 css = ["tinycss2 (>=1.1.0)"]
 dev = ["pip-tools (==6.5.1)", "pytest (==7.1.1)", "flake8 (==4.0.1)", "tox (==3.24.5)", "sphinx (==4.3.2)", "twine (==4.0.0)", "wheel (==0.37.1)", "hashin (==0.17.0)", "black (==22.3.0)", "mypy (==0.942)"]
+
+[[package]]
+name = "bolt"
+version = "0.3.1"
+description = "Supercharge Minecraft commands with Python"
+category = "main"
+optional = false
+python-versions = ">=3.8,<4.0"
+
+[package.dependencies]
+beet = ">=0.60.0"
+mecha = ">=0.48.1"
 
 [[package]]
 name = "certifi"
@@ -867,14 +879,14 @@ testing = ["coverage", "pytest (>=3.6,<4)", "pytest-cov", "pytest-regressions"]
 
 [[package]]
 name = "mecha"
-version = "0.45.0"
+version = "0.48.1"
 description = "A powerful Minecraft command library"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-beet = ">=0.57.0"
+beet = ">=0.60.0"
 tokenstream = ">=1.4,<2.0"
 
 [[package]]
@@ -2014,7 +2026,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "2ea2a6cb69e378d78526a62f12aa82f7b60aea405bfe871ed37d86cb7a875fb2"
+content-hash = "66501a6b35823b3d7da6a8859bfb66adb61824dd62dc269f07052d8d04ee0b31"
 
 [metadata.files]
 alabaster = [
@@ -2081,8 +2093,8 @@ beautifulsoup4 = [
     {file = "beautifulsoup4-4.11.1.tar.gz", hash = "sha256:ad9aa55b65ef2808eb405f46cf74df7fcb7044d5cbc26487f96eb2ef2e436693"},
 ]
 beet = [
-    {file = "beet-0.57.0-py3-none-any.whl", hash = "sha256:daaf5dedfabe173935aed45cf4e7570947bac5bbe8fe069721846af52c6c3a62"},
-    {file = "beet-0.57.0.tar.gz", hash = "sha256:6ef70983ae87852399e4831c1f11b10616c8911d93a14e2dc3e10814e91bd9da"},
+    {file = "beet-0.63.1-py3-none-any.whl", hash = "sha256:7ccac89303a0c7dbfefb3913b154b3ef3148347b4e0e2d9fb63ef7421406359a"},
+    {file = "beet-0.63.1.tar.gz", hash = "sha256:19a3723ff0ac5fe80b2d57ffb30349e1e5654b78d30a6fd81bc5d3a2c7ba7687"},
 ]
 black = [
     {file = "black-22.3.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:2497f9c2386572e28921fa8bec7be3e51de6801f7459dffd6e62492531c47e09"},
@@ -2112,6 +2124,10 @@ black = [
 bleach = [
     {file = "bleach-5.0.0-py3-none-any.whl", hash = "sha256:08a1fe86d253b5c88c92cc3d810fd8048a16d15762e1e5b74d502256e5926aa1"},
     {file = "bleach-5.0.0.tar.gz", hash = "sha256:c6d6cc054bdc9c83b48b8083e236e5f00f238428666d2ce2e083eaa5fd568565"},
+]
+bolt = [
+    {file = "bolt-0.3.1-py3-none-any.whl", hash = "sha256:513ecf1abd4a5d79c997d998a0649f51239fc7f221e983835f197c59b2769488"},
+    {file = "bolt-0.3.1.tar.gz", hash = "sha256:5ff4afe0c375b1c9eaabb893fd28fe082dd30c49ec5cdda5f5892e3f69cdeab8"},
 ]
 certifi = [
     {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
@@ -2488,8 +2504,8 @@ mdit-py-plugins = [
     {file = "mdit_py_plugins-0.2.8-py3-none-any.whl", hash = "sha256:1833bf738e038e35d89cb3a07eb0d227ed647ce7dd357579b65343740c6d249c"},
 ]
 mecha = [
-    {file = "mecha-0.45.0-py3-none-any.whl", hash = "sha256:b94391be1f6eaf5422121154f3235331f7556a998507c080931aa8558358df53"},
-    {file = "mecha-0.45.0.tar.gz", hash = "sha256:3a5b86676b345c84f115310b0a6c7ca922d808fe6bb6a1e380e2789013481ca9"},
+    {file = "mecha-0.48.1-py3-none-any.whl", hash = "sha256:a22a4f6815ab232fcc896836684d56beb82599babf2b137d83b8106f5a963cab"},
+    {file = "mecha-0.48.1.tar.gz", hash = "sha256:3c2a6a5da4ae2912939e2a590bd7d0a15dccbe3651c7efbf2369f91dbf880a99"},
 ]
 mistune = [
     {file = "mistune-0.8.4-py2.py3-none-any.whl", hash = "sha256:88a1051873018da288eee8538d476dffe1262495144b33ecb586c4ab266bb8d4"},

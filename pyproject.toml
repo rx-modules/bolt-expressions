@@ -24,8 +24,9 @@ keywords = [
 [tool.poetry.dependencies]
 python = "^3.9"
 beet = ">=0.55.0"
-mecha = ">=0.43.1"
+mecha = "^0.48.1"
 nbtlib = "1.12.1"
+bolt = "^0.3.1"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3.0"
