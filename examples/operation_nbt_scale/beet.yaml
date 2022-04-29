@@ -1,0 +1,16 @@
+name: bolt-expressions-nbt-scale
+
+data_pack:
+  load: [src]
+
+require:
+  - bolt
+  - bolt_expressions
+
+pipeline:
+  - mecha
+
+output: dist
+
+meta:
+  generate_namespace: test

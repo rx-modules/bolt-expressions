@@ -187,6 +187,101 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
 
 
 @Optimizer.rule
+def data_get_scaling(nodes: Iterable["op.Operation"]):
+    """
+    ````
+    execute store result score $i0 temp run data get storage demo value 1
+    scoreboard players operation $i0 temp *= $100 const
+    ```
+    ->
+    ```
+    execute store result score $i0 temp run data get storage demo value 100
+    ```
+    Examples to try:
+    >>> obj["#offset"] = (player.Motion[0] * 100) - obj["#x"]
+    """
+    for node in nodes:
+        next_node = next(nodes, None)
+        if (
+            isinstance(node, op.Set)
+            and isinstance(next_node, (op.Multiply, op.Divide))
+            and isinstance(node.latter, DataSource)
+            and isinstance(next_node.latter, ConstantScoreSource)
+            and node.former == next_node.former
+        ):
+            scale = int(next_node.latter.scoreholder[1:])
+            if isinstance(next_node, op.Divide):
+                scale = 1 / scale
+            out = op.Set(node.former, node.latter._copy(scale=scale))
+            yield out
+        else:
+            nodes.push(next_node)
+            yield node
+
+
+@Optimizer.rule
+def data_set_scaling(nodes: Iterable["op.Operation"]):
+    """
+    Turns a multiplication/division of a temp score followed by a
+    data set operation into a single set operation with a scale argument.
+    ```
+    scoreboard players operation $i0 temp /= $100 const
+    execute store result storage demo out int 1 run scoreboard players get $i0 temp
+    ```
+    ->
+    ```
+    execute store result storage demo out float 0.01 run scoreboard players get $i0 temp
+    ```
+
+    Also works with all data operations such as append, prepend and insert:
+    ```
+    scoreboard players operation $i1 bolt.expr.temp *= $100 bolt.expr.const
+    data modify storage demo list append value 0
+    execute store result storage demo list[-1] int 1 run scoreboard players get $i1 bolt.expr.temp
+    ```
+    ->
+    ```
+    data modify storage demo list append value 0
+    execute store result storage demo list[-1] int 100 run scoreboard players get $i1 bolt.expr.temp
+    
+    ```
+    Examples to try:
+    >>> temp.out = (obj["$value"] + 1) * 10
+    >>> temp.percent = (obj["$stack"] * 100) / 64
+    """
+    for node in nodes:
+        operation_node = None
+        next_node = next(nodes, None)
+        # skip data operation node (just so we can get to
+        # the actual Set node)
+        if isinstance(next_node, op.DataOperation):
+            operation_node = next_node
+            next_node = next(nodes, None)
+        if (
+            isinstance(node, (op.Multiply, op.Divide))
+            and isinstance(next_node, op.Set)
+            and isinstance(node.latter, ConstantScoreSource)
+            and isinstance(next_node.former, DataSource)
+            and node.former == next_node.latter
+        ):
+            scale = int(node.latter.scoreholder[1:])
+            number_type = next_node.former._number_type
+            if isinstance(node, op.Divide):
+                scale = 1 / scale
+                if number_type not in ("float", "double"):
+                    number_type = "float"
+            source = next_node.former._copy(scale=scale, number_type=number_type)
+            out = op.Set(source, node.former)
+            if operation_node:
+                yield operation_node # yield the data operation node back in
+            yield out
+        else:
+            nodes.push(next_node)
+            nodes.push(operation_node)
+            yield node
+
+
+@Optimizer.rule
 def constant_to_literal_replacement(
     nodes: Iterable["op.Operation"],
 ) -> Iterable["op.Operation"]:
@@ -250,4 +345,34 @@ def set_to_self_removal(nodes: Iterable["op.Operation"]):
             if node.former != node.latter:
                 yield node
         else:
+            yield node
+
+@Optimizer.rule
+def set_and_get_cleanup(nodes: Iterable["op.Operation"]):
+    """
+    Removes unnecessary temp vars possibly originated from previous
+    optimizations.
+    ```
+    scoreboard players operation $i0 bolt.expr.temp = $value obj
+    execute store result storage demo out float 0.01 run scoreboard players get $i0 bolt.expr.temp
+    ```
+    ->
+    ```
+    execute store result storage demo out float 0.01 run scoreboard players get $value obj
+    ```
+    Examples to try:
+    >>> temp.out = obj["$value"] / 100
+    >>> temp.out = temp.value * 100 / 100
+    """
+    for node in nodes:
+        next_node = next(nodes, None)
+        if (
+            isinstance(node, op.Set)
+            and isinstance(next_node, op.Set)
+            and node.former == next_node.latter
+        ):
+            out = op.Set(next_node.former, node.latter)
+            yield out
+        else:
+            nodes.push(next_node)
             yield node
