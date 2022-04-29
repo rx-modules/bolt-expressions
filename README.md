@@ -32,7 +32,7 @@ scoreboard players operations @s math = $i0 bolt.expressions.temp
 
 ## Installation
 
-The package can be installed with `pip`. Note, you must have both `beet` and `mecha` installed to use this package.
+The package can be installed with `pip`. Note, you must have `beet`, `mecha` and `bolt` installed to use this package.
 
 ```bash
 $ pip install bolt-expressions
@@ -40,11 +40,11 @@ $ pip install bolt-expressions
 
 ## Getting started
 
-This package is designed to be used within any `bolt` script (either a `.mcfunction` or `bolt` file) inside a `mecha.contrib.bolt` enabled project. Note, `bolt-expressions` is not a plugin (yet), so there's no need to `require` `bolt-expressions`.
+This package is designed to be used within any `bolt` script (either a `.mcfunction` or `bolt` file) inside a `bolt` enabled project.
 
 ```yaml
 require:
-    - mecha.contrib.bolt
+    - bolt
 
 pipeline:
     - mecha
