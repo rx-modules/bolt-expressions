@@ -2,6 +2,14 @@
 
 <!--next-version-placeholder-->
 
+## v0.6.1 (2022-04-30)
+### Fix
+* Use `bolt` package instead of `mecha.contrib.bolt` in `api.py` ([`ace4b1a`](https://github.com/rx-modules/bolt-expressions/commit/ace4b1ae5f637f771e819e6bb83a32cd8a92866b))
+
+### Documentation
+* Changes related to the new `bolt` package. ([`6ceac3b`](https://github.com/rx-modules/bolt-expressions/commit/6ceac3bc93a4e6949302eb96bb68ef60d8c2461b))
+* Fix tutorial codeblocks not using mcfunction lang ([`aff3d90`](https://github.com/rx-modules/bolt-expressions/commit/aff3d905f87ccdd8a74467a38d8f925f550780af))
+
 ## v0.6.0 (2022-04-14)
 ### Feature
 * Add expression node methods ([`97b5a44`](https://github.com/rx-modules/bolt-expressions/commit/97b5a44253370aeaef5d9c820e4ef93c4f4950c9))
