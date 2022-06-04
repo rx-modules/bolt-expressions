@@ -167,8 +167,12 @@ class Score:
     ref: Scoreboard = field(repr=False)
     objective: str
 
-    def __getitem__(self, scoreholder: str) -> ScoreSource:
-        return ScoreSource.create(scoreholder, self.objective)
+    def __getitem__(self, scoreholder: Union[str, List[str]]) -> ScoreSource:
+        if type(scoreholder) is str:
+            return ScoreSource.create(scoreholder, self.objective)
+        return [
+            ScoreSource.create(holder, self.objective) for holder in scoreholder
+        ]
 
     def __setitem__(self, scoreholder: str, value: Operation):
         self.ref.set_score(self[scoreholder], value)
