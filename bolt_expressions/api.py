@@ -151,7 +151,11 @@ class Scoreboard:
             name = self._expr.opts.objective_prefix + name
         return Score(self, name)
 
-    __call__ = objective
+    def __call__(self, objective: str, *holders: List[str], prefixed_obj=True):
+        obj = self.objective(objective, prefixed_obj)
+        if len(holders):
+            return obj[holders]
+        return obj
 
     def reset(self, source: ScoreSource):
         cmd = resolver.generate("reset:score", source)
