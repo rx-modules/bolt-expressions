@@ -243,7 +243,7 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
     ```
     data modify storage demo list append value 0
     execute store result storage demo list[-1] int 100 run scoreboard players get $i1 bolt.expr.temp
-    
+
     ```
     Examples to try:
     >>> temp.out = (obj["$value"] + 1) * 10
@@ -273,7 +273,7 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
             source = next_node.former._copy(scale=scale, number_type=number_type)
             out = op.Set(source, node.former)
             if operation_node:
-                yield operation_node # yield the data operation node back in
+                yield operation_node  # yield the data operation node back in
             yield out
         else:
             nodes.push(next_node)
@@ -346,6 +346,7 @@ def set_to_self_removal(nodes: Iterable["op.Operation"]):
                 yield node
         else:
             yield node
+
 
 @Optimizer.rule
 def set_and_get_cleanup(nodes: Iterable["op.Operation"]):
