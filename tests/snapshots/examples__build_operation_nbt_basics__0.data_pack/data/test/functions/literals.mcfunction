@@ -5,12 +5,8 @@ execute store result entity @s Health int 1 run scoreboard players get $i0 bolt.
 execute store result score $i0 bolt.expr.temp run data get entity rx97 Health 1
 scoreboard players remove $i0 bolt.expr.temp 30
 execute store result entity rx97 Health int 1 run scoreboard players get $i0 bolt.expr.temp
-execute store result score $i0 bolt.expr.temp run data get block 0 0 0 data.ur_mom 1
-scoreboard players operation $i0 bolt.expr.temp *= $40 bolt.expr.const
-execute store result block 0 0 0 data.ur_mom int 1 run scoreboard players get $i0 bolt.expr.temp
-execute store result score $i0 bolt.expr.temp run data get block ~1 ~2 ~3 Items[0].Count 1
-scoreboard players operation $i0 bolt.expr.temp /= $50 bolt.expr.const
-execute store result block ~1 ~2 ~3 Items[0].Count int 1 run scoreboard players get $i0 bolt.expr.temp
+data modify block 0 0 0 data.ur_mom set from block 0 0 0 data.ur_mom
+data modify block ~1 ~2 ~3 Items[0].Count set from block ~1 ~2 ~3 Items[0].Count
 execute store result score $i0 bolt.expr.temp run data get entity TheWii Inventory[{Slot: -103b}].tag.data.bolt 1
 scoreboard players operation $i0 bolt.expr.temp %= $60 bolt.expr.const
 execute store result entity TheWii Inventory[{Slot: -103b}].tag.data.bolt int 1 run scoreboard players get $i0 bolt.expr.temp
