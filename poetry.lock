@@ -117,7 +117,7 @@ lxml = ["lxml"]
 
 [[package]]
 name = "beet"
-version = "0.67.0"
+version = "0.67.1"
 description = "The Minecraft pack development kit"
 category = "main"
 optional = false
@@ -1946,8 +1946,8 @@ beautifulsoup4 = [
     {file = "beautifulsoup4-4.11.1.tar.gz", hash = "sha256:ad9aa55b65ef2808eb405f46cf74df7fcb7044d5cbc26487f96eb2ef2e436693"},
 ]
 beet = [
-    {file = "beet-0.67.0-py3-none-any.whl", hash = "sha256:4e44e7278be50ebd8dec697e411ccdc377a24308e21cdb197f071dfbe1e1cde7"},
-    {file = "beet-0.67.0.tar.gz", hash = "sha256:f6796b7a8e8241aabbbf5b7e15403e87645055b4ec952bb9cfc0a5c0ba52d48d"},
+    {file = "beet-0.67.1-py3-none-any.whl", hash = "sha256:1b849bef4133012f3f058ea7a56a2250b4afd9bc2bdf785c7d381bf3b2a7bca3"},
+    {file = "beet-0.67.1.tar.gz", hash = "sha256:cd874be2e4894be467043bebd6477b04ccebb8c52e5d5957db539371dd47c4b2"},
 ]
 black = [
     {file = "black-22.3.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:2497f9c2386572e28921fa8bec7be3e51de6801f7459dffd6e62492531c47e09"},
