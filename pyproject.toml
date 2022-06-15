@@ -34,7 +34,7 @@ isort = "^5.10.1"
 python-semantic-release = "^7.29.1"
 mudkip = ">=0.5.1"
 pytest-insta = ">=0.1.11"
-rich = "^12.2.0"
+rich = "^12.4.4"
 pygments = {git = "https://github.com/rx-modules/pygments"}
 
 [tool.pytest.ini_options]
