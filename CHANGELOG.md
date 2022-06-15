@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.7.0 (2022-06-15)
+### Feature
+* Scale nbt data with multiplication/division ([`ebf9420`](https://github.com/rx-modules/bolt-expressions/commit/ebf942009d5696b57d695e05b3dfc2819f9029d3))
+* Directly create score sources using the Scoreboard API ([`4d42c97`](https://github.com/rx-modules/bolt-expressions/commit/4d42c97990f872f107892cf6b2f27202343ceb28))
+* Create multiple score sources at once ([`4eca574`](https://github.com/rx-modules/bolt-expressions/commit/4eca5743740799ec57def181559ff908d949e71c))
+
 ## v0.6.1 (2022-04-30)
 ### Fix
 * Use `bolt` package instead of `mecha.contrib.bolt` in `api.py` ([`ace4b1a`](https://github.com/rx-modules/bolt-expressions/commit/ace4b1ae5f637f771e819e6bb83a32cd8a92866b))

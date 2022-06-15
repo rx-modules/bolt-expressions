@@ -1,4 +1,4 @@
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 from .api import Data as _Data
 from .api import Expression as _Expression
