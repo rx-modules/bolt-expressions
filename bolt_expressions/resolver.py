@@ -1,13 +1,16 @@
 from typing import Dict, Iterable, List
 
 from .operations import GenericValue, Operation
-from .sources import DataSource, ScoreSource
+from .sources import DataSource, ScoreSource, Source
 
 Command: type = str
 
 
 def get_templates() -> Dict[str, str]:
     return {
+        "node": resolve_node,
+        "execute": resolve_execute,
+        "execute:store": resolve_execute_store,
         "set:score:literal": lambda op: f"scoreboard players set {op.former} {op.latter}",
         "add:score:literal": lambda op: f"scoreboard players add {op.former} {op.latter}",
         "subtract:score:literal": lambda op: f"scoreboard players remove {op.former} {op.latter}",
@@ -37,12 +40,6 @@ def get_templates() -> Dict[str, str]:
         "enable:score": lambda source: f"scoreboard players enable {source}",
     }
 
-
-def resolve(nodes: List[Operation]) -> Iterable[Command]:
-    """Transforms a list of operation nodes into command strings."""
-    yield from map(generate_node, nodes)
-
-
 def get_type(node: GenericValue):
     # optimizer might convert an int score back to a literal int
     # for operations like Set, Add and Subtract
@@ -52,17 +49,30 @@ def get_type(node: GenericValue):
         return "data"
     return "literal"
 
+def generate(template_id: str, *args, **kwargs):
+    template = get_templates()[template_id]
+    return template(*args, *kwargs.values())
 
-def generate_node(node: Operation) -> Command:
+def resolve_execute(node: Operation):
+    args = []
+    for source in node.store:
+        args.append(generate("execute:store", source))
+    return " ".join(("execute", *args, "run ")) if args else ""
+
+def resolve_execute_store(source: Source):
+    if isinstance(source, ScoreSource):
+        return f"store result score {source}"
+    if isinstance(source, DataSource):
+        return f"store result {source} {source._number_type} {source._scale}"
+
+def resolve_node(node: Operation):
     id = node.__class__.__name__.lower()  # TODO Operation should have an id property
     former_type = get_type(node.former)
     latter_type = get_type(node.latter)
     template_id = f"{id}:{former_type}:{latter_type}"
-    return generate(template_id, node)
+    cmd = generate("execute", node)
+    return cmd + generate(template_id, node)
 
-
-def generate(template_id: str, *args, **kwargs):
-    template = get_templates()[template_id]
-    if callable(template):
-        return template(*args, *kwargs.values())
-    return template.format(**kwargs)
+def resolve(nodes: List[Operation]) -> Iterable[Command]:
+    """Transforms a list of operation nodes into command strings."""
+    yield from map(resolve_node, nodes)

@@ -29,6 +29,7 @@ from .sources import (
     Source,
     TempScoreSource,
 )
+from .utils import identifier_generator
 
 # from rich import print
 # from rich.pretty import pprint
@@ -39,6 +40,7 @@ class ExpressionOptions(BaseModel):
 
     temp_objective: str = "bolt.expr.temp"
     const_objective: str = "bolt.expr.const"
+    temp_storage: str = "bolt.expr:temp"
     init_path: str = "init_expressions"
     objective_prefix: str = ""
 
@@ -189,6 +191,7 @@ class Data:
 
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
+        self.identifiers = identifier_generator(self.ctx)
         DataSource.on_rebind(self.set_data)
         DataSource.attach("remove", self.remove)
         DataSource.attach("append", self.append)
@@ -212,6 +215,17 @@ class Data:
     def block(self, position: str):
         return DataSource.create("block", position)
 
+    def dummy(self, scale: int = 1, type: str = "int"):
+        "Create a dummy data source in a storage."
+        path = next(self.identifiers)
+        target = self._expr.opts.temp_storage
+        return DataSource.create("storage", target, path, scale, type)
+
+    def cast(self, value: Union[Source, Operation], type: str):
+        source = self.dummy(type=type)
+        self._expr.set(source, value)
+        return source
+
     def remove(self, source: DataSource, value: Union[str, int] = None):
         node = source if value is None else source[value]
         if not len(node._path):
@@ -228,7 +242,7 @@ class Data:
         self._expr.resolve(Prepend.create(source, value))
 
     def insert(self, source: DataSource, index: int, value: GenericValue):
-        self._expr.resolve(Insert.create(source, value, index))
+        self._expr.resolve(Insert.create(source, value, index=index))
 
     def merge(self, source: DataSource, value: GenericValue):
         Operation = Merge if len(source._path) else MergeRoot

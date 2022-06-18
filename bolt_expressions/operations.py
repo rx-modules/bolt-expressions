@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Union
+from dataclasses import dataclass, field
+from typing import Any, Callable, Iterable, List, Tuple, Union
 
 from nbtlib import Int
 
@@ -34,6 +34,7 @@ def wrapped_max(*args, **kwargs):
 class Operation(ExpressionNode):
     former: GenericValue
     latter: GenericValue
+    store: Tuple[Source] = field(default_factory=tuple)
 
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue, *args, **kwargs):
@@ -88,7 +89,7 @@ class MergeRoot(Merge):
 
 @dataclass(unsafe_hash=False, order=False)
 class Insert(DataOperation):
-    index: int
+    index: int = 0
 
     def unroll(self):
         if type(self.latter) in (DataSource, Literal):
@@ -96,20 +97,20 @@ class Insert(DataOperation):
         else:
             *latter_nodes, latter_var = self.latter.unroll()
             yield from latter_nodes
-            yield self.__class__.create(self.former, 0, self.index)
+            yield self.__class__.create(self.former, 0, index=self.index)
             yield Set.create(self.former[self.index], latter_var)
 
 
 class Append(Insert):
     @classmethod
-    def create(cls, former: DataSource, latter: GenericValue, *args):
-        return super().create(former, latter, -1)
+    def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
+        return super().create(former, latter, index=-1)
 
 
 class Prepend(Insert):
     @classmethod
-    def create(cls, former: DataSource, latter: GenericValue, *args):
-        return super().create(former, latter, 0)
+    def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
+        return super().create(former, latter, index=0)
 
 
 class Set(Operation):

@@ -1,0 +1,13 @@
+from typing import Dict
+
+from beet import Context
+from bolt import Runtime
+
+
+def identifier_generator(ctx: Context):
+    runtime = ctx.inject(Runtime)
+    incr: Dict[str, int] = {}
+    while True:
+        path = runtime.get_path()
+        incr[path] = incr.setdefault(path, -1) + 1
+        yield ctx.generate.format(f"{{hash}}_{incr[path]}", path)
