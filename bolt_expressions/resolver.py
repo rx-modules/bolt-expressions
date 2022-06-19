@@ -23,7 +23,7 @@ def get_templates() -> Dict[str, str]:
         "min:score:score": lambda op: f"scoreboard players operation {op.former} < {op.latter}",
         "max:score:score": lambda op: f"scoreboard players operation {op.former} > {op.latter}",
         "set:data:literal": lambda op: f"data modify {op.former} set value {op.latter}",
-        "set:data:data": lambda op: f"data modify {op.former} set from {op.latter}",
+        "set:data:data": resolve_set_data_data,
         "set:data:score": lambda op: f"execute store result {op.former} {op.former._number_type} {op.former._scale} run scoreboard players get {op.latter}",
         "set:score:data": lambda op: f"execute store result score {op.former} run data get {op.latter} {op.latter._scale}",
         "append:data:literal": lambda op: f"data modify {op.former} append value {op.latter}",
@@ -40,6 +40,7 @@ def get_templates() -> Dict[str, str]:
         "enable:score": lambda source: f"scoreboard players enable {source}",
     }
 
+
 def get_type(node: GenericValue):
     # optimizer might convert an int score back to a literal int
     # for operations like Set, Add and Subtract
@@ -49,9 +50,11 @@ def get_type(node: GenericValue):
         return "data"
     return "literal"
 
+
 def generate(template_id: str, *args, **kwargs):
     template = get_templates()[template_id]
     return template(*args, *kwargs.values())
+
 
 def resolve_execute(node: Operation):
     args = []
@@ -59,11 +62,23 @@ def resolve_execute(node: Operation):
         args.append(generate("execute:store", source))
     return " ".join(("execute", *args, "run ")) if args else ""
 
+
 def resolve_execute_store(source: Source):
     if isinstance(source, ScoreSource):
         return f"store result score {source}"
     if isinstance(source, DataSource):
         return f"store result {source} {source._number_type} {source._scale}"
+
+
+def resolve_set_data_data(op: Operation):
+    if (
+        op.former._scale != 1
+        or op.latter._scale != 1
+        or op.former._number_type != "int"
+    ):
+        return f"execute store result {op.former} {op.former._number_type} {op.former._scale} run data get {op.latter} {op.latter._scale}"
+    return f"data modify {op.former} set from {op.latter}"
+
 
 def resolve_node(node: Operation):
     id = node.__class__.__name__.lower()  # TODO Operation should have an id property
@@ -72,6 +87,7 @@ def resolve_node(node: Operation):
     template_id = f"{id}:{former_type}:{latter_type}"
     cmd = generate("execute", node)
     return cmd + generate(template_id, node)
+
 
 def resolve(nodes: List[Operation]) -> Iterable[Command]:
     """Transforms a list of operation nodes into command strings."""
