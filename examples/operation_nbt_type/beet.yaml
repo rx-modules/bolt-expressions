@@ -1,0 +1,17 @@
+name: bolt-expressions-nbt-type
+
+data_pack:
+  load:
+    data/test/functions: src
+
+require:
+  - bolt
+  - bolt_expressions
+
+pipeline:
+  - mecha
+
+output: dist
+
+meta:
+  generate_namespace: test
