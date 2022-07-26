@@ -187,39 +187,6 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
 
 
 @Optimizer.rule
-def data_get_scaling(nodes: Iterable["op.Operation"]):
-    """
-    ````
-    execute store result score $i0 temp run data get storage demo value 1
-    scoreboard players operation $i0 temp *= $100 const
-    ```
-    ->
-    ```
-    execute store result score $i0 temp run data get storage demo value 100
-    ```
-    Examples to try:
-    >>> obj["#offset"] = (player.Motion[0] * 100) - obj["#x"]
-    """
-    for node in nodes:
-        next_node = next(nodes, None)
-        if (
-            isinstance(node, op.Set)
-            and isinstance(next_node, (op.Multiply, op.Divide))
-            and isinstance(node.latter, DataSource)
-            and isinstance(next_node.latter, ConstantScoreSource)
-            and node.former == next_node.former
-        ):
-            scale = int(next_node.latter.scoreholder[1:])
-            if isinstance(next_node, op.Divide):
-                scale = 1 / scale
-            out = op.Set(node.former, node.latter._copy(scale=scale))
-            yield out
-        else:
-            nodes.push(next_node)
-            yield node
-
-
-@Optimizer.rule
 def data_set_scaling(nodes: Iterable["op.Operation"]):
     """
     Turns a multiplication/division of a temp score followed by a
@@ -265,19 +232,52 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
             and node.former == next_node.latter
         ):
             scale = int(node.latter.scoreholder[1:])
-            number_type = next_node.former._number_type
+            source = next_node.former
+            number_type = source._nbt_type
             if isinstance(node, op.Divide):
                 scale = 1 / scale
-                if number_type not in ("float", "double"):
-                    number_type = "float"
-            source = next_node.former._copy(scale=scale, number_type=number_type)
-            out = op.Set(source, node.former)
+                number_type = number_type or source._default_floating_point_type
+            new_source = source._copy(scale=scale, nbt_type=number_type)
+            out = op.Set(new_source, node.former)
             if operation_node:
                 yield operation_node  # yield the data operation node back in
             yield out
         else:
             nodes.push(next_node)
             nodes.push(operation_node)
+            yield node
+
+
+@Optimizer.rule
+def data_get_scaling(nodes: Iterable["op.Operation"]):
+    """
+    ````
+    execute store result score $i0 temp run data get storage demo value 1
+    scoreboard players operation $i0 temp *= $100 const
+    ```
+    ->
+    ```
+    execute store result score $i0 temp run data get storage demo value 100
+    ```
+    Examples to try:
+    >>> obj["#offset"] = (player.Motion[0] * 100) - obj["#x"]
+    """
+    for node in nodes:
+        next_node = next(nodes, None)
+        if (
+            isinstance(node, op.Set)
+            and isinstance(next_node, (op.Multiply, op.Divide))
+            and isinstance(node.latter, DataSource)
+            and isinstance(next_node.latter, ConstantScoreSource)
+            and node.former == next_node.former
+        ):
+            scale = int(next_node.latter.scoreholder[1:])
+            if isinstance(next_node, op.Divide):
+                scale = 1 / scale
+            out = op.Set(node.former, node.latter._copy(scale=scale))
+            yield out
+        else:
+            nodes.push(next_node)
             yield node
 
 

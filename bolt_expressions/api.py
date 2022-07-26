@@ -8,6 +8,7 @@ from mecha import Mecha
 from pydantic import BaseModel
 
 from . import resolver
+from .literals import literal_types
 from .node import ExpressionNode
 from .operations import (
     Append,
@@ -223,8 +224,10 @@ class Data:
 
     def cast(self, value: Union[Source, Operation], type: str):
         source = self.dummy(type=type)
+        if not isinstance(value, ExpressionNode):
+            value = literal_types[type](value)
         self._expr.set(source, value)
-        return source
+        return source._copy(nbt_type=None)
 
     def remove(self, source: DataSource, value: Union[str, int] = None):
         node = source if value is None else source[value]

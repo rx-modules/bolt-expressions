@@ -1,9 +1,21 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from nbtlib import Base, Byte, Compound, Double, Float, Int, List, String
+from nbtlib import Base, Byte, Compound, Double, Float, Int, List, Long, Short, String
 
 from .node import ExpressionNode
+
+literal_types = {
+    "byte": Byte,
+    "short": Short,
+    "int": Int,
+    "long": Long,
+    "float": Float,
+    "double": Double,
+    "compound": Compound,
+    "list": List,
+    "string": String,
+}
 
 
 def convert_tag(value):

@@ -81,11 +81,13 @@ def parse_compound(value: Union[str, dict, Path, Compound]):
 
 @dataclass(unsafe_hash=True, order=False)
 class DataSource(Source):
+    _default_nbt_type: ClassVar[str] = "int"
+    _default_floating_point_type: ClassVar[str] = "double"
     _type: str
     _target: str
     _path: Path = field(default_factory=Path)
     _scale: float = 1
-    _number_type: str = "int"
+    _nbt_type: str = None
 
     _constructed: bool = field(hash=False, default=False)
 
@@ -142,7 +144,7 @@ class DataSource(Source):
         return self._copy(
             path=path,
             scale=scale if scale is not None else self._scale,
-            number_type=type if type is not None else self._number_type,
+            nbt_type=type if type is not None else self._nbt_type,
         )
 
     def __str__(self):
@@ -158,8 +160,11 @@ class DataSource(Source):
             _target=kwargs.get("target", self._target),
             _path=kwargs.get("path", self._path),
             _scale=kwargs.get("scale", self._scale),
-            _number_type=kwargs.get("number_type", self._number_type),
+            _nbt_type=kwargs.get("nbt_type", self._nbt_type),
         )
+
+    def get_type(self):
+        return self._nbt_type if self._nbt_type else self._default_nbt_type
 
     def all(self) -> "DataSource":
         path = self._path + "[]"
