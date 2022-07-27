@@ -2,6 +2,14 @@
 
 <!--next-version-placeholder-->
 
+## v0.8.0 (2022-07-27)
+### Feature
+* Api method to cast expressions to any nbt type ([`eb3d532`](https://github.com/rx-modules/bolt-expressions/commit/eb3d53227df26d48f8291f1f0137ccc12f75caba))
+
+### Fix
+* Better nbt type handling ([`9f63995`](https://github.com/rx-modules/bolt-expressions/commit/9f63995b4fdfd38803da54260acd18bb09493c45))
+* Scaling/casting between data sources doesn't work ([`5074414`](https://github.com/rx-modules/bolt-expressions/commit/50744149cf3a16cefce18e42d096ffc44196f1bc))
+
 ## v0.7.0 (2022-06-15)
 ### Feature
 * Scale nbt data with multiplication/division ([`ebf9420`](https://github.com/rx-modules/bolt-expressions/commit/ebf942009d5696b57d695e05b3dfc2819f9029d3))
