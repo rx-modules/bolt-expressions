@@ -117,7 +117,7 @@ lxml = ["lxml"]
 
 [[package]]
 name = "beet"
-version = "0.67.1"
+version = "0.69.0"
 description = "The Minecraft pack development kit"
 category = "main"
 optional = false
@@ -177,15 +177,15 @@ dev = ["pip-tools (==6.5.1)", "pytest (==7.1.1)", "flake8 (==4.0.1)", "tox (==3.
 
 [[package]]
 name = "bolt"
-version = "0.3.3"
+version = "0.17.3"
 description = "Supercharge Minecraft commands with Python"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-beet = ">=0.60.0"
-mecha = ">=0.48.1"
+beet = ">=0.68.3"
+mecha = ">=0.54.9"
 
 [[package]]
 name = "certifi"
@@ -779,15 +779,15 @@ testing = ["coverage", "pytest (>=3.6,<4)", "pytest-cov", "pytest-regressions"]
 
 [[package]]
 name = "mecha"
-version = "0.50.2"
+version = "0.54.9"
 description = "A powerful Minecraft command library"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-beet = ">=0.60.0"
-tokenstream = "1.4.1"
+beet = ">=0.68.2"
+tokenstream = "1.4.2"
 
 [[package]]
 name = "mistune"
@@ -1726,7 +1726,7 @@ test = ["pytest", "pytest-cov", "pytest-flake8", "pytest-isort", "coverage"]
 
 [[package]]
 name = "tokenstream"
-version = "1.4.1"
+version = "1.4.2"
 description = "A versatile token stream for handwritten parsers"
 category = "main"
 optional = false
@@ -1883,7 +1883,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "80de9ab513bfdf3bdf98537620e7e4d44810589a04aed048da77ffdc97df6f4c"
+content-hash = "00318541beca6e75e0934a4f3aa1c3f2ef4b5a86217a73ee9c15d11202f3d116"
 
 [metadata.files]
 alabaster = [
@@ -1945,10 +1945,7 @@ beautifulsoup4 = [
     {file = "beautifulsoup4-4.11.1-py3-none-any.whl", hash = "sha256:58d5c3d29f5a36ffeb94f02f0d786cd53014cf9b3b3951d42e0080d8a9498d30"},
     {file = "beautifulsoup4-4.11.1.tar.gz", hash = "sha256:ad9aa55b65ef2808eb405f46cf74df7fcb7044d5cbc26487f96eb2ef2e436693"},
 ]
-beet = [
-    {file = "beet-0.67.1-py3-none-any.whl", hash = "sha256:1b849bef4133012f3f058ea7a56a2250b4afd9bc2bdf785c7d381bf3b2a7bca3"},
-    {file = "beet-0.67.1.tar.gz", hash = "sha256:cd874be2e4894be467043bebd6477b04ccebb8c52e5d5957db539371dd47c4b2"},
-]
+beet = []
 black = [
     {file = "black-22.3.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:2497f9c2386572e28921fa8bec7be3e51de6801f7459dffd6e62492531c47e09"},
     {file = "black-22.3.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:5795a0375eb87bfe902e80e0c8cfaedf8af4d49694d69161e5bd3206c18618bb"},
@@ -1978,10 +1975,7 @@ bleach = [
     {file = "bleach-5.0.0-py3-none-any.whl", hash = "sha256:08a1fe86d253b5c88c92cc3d810fd8048a16d15762e1e5b74d502256e5926aa1"},
     {file = "bleach-5.0.0.tar.gz", hash = "sha256:c6d6cc054bdc9c83b48b8083e236e5f00f238428666d2ce2e083eaa5fd568565"},
 ]
-bolt = [
-    {file = "bolt-0.3.3-py3-none-any.whl", hash = "sha256:9431c31ad42ebbb9b28a60276bf49f4470e220e58cf05882c33c569dd56fa55a"},
-    {file = "bolt-0.3.3.tar.gz", hash = "sha256:634003be92ce2d231ed58cc00c749011e39d92cbd13f4917d4b9ea771a19beb2"},
-]
+bolt = []
 certifi = [
     {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
     {file = "certifi-2021.10.8.tar.gz", hash = "sha256:78884e7c1d4b00ce3cea67b44566851c4343c120abd683433ce934a68ea58872"},
@@ -2336,10 +2330,7 @@ mdit-py-plugins = [
     {file = "mdit-py-plugins-0.3.0.tar.gz", hash = "sha256:ecc24f51eeec6ab7eecc2f9724e8272c2fb191c2e93cf98109120c2cace69750"},
     {file = "mdit_py_plugins-0.3.0-py3-none-any.whl", hash = "sha256:b1279701cee2dbf50e188d3da5f51fee8d78d038cdf99be57c6b9d1aa93b4073"},
 ]
-mecha = [
-    {file = "mecha-0.50.2-py3-none-any.whl", hash = "sha256:f3f640fae9e909107d0339b2d8ad5117e06a1c35febdc6cca9c872fc9702c2e7"},
-    {file = "mecha-0.50.2.tar.gz", hash = "sha256:2e2f67e32aae30dd5dce792b409f98039f72f2163361588ee95d8696028194ec"},
-]
+mecha = []
 mistune = [
     {file = "mistune-0.8.4-py2.py3-none-any.whl", hash = "sha256:88a1051873018da288eee8538d476dffe1262495144b33ecb586c4ab266bb8d4"},
     {file = "mistune-0.8.4.tar.gz", hash = "sha256:59a3429db53c50b5c6bcc8a07f8848cb00d7dc8bdb431a4ab41920d201d4756e"},
@@ -2841,8 +2832,8 @@ tinycss2 = [
     {file = "tinycss2-1.1.1.tar.gz", hash = "sha256:b2e44dd8883c360c35dd0d1b5aad0b610e5156c2cb3b33434634e539ead9d8bf"},
 ]
 tokenstream = [
-    {file = "tokenstream-1.4.1-py3-none-any.whl", hash = "sha256:66b42b059e1bda1b88dc54b63f4de935e1e8e2f1f746e06d5323e694d10d38fa"},
-    {file = "tokenstream-1.4.1.tar.gz", hash = "sha256:a3e65dea39ca75a3cbe68880f325cd65a0b957f952137bc8bd2eeca8b4a44df7"},
+    {file = "tokenstream-1.4.2-py3-none-any.whl", hash = "sha256:e4979949e3ca8ab68fe9e924005e668da5b262892c370daf043d767e8e509e4b"},
+    {file = "tokenstream-1.4.2.tar.gz", hash = "sha256:f106b0bd0ae629847485e8ddfc9ac3c479c6c2d8c9db164f9b666e9fda6608cf"},
 ]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
