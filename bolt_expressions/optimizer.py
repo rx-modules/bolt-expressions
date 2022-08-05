@@ -1,3 +1,4 @@
+from dataclasses import replace
 from functools import wraps
 from itertools import chain
 from typing import (
@@ -237,7 +238,7 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
             if isinstance(node, op.Divide):
                 scale = 1 / scale
                 number_type = number_type or source._default_floating_point_type
-            new_source = source._copy(scale=scale, nbt_type=number_type)
+            new_source = replace(source, _scale=scale, _nbt_type=number_type)
             out = op.Set(new_source, node.former)
             if operation_node:
                 yield operation_node  # yield the data operation node back in
@@ -274,7 +275,7 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
             scale = int(next_node.latter.scoreholder[1:])
             if isinstance(next_node, op.Divide):
                 scale = 1 / scale
-            out = op.Set(node.former, node.latter._copy(scale=scale))
+            out = op.Set(node.former, replace(node.latter, _scale=scale))
             yield out
         else:
             nodes.push(next_node)

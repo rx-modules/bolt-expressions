@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Iterable, List, Union
 
@@ -236,7 +236,7 @@ class Data:
         if not isinstance(value, ExpressionNode):
             value = literal_types[type](value)
         self._expr.set(source, value)
-        return source._copy(nbt_type=None)
+        return replace(source, _nbt_type=None)
 
     def remove(self, source: DataSource, value: Union[str, int] = None):
         node = source if value is None else source[value]

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cache
 from itertools import count
 from typing import Callable, ClassVar, Union
@@ -85,7 +85,7 @@ class DataSource(Source):
     _scale: float = 1
     _nbt_type: str = None
 
-    _constructed: bool = field(hash=False, default=False)
+    _constructed: bool = field(hash=False, default=False, init=False)
 
     def __post_init__(self):
         self._constructed = True
@@ -118,7 +118,7 @@ class DataSource(Source):
             return self.filtered(key)
         # self[0] or self.foo
         path = self._path[key]
-        return self._copy(path=path)
+        return replace(self, _path=path)
 
     def __getattr__(self, key: str):
         try:
@@ -137,10 +137,11 @@ class DataSource(Source):
             path = self._path[parse_compound(matching)]
         else:
             path = self._path
-        return self._copy(
-            path=path,
-            scale=scale if scale is not None else self._scale,
-            nbt_type=type if type is not None else self._nbt_type,
+        return replace(
+            self,
+            _path=path,
+            _scale=scale if scale is not None else self._scale,
+            _nbt_type=type if type is not None else self._nbt_type,
         )
 
     def __str__(self):
@@ -149,25 +150,14 @@ class DataSource(Source):
     def __repr__(self):
         return f'"{str(self)}"'
 
-    def _copy(self, **kwargs) -> "DataSource":
-        """Create a new DataSource with overwritten properties."""
-        return DataSource.create(
-            _type=kwargs.get("type", self._type),
-            _target=kwargs.get("target", self._target),
-            _path=kwargs.get("path", self._path),
-            _scale=kwargs.get("scale", self._scale),
-            _nbt_type=kwargs.get("nbt_type", self._nbt_type),
-            methods=kwargs.get("methods", self.methods),
-        )
-
     def get_type(self):
         return self._nbt_type if self._nbt_type else self._default_nbt_type
 
     def all(self) -> "DataSource":
         path = self._path + "[]"
-        return self._copy(path=path)
+        return replace(self, _path=path)
 
     def filtered(self, value: Union[str, Path, Compound]):
         compound = parse_compound(value)
         path = self._path[:][compound]
-        return self._copy(path=path)
+        return replace(self, _path=path)
