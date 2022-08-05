@@ -7,18 +7,26 @@ class ExpressionNode:
     attached_methods = set()
 
     @classmethod
-    def link(cls, magic_method: str, reverse=False):
-        def decorator(operation_class):
-            def normal(self, other: "ExpressionNode"):
-                return operation_class.create(self, other)
+    def link(cls, name: str, reverse=False, unary=False):
+        def decorator(operation):
+            is_class = isinstance(operation, type) and issubclass(
+                operation, ExpressionNode
+            )
+            create = operation.create if is_class else operation
 
-            def reversed(self, other: "ExpressionNode"):
-                return operation_class.create(other, self)
+            def unary_method(node: "ExpressionNode"):
+                return create(node)
 
-            setattr(cls, f"__{magic_method}__", normal)
-            if reverse:
-                setattr(cls, f"__r{magic_method}__", reversed)
-            return operation_class
+            def binary_method(left: "ExpressionNode", right: "ExpressionNode"):
+                return create(left, right)
+
+            def rbinary_method(left: "ExpressionNode", right: "ExpressionNode"):
+                return create(right, left)
+
+            setattr(cls, f"__{name}__", unary_method if unary else binary_method)
+            if reverse and not unary:
+                setattr(cls, f"__r{name}__", rbinary_method)
+            return operation
 
         return decorator
 
