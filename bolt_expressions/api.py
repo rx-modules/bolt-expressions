@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from . import resolver
 from .literals import literal_types
-from .node import ExpressionNode
+from .node import ExpressionMethods, ExpressionNode
 from .operations import (
     Append,
     GenericValue,
@@ -48,10 +48,11 @@ class ExpressionOptions(BaseModel):
 
 @dataclass
 class Expression:
-    ctx: Context
+    ctx: Context = field(repr=False)
     activated: bool = False
     called_init: bool = False
     init_commands: List[str] = field(default_factory=list)
+    methods: ExpressionMethods = field(init=False)
 
     def __post_init__(self):
         if not self.activated:
@@ -60,10 +61,9 @@ class Expression:
             self._runtime.expose("max", wrapped_max)
             self.activated = True
 
-        Set.on_resolve(self.resolve)
         TempScoreSource.objective = self.opts.temp_objective
         ConstantScoreSource.objective = self.opts.const_objective
-
+        self.methods = ExpressionMethods()
         self.init_commands.append(
             f"scoreboard objectives add {self.opts.temp_objective} dummy"
         )
@@ -94,7 +94,7 @@ class Expression:
             self._inject_command(cmd)
 
     def set(self, source: Source, value: GenericValue):
-        Set.create(source, value).resolve()
+        self.resolve(Set.create(source, value))
 
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
@@ -130,15 +130,15 @@ class Scoreboard:
     ```
     """
 
-    ctx: Context
+    ctx: Context = field(repr=False)
     constants: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
         ConstantScoreSource.on_created(self.add_constant)
-        ScoreSource.on_rebind(self.set_score)
-        ScoreSource.attach("reset", self.reset)
-        ScoreSource.attach("enable", self.enable)
+        self._expr.methods.add(
+            ScoreSource, rebind=self.set_score, reset=self.reset, enable=self.enable
+        )
 
     def add_constant(self, node: ConstantScoreSource):
         self._expr.init_commands.append(
@@ -175,9 +175,13 @@ class Score:
     objective: str
 
     def __getitem__(self, scoreholder: Union[str, List[str]]) -> ScoreSource:
+        methods = self.ref._expr.methods
         if type(scoreholder) is str:
-            return ScoreSource.create(scoreholder, self.objective)
-        return [ScoreSource.create(holder, self.objective) for holder in scoreholder]
+            return ScoreSource.create(scoreholder, self.objective, methods=methods)
+        return [
+            ScoreSource.create(holder, self.objective, methods=methods)
+            for holder in scoreholder
+        ]
 
     def __setitem__(self, scoreholder: str, value: Operation):
         self.ref.set_score(self[scoreholder], value)
@@ -188,17 +192,20 @@ class Score:
 
 @dataclass
 class Data:
-    ctx: Context
+    ctx: Context = field(repr=False)
 
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
         self.identifiers = identifier_generator(self.ctx)
-        DataSource.on_rebind(self.set_data)
-        DataSource.attach("remove", self.remove)
-        DataSource.attach("append", self.append)
-        DataSource.attach("prepend", self.prepend)
-        DataSource.attach("insert", self.insert)
-        DataSource.attach("merge", self.merge)
+        self._expr.methods.add(
+            DataSource,
+            rebind=self.set_data,
+            remove=self.remove,
+            append=self.append,
+            prepend=self.prepend,
+            insert=self.insert,
+            merge=self.merge,
+        )
 
     def __call__(self, target: str):
         """Guess target type and return a data source."""
@@ -208,19 +215,21 @@ class Data:
         return self._expr.set(source, value)
 
     def storage(self, resource_location: str):
-        return DataSource.create("storage", resource_location)
+        return DataSource.create("storage", resource_location, methods=self._expr.methods)
 
     def entity(self, entity: str):
-        return DataSource.create("entity", entity)
+        return DataSource.create("entity", entity, methods=self._expr.methods)
 
     def block(self, position: str):
-        return DataSource.create("block", position)
+        return DataSource.create("block", position, methods=self._expr.methods)
 
     def dummy(self, scale: int = 1, type: str = "int"):
         "Create a dummy data source in a storage."
         path = next(self.identifiers)
         target = self._expr.opts.temp_storage
-        return DataSource.create("storage", target, path, scale, type)
+        return DataSource.create(
+            "storage", target, path, scale, type, methods=self._expr.methods
+        )
 
     def cast(self, value: Union[Source, Operation], type: str):
         source = self.dummy(type=type)

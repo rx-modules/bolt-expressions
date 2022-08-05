@@ -24,12 +24,8 @@ class ScoreSource(Source):
     scoreholder: str
     objective: str
 
-    @classmethod
-    def on_rebind(cls, callback: Callable):
-        cls._rebind = callback
-
     def __rebind__(self, other: ExpressionNode):
-        self._rebind(self, other)
+        self.emit("rebind", other)
         return self
 
     def __str__(self):
@@ -94,17 +90,13 @@ class DataSource(Source):
     def __post_init__(self):
         self._constructed = True
 
-    @classmethod
-    def on_rebind(cls, callback: Callable):
-        cls._rebind = callback
-
     def unroll(self):
         temp_var = TempScoreSource.create()
         yield op.Set.create(temp_var, self)
         yield temp_var
 
     def __rebind__(self, other):
-        self._rebind(self, other)
+        self.emit("rebind", other)
         return self
 
     def __setattr__(self, key: str, value):
@@ -115,7 +107,7 @@ class DataSource(Source):
 
     def __setitem__(self, key: str, value):
         child = self.__getitem__(key)
-        child._rebind(child, value)
+        child.__rebind__(value)
 
     def __getitem__(self, key: Union[str, int, Path, Compound]) -> "DataSource":
         if key is SOLO_COLON:
@@ -128,7 +120,11 @@ class DataSource(Source):
         path = self._path[key]
         return self._copy(path=path)
 
-    __getattr__ = __getitem__
+    def __getattr__(self, key: str):
+        try:
+            return super().__getattr__(key)
+        except AttributeError:
+            return self.__getitem__(key)
 
     def __call__(
         self,
@@ -161,6 +157,7 @@ class DataSource(Source):
             _path=kwargs.get("path", self._path),
             _scale=kwargs.get("scale", self._scale),
             _nbt_type=kwargs.get("nbt_type", self._nbt_type),
+            methods=kwargs.get("methods", self.methods),
         )
 
     def get_type(self):

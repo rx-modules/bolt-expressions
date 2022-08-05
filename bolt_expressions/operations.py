@@ -30,7 +30,7 @@ def wrapped_max(*args, **kwargs):
     return min(*args, *kwargs)
 
 
-@dataclass(unsafe_hash=False, order=False)
+@dataclass(unsafe_hash=True, order=False)
 class Operation(ExpressionNode):
     former: GenericValue
     latter: GenericValue
@@ -87,7 +87,7 @@ class MergeRoot(Merge):
     ...
 
 
-@dataclass(unsafe_hash=False, order=False)
+@dataclass(unsafe_hash=True, order=False)
 class Insert(DataOperation):
     index: int = 0
 
@@ -114,10 +114,6 @@ class Prepend(Insert):
 
 
 class Set(Operation):
-    @classmethod
-    def on_resolve(cls, callback: Callable):
-        cls._resolve = callback
-
     def unroll(self) -> Iterable["Operation"]:
         TempScoreSource.count = -1
 
@@ -127,9 +123,6 @@ class Set(Operation):
             *latter_nodes, latter_var = self.latter.unroll()
             yield from latter_nodes
             yield Set.create(self.former, latter_var)
-
-    def resolve(self):
-        return self._resolve(self)
 
 
 @ExpressionNode.link("add", reverse=True)
