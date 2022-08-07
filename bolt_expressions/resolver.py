@@ -58,16 +58,16 @@ def generate(template_id: str, *args, **kwargs):
 
 def resolve_execute(node: Operation):
     args = []
-    for source in node.store:
-        args.append(generate("execute:store", source))
+    for source, type in node.store:
+        args.append(generate("execute:store", source, type))
     return " ".join(("execute", *args, "run ")) if args else ""
 
 
-def resolve_execute_store(source: Source):
+def resolve_execute_store(source: Source, type: str):
     if isinstance(source, ScoreSource):
-        return f"store result score {source}"
+        return f"store {type} score {source}"
     if isinstance(source, DataSource):
-        return f"store result {source} {source.get_type()} {source._scale}"
+        return f"store {type} {source} {source.get_type()} {source._scale}"
 
 
 def resolve_set_data_data(op: Operation):

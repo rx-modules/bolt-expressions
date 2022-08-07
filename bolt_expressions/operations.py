@@ -34,7 +34,7 @@ def wrapped_max(*args, **kwargs):
 class Operation(ExpressionNode):
     former: GenericValue
     latter: GenericValue
-    store: Tuple[Source] = field(default_factory=tuple)
+    store: Tuple[Tuple[Source, str]] = field(default_factory=tuple)
 
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue, *args, **kwargs):
