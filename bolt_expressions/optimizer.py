@@ -16,6 +16,7 @@ from typing import (
 
 from . import operations as op
 from .literals import Literal
+from .conditions import LessThanOrEqualTo, GreaterThanOrEqualTo
 from .sources import ConstantScoreSource, DataSource, ScoreSource, TempScoreSource
 
 # from rich import print
@@ -289,11 +290,14 @@ def constant_to_literal_replacement(
     for node in nodes:
         # print("[bold]constant_to_literal_replacement[/bold]", node)
         if (
-            isinstance(node, (op.Set, op.Add, op.Subtract))
+            isinstance(
+                node,
+                (op.Set, op.Add, op.Subtract, GreaterThanOrEqualTo, LessThanOrEqualTo),
+            )
             and type(node.latter) is ConstantScoreSource
         ):
             literal = int(node.latter.scoreholder[1:])
-            yield node.__class__(node.former, Literal.create(literal))
+            yield replace(node, latter=Literal.create(literal))
         else:
             yield node
 
