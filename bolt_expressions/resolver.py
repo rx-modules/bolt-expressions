@@ -38,6 +38,16 @@ def get_templates() -> Dict[str, str]:
         "remove:data": lambda source: f"data remove {source}",
         "reset:score": lambda source: f"scoreboard players reset {source}",
         "enable:score": lambda source: f"scoreboard players enable {source}",
+        # CONDITIONS
+        "istrue": lambda node: generate(f"istrue:{get_type(node)}", node),
+        "istrue:score": lambda source: f"execute if score {source} matches -2147483648.. unless score {source} matches 0",
+        "istrue:data": lambda source: f"execute if data {source}",
+        "lessthan:score:score": lambda op: f"execute if score {op.former} < {op.latter}",
+        "greaterthan:score:score": lambda op: f"execute if score {op.former} > {op.latter}",
+        "lessthanorequalto:score:score": lambda op: f"execute if score {op.former} <= {op.latter}",
+        "lessthanorequalto:score:literal": lambda op: f"execute if score {op.former} matches ..{op.latter}",
+        "greaterthanorequalto:score:score": lambda op: f"execute if score {op.former} >= {op.latter}",
+        "greaterthanorequalto:score:literal": lambda op: f"execute if score {op.former} matches {op.latter}..",
     }
 
 

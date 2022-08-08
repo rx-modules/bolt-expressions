@@ -4,7 +4,7 @@ from typing import Iterable, List, Union
 
 from beet import Context, Function, FunctionTag
 from bolt import Runtime
-from mecha import Mecha
+from mecha import AstChildren, AstCommand, AstNode, AstRoot, Mecha
 from pydantic import BaseModel
 
 from . import resolver
@@ -22,6 +22,7 @@ from .operations import (
     wrapped_max,
     wrapped_min,
 )
+from . import conditions
 from .optimizer import Optimizer
 from .sources import (
     ConstantScoreSource,
@@ -30,7 +31,7 @@ from .sources import (
     Source,
     TempScoreSource,
 )
-from .utils import identifier_generator
+from .utils import identifier_generator, insert_nested_commands
 
 # from rich import print
 # from rich.pretty import pprint
@@ -64,6 +65,7 @@ class Expression:
         TempScoreSource.objective = self.opts.temp_objective
         ConstantScoreSource.objective = self.opts.const_objective
         self.methods = ExpressionMethods()
+        self.methods.add(ExpressionNode, _resolve_branch=self.resolve_branch)
         self.init_commands.append(
             f"scoreboard objectives add {self.opts.temp_objective} dummy"
         )
@@ -80,11 +82,15 @@ class Expression:
         return self.ctx.inject(Mecha)
 
     def _inject_command(self, cmd: str):
-        self._runtime.commands.append(self._mc.parse(cmd, using="command"))
+        self.inject_node(self._mc.parse(cmd, using="command"))
 
-    def resolve(self, nodes: Operation):
+    def inject_node(self, node: AstNode):
+        self._runtime.commands.append(node)
+
+    def resolve(self, nodes: Operation | Iterable[Operation]):
         # pprint(nodes)
-        nodes = list(nodes.unroll())
+        if isinstance(nodes, Operation):
+            nodes = list(nodes.unroll())
         # pprint(nodes)
         nodes = list(Optimizer.optimize(nodes))
         # pprint(nodes)
@@ -92,6 +98,24 @@ class Expression:
         # pprint(cmds, expand_all=True)
         for cmd in cmds:
             self._inject_command(cmd)
+
+    def resolve_branch(self, node: ExpressionNode):
+        *nodes, result = node.unroll()
+
+        if nodes:
+            self.resolve(nodes)
+
+        with self._runtime.scope() as commands:
+            yield True
+
+        condition = resolver.generate("istrue", result)
+        parsed = self._mc.parse(condition, using="command")
+        root = AstRoot(commands=AstChildren(commands))
+        commands = AstCommand(
+            identifier="execute:commands", arguments=AstChildren((root,))
+        )
+        output = insert_nested_commands(parsed, commands)
+        self.inject_node(output)
 
     def set(self, source: Source, value: GenericValue):
         self.resolve(Set.create(source, value))
