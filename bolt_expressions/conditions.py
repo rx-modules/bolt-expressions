@@ -1,23 +1,35 @@
 from contextlib import contextmanager
+from dataclasses import replace
 from typing import Iterable
 
 from .node import ExpressionNode
 from .sources import TempScoreSource
-from .operations import Operation
+from .operations import Operation, BinaryOperation, UnaryOperation
 
 
-class Condition(Operation):
+class UnaryCondition(UnaryOperation):
+    def unroll(self) -> Iterable["Operation"]:
+        *nodes, value = self.value.unroll()
+
+        yield from nodes
+
+        output = TempScoreSource.create()
+        store = (output, "success")
+        yield replace(self, value=value, store=(store,))
+        yield output
+
+class BinaryCondition(BinaryOperation):
     def unroll(self) -> Iterable[Operation]:
-        *former_nodes, former_var = self.former.unroll()
-        *latter_nodes, latter_var = self.latter.unroll()
+        *former_nodes, former = self.former.unroll()
+        *latter_nodes, latter = self.latter.unroll()
 
         yield from former_nodes
         yield from latter_nodes
 
-        temp_var = TempScoreSource.create()
-        store = (temp_var, "success")
-        yield self.__class__.create(former_var, latter_var, store=(store,))
-        yield temp_var
+        output = TempScoreSource.create()
+        store = (output, "success")
+        yield replace(self, former=former, latter=latter, store=(store,))
+        yield output
 
 
 @ExpressionNode.link("branch", unary=True)
@@ -34,21 +46,25 @@ def branch(node: ExpressionNode):
 # class NotEqual(Operation): ...
 
 
+@ExpressionNode.link("not", unary=True)
+class Not(UnaryCondition):
+    ...
+
 @ExpressionNode.link("lt")
-class LessThan(Condition):
+class LessThan(BinaryCondition):
     ...
 
 
 @ExpressionNode.link("gt")
-class GreaterThan(Condition):
+class GreaterThan(BinaryCondition):
     ...
 
 
 @ExpressionNode.link("le")
-class LessThanOrEqualTo(Condition):
+class LessThanOrEqualTo(BinaryCondition):
     ...
 
 
 @ExpressionNode.link("ge")
-class GreaterThanOrEqualTo(Condition):
+class GreaterThanOrEqualTo(BinaryCondition):
     ...

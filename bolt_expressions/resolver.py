@@ -1,6 +1,8 @@
 from typing import Dict, Iterable, List
 
-from .operations import GenericValue, Operation
+
+from .node import ExpressionNode
+from .operations import GenericValue, Operation, UnaryOperation, BinaryOperation
 from .sources import DataSource, ScoreSource, Source
 
 Command: type = str
@@ -8,7 +10,9 @@ Command: type = str
 
 def get_templates() -> Dict[str, str]:
     return {
-        "node": resolve_node,
+        "node": resolve_operation,
+        "operation:unary": resolve_unary,
+        "operation:binary": resolve_binary,
         "execute": resolve_execute,
         "execute:store": resolve_execute_store,
         "set:score:literal": lambda op: f"scoreboard players set {op.former} {op.latter}",
@@ -42,6 +46,8 @@ def get_templates() -> Dict[str, str]:
         "istrue": lambda node: generate(f"istrue:{get_type(node)}", node),
         "istrue:score": lambda source: f"execute if score {source} matches -2147483648.. unless score {source} matches 0",
         "istrue:data": lambda source: f"execute if data {source}",
+        "not:score": lambda op: f"execute unless score {op.value} matches ..-1 unless score {op.value} matches 1..",
+        "not:data": lambda op: f"execute unless data {op.value}",
         "lessthan:score:score": lambda op: f"execute if score {op.former} < {op.latter}",
         "greaterthan:score:score": lambda op: f"execute if score {op.former} > {op.latter}",
         "lessthanorequalto:score:score": lambda op: f"execute if score {op.former} <= {op.latter}",
@@ -90,7 +96,7 @@ def resolve_set_data_data(op: Operation):
     return f"data modify {op.former} set from {op.latter}"
 
 
-def resolve_node(node: Operation):
+def resolve_binary(node: BinaryOperation):
     id = node.__class__.__name__.lower()  # TODO Operation should have an id property
     former_type = get_type(node.former)
     latter_type = get_type(node.latter)
@@ -98,7 +104,20 @@ def resolve_node(node: Operation):
     cmd = generate("execute", node)
     return cmd + generate(template_id, node)
 
+def resolve_unary(node: UnaryOperation):
+    id = node.__class__.__name__.lower()
+    value_type = get_type(node.value)
+    template_id = f"{id}:{value_type}"
+    cmd = generate("execute", node)
+    return cmd + generate(template_id, node)
+
+def resolve_operation(node: Operation):
+    if isinstance(node, UnaryOperation):
+        return generate("operation:unary", node)
+    if isinstance(node, BinaryOperation):
+        return generate("operation:binary", node)
+    
 
 def resolve(nodes: List[Operation]) -> Iterable[Command]:
     """Transforms a list of operation nodes into command strings."""
-    yield from map(resolve_node, nodes)
+    yield from map(resolve_operation, nodes)

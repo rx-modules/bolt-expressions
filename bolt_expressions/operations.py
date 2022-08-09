@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterable, List, Tuple, Union
 
 from nbtlib import Int
@@ -30,29 +30,48 @@ def wrapped_max(*args, **kwargs):
     return min(*args, *kwargs)
 
 
+def convert_literal(value: Any):
+    literal = Literal.create(value)
+    if type(literal.value) is Int:
+        return ConstantScoreSource.create(literal.value.real)
+    return literal
+
+
 @dataclass(unsafe_hash=True, order=False)
 class Operation(ExpressionNode):
+    store: Tuple[Tuple[Source, str]] = field(default_factory=tuple, kw_only=True)
+
+
+@dataclass(unsafe_hash=True, order=False)
+class UnaryOperation(Operation):
+    value: ExpressionNode
+
+    def unroll(self) -> Iterable["Operation"]:
+        *nodes, value = self.value.unroll()
+
+        yield from nodes
+        output = TempScoreSource.create()
+        store = (output, "result")
+        yield replace(self, value=value, store=(store,))
+        yield output
+
+
+@dataclass(unsafe_hash=True, order=False)
+class BinaryOperation(Operation):
     former: GenericValue
     latter: GenericValue
-    store: Tuple[Tuple[Source, str]] = field(default_factory=tuple)
 
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue, *args, **kwargs):
         """Factory method to create new operations"""
 
         if not isinstance(former, ExpressionNode):
-            former = cls._handle_literal(former)
+            former = convert_literal(former)
         if not isinstance(latter, ExpressionNode):
-            latter = cls._handle_literal(latter)
+            latter = convert_literal(latter)
 
         return super().create(former, latter, *args, **kwargs)
 
-    @classmethod
-    def _handle_literal(cls, value: Any):
-        literal = Literal.create(value)
-        if type(literal.value) is Int:
-            return ConstantScoreSource.create(literal.value.real)
-        return literal
 
     def unroll(self) -> Iterable["Operation"]:
         *former_nodes, former_var = self.former.unroll()
@@ -70,7 +89,7 @@ class Operation(ExpressionNode):
         yield temp_var
 
 
-class DataOperation(Operation):
+class DataOperation(BinaryOperation):
     @classmethod
     def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
         if not isinstance(latter, ExpressionNode):
@@ -113,7 +132,7 @@ class Prepend(Insert):
         return super().create(former, latter, index=0)
 
 
-class Set(Operation):
+class Set(BinaryOperation):
     def unroll(self) -> Iterable["Operation"]:
         TempScoreSource.count = -1
 
@@ -126,7 +145,7 @@ class Set(Operation):
 
 
 @ExpressionNode.link("add", reverse=True)
-class Add(Operation):
+class Add(BinaryOperation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -135,12 +154,12 @@ class Add(Operation):
 
 
 @ExpressionNode.link("sub", reverse=True)
-class Subtract(Operation):
+class Subtract(BinaryOperation):
     ...  # fmt: skip
 
 
 @ExpressionNode.link("mul", reverse=True)
-class Multiply(Operation):
+class Multiply(BinaryOperation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -149,20 +168,20 @@ class Multiply(Operation):
 
 
 @ExpressionNode.link("truediv", reverse=True)
-class Divide(Operation):
+class Divide(BinaryOperation):
     ...
 
 
 @ExpressionNode.link("mod", reverse=True)
-class Modulus(Operation):
+class Modulus(BinaryOperation):
     ...
 
 
 @ExpressionNode.link("min", reverse=True)
-class Min(Operation):
+class Min(BinaryOperation):
     ...
 
 
 @ExpressionNode.link("max", reverse=True)
-class Max(Operation):
+class Max(BinaryOperation):
     ...
