@@ -307,34 +307,42 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
     """Replace the outermost temp score by the output score.
     If expression tree uses the output score, this rule won't be applied.
     """
-    all_nodes = list(nodes)
-    # print("[bold]Applying output score replacement on tree:[/bold]")
-    # pprint(all_nodes)
-    last_node = all_nodes[-1]
-    target_var = last_node.latter
-    output_var = last_node.former
+
+    def operation_input(node: op.Operation) -> op.GenericValue | None:
+        if isinstance(node, op.UnaryOperation):
+            return node.value
+        if isinstance(node, op.BinaryOperation):
+            return node.latter
+
     can_replace = False
-    # print(f"Last node is {last_node}")
-    if (
-        isinstance(output_var, ScoreSource)
-        and type(last_node) is op.Set
-        and len(all_nodes) > 1
-    ):
-        for node in all_nodes[1:]:  # Ignore the first Set operation
-            # print(f"Is {node.latter} equal to {output_var}? {node.latter == output_var}")
-            if node.latter == output_var:
-                break
-        else:
-            can_replace = True
-    # print(f"Can replace output score? {can_replace}")
-    def replace(source):
-        if source == target_var:
-            return output_var
-        return source
+    all_nodes = list(nodes)
+    last_node = all_nodes[-1]
+    if isinstance(last_node, op.Set):
+        output = last_node.former
+        target = last_node.latter
+
+        uses_output = map(lambda node: output == operation_input(node), all_nodes[1:-1])
+        can_replace = (
+            isinstance(output, ScoreSource)
+            and len(all_nodes) > 1
+            and not any(uses_output)
+        )
+
+    def replace_value(value: op.GenericValue) -> op.GenericValue:
+        return output if value == target else value
+
+    def replace_node(node: op.Operation) -> op.Operation:
+        store = [(replace_value(source), type) for source, type in node.store]
+        replaced = {
+            name: replace_value(value)
+            for name, value in node.__dict__.items()
+            if isinstance(value, ScoreSource)
+        }
+        return replace(node, **replaced, store=tuple(store))
 
     if can_replace:
         for node in all_nodes:
-            yield node.__class__(replace(node.former), replace(node.latter))
+            yield replace_node(node)
     else:
         yield from all_nodes
 
