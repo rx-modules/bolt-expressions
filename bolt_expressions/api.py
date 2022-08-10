@@ -8,6 +8,7 @@ from mecha import AstChildren, AstCommand, AstNode, AstRoot, Mecha
 from pydantic import BaseModel
 
 from . import resolver
+from .ast import ExecuteTransformer
 from .literals import literal_types
 from .node import ExpressionMethods, ExpressionNode
 from .operations import (
@@ -60,6 +61,7 @@ class Expression:
             self.opts = self.ctx.validate("bolt_expressions", ExpressionOptions)
             self._runtime.expose("min", wrapped_min)
             self._runtime.expose("max", wrapped_max)
+            self._mc.transform.extend(ExecuteTransformer())
             self.activated = True
 
         TempScoreSource.objective = self.opts.temp_objective
