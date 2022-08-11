@@ -8,7 +8,7 @@ from mecha import AstChildren, AstCommand, AstNode, AstRoot, Mecha
 from pydantic import BaseModel
 
 from . import resolver
-from .ast import ExecuteTransformer
+from .ast import ExecuteTransformer, ConstantScoreChecker
 from .literals import literal_types
 from .node import ExpressionMethods, ExpressionNode
 from .operations import (
@@ -157,19 +157,25 @@ class Scoreboard:
     """
 
     ctx: Context = field(repr=False)
-    constants: List[str] = field(default_factory=list)
+    constants: set[int] = field(default_factory=set)
 
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
-        ConstantScoreSource.on_created(self.add_constant)
+        self._expr._mc.check.extend(
+            ConstantScoreChecker(
+                objective=self._expr.opts.const_objective, callback=self.add_constant
+            )
+        )
         self._expr.methods.add(
             ScoreSource, rebind=self.set_score, reset=self.reset, enable=self.enable
         )
 
     def add_constant(self, node: ConstantScoreSource):
-        self._expr.init_commands.append(
-            f"scoreboard players set {node} {int(node.scoreholder[1:])}"
-        )
+        if not node.value in self.constants:
+            self.constants.add(node.value)
+            self._expr.init_commands.append(
+                f"scoreboard players set {node} {node.value}"
+            )
 
     def set_score(self, score: ScoreSource, value: GenericValue):
         return self._expr.set(score, value)

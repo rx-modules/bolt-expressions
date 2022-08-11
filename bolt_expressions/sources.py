@@ -43,18 +43,19 @@ class ScoreSource(Source):
         return self.objective
 
 
+@dataclass(unsafe_hash=True, order=False)
 class ConstantScoreSource(ScoreSource):
     objective: str = "const"
+    value: int = field(hash=False, kw_only=True)
 
     @classmethod
-    def on_created(cls, callback: Callable):
-        cls._created = callback
-
+    def create(cls, value: Union[str, int, float]):
+        return super().create(f"${int(value)}", cls.objective, value=value)
+    
     @classmethod
-    def create(cls, value: Union[int, float]):
-        node = super().create(f"${int(value)}", cls.objective)
-        cls._created(node)
-        return node
+    def from_name(cls, name: str):
+        value = name[1:]
+        return cls.create(value)
 
 
 class TempScoreSource(ScoreSource):
