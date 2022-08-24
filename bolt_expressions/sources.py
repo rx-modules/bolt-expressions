@@ -121,7 +121,11 @@ class DataSource(Source):
         if key is SOLO_COLON:
             # self[:]
             return self.all()
-        if type(key) is str and key[0] == "{" and key[-1] == "}":
+        if (
+            isinstance(key, dict)
+            or isinstance(key, str)
+            and (key[0], key[-1]) == ("{", "}")
+        ):
             # self[{abc:1b}]
             return self.filtered(key)
         # self[0] or self.foo

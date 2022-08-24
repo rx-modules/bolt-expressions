@@ -1,4 +1,4 @@
-from nbtlib import Compound, Path, Byte
+from nbtlib import Compound, Path, Byte, Short
 from bolt_expressions import Data
 
 temp = Data.storage(demo:temp)
@@ -50,11 +50,16 @@ function ./paths:
     #> Select all compound elements that match the specified compound
     say temp.foo["{test:1b}"]
     say temp.foo["{test:1b"]
+    say temp.foo[{test: Byte(1)}]
     say temp.foo["{"]
     say temp.foo["{}"]
     say temp.foo["{its:compound}"]
     say temp.foo[" {becomes:named_tag}"]
     say temp.foo["{also:named_tag} "]
+
+    val = temp.value
+    data modify storage val._target val["{id: 0}"]._path set value 0
+    data modify storage val._target val[{id: 0}]._path set value 0
 
     #> Selecting all elements in an array
     say temp.item.tag.Enchantments.all()

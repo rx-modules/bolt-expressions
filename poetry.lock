@@ -117,7 +117,7 @@ lxml = ["lxml"]
 
 [[package]]
 name = "beet"
-version = "0.69.0"
+version = "0.71.0"
 description = "The Minecraft pack development kit"
 category = "main"
 optional = false
@@ -177,14 +177,14 @@ dev = ["pip-tools (==6.5.1)", "pytest (==7.1.1)", "flake8 (==4.0.1)", "tox (==3.
 
 [[package]]
 name = "bolt"
-version = "0.17.3"
+version = "0.17.7"
 description = "Supercharge Minecraft commands with Python"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-beet = ">=0.68.3"
+beet = ">=0.71.0"
 mecha = ">=0.54.9"
 
 [[package]]
@@ -1883,7 +1883,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "efb33b14a8807778241e0845a4f5feb4306bd8d0d9257e621d32003bdc741442"
+content-hash = "0cd8dfdaeebb0b9dcee1f2c66c3d8d7351577a72c48401c807110807e50d735b"
 
 [metadata.files]
 alabaster = [

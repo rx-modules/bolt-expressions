@@ -19,11 +19,14 @@ say storage demo:temp value.preserved.scale
 say storage demo:temp scale.set.until.set.again
 say storage demo:temp foo[{test: 1b}]
 say storage demo:temp foo."{test:1b"
+say storage demo:temp foo[{test: 1b}]
 say storage demo:temp foo."{"
 say storage demo:temp foo[{}]
 say storage demo:temp foo[{its: "compound"}]
 say storage demo:temp foo." {becomes:named_tag}"
 say storage demo:temp foo."{also:named_tag} "
+data modify storage demo:temp value[{id: 0}] set value 0
+data modify storage demo:temp value[{id: 0}] set value 0
 say storage demo:temp item.tag.Enchantments[]
 say storage demo:temp item.tag.Enchantments[]
 say storage demo:temp items[].ids[].literal.all.key
