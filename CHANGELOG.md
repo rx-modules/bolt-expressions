@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.8.1 (2022-08-24)
+### Fix
+* Let dicts be used as filter keys in DataSource paths ([`f10cbdf`](https://github.com/rx-modules/bolt-expressions/commit/f10cbdfdc334b67d1303f920d9512271ced2a540))
+
 ## v0.8.0 (2022-07-27)
 ### Feature
 * Api method to cast expressions to any nbt type ([`eb3d532`](https://github.com/rx-modules/bolt-expressions/commit/eb3d53227df26d48f8291f1f0137ccc12f75caba))
