@@ -16,7 +16,7 @@ PyPI package <https://pypi.org/project/bolt-expressions>
 ```
 
 ```{eval-rst}
-.. mdinclude:: ../README.md
+{include} ../README.md
   :start-line: 10
   :end-line: -3
 ```
