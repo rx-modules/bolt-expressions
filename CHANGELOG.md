@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.8.2 (2022-08-28)
+### Fix
+* DataSource._copy doesn't support subclasses. ([`21d1db3`](https://github.com/rx-modules/bolt-expressions/commit/21d1db3447061fa5eefcaf60aae8ac9b755e4d5e))
+
 ## v0.8.1 (2022-08-24)
 ### Fix
 * Let dicts be used as filter keys in DataSource paths ([`f10cbdf`](https://github.com/rx-modules/bolt-expressions/commit/f10cbdfdc334b67d1303f920d9512271ced2a540))
