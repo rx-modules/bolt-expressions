@@ -159,7 +159,7 @@ class DataSource(Source):
 
     def _copy(self, **kwargs) -> "DataSource":
         """Create a new DataSource with overwritten properties."""
-        return DataSource.create(
+        return self.__class__.create(
             _type=kwargs.get("type", self._type),
             _target=kwargs.get("target", self._target),
             _path=kwargs.get("path", self._path),
