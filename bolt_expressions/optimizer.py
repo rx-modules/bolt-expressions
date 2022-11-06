@@ -231,7 +231,7 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
             and isinstance(next_node.former, DataSource)
             and node.former == next_node.latter
         ):
-            scale = int(node.latter.scoreholder[1:])
+            scale = node.latter.value
             source = next_node.former
             number_type = source._nbt_type
             if isinstance(node, op.Divide):
@@ -271,7 +271,7 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
             and isinstance(next_node.latter, ConstantScoreSource)
             and node.former == next_node.former
         ):
-            scale = int(next_node.latter.scoreholder[1:])
+            scale = next_node.latter.value
             if isinstance(next_node, op.Divide):
                 scale = 1 / scale
             out = op.Set(node.former, node.latter._copy(scale=scale))
@@ -291,7 +291,7 @@ def constant_to_literal_replacement(
             isinstance(node, (op.Set, op.Add, op.Subtract))
             and type(node.latter) is ConstantScoreSource
         ):
-            literal = int(node.latter.scoreholder[1:])
+            literal = node.latter.value
             yield node.__class__(node.former, Literal.create(literal))
         else:
             yield node
