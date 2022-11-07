@@ -175,7 +175,7 @@ class Scoreboard:
         """Get a Score instance through the Scoreboard API"""
         if prefixed:
             name = self._expr.opts.objective_prefix + name
-        
+
         if criteria:
             self.add_objective(name, criteria)
 
