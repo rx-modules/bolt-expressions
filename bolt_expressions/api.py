@@ -153,12 +153,12 @@ class Scoreboard:
         ScoreSource.attach("reset", self.reset)
         ScoreSource.attach("enable", self.enable)
 
-    def add_objective(self, name: str, criterion: str = "dummy"):
+    def add_objective(self, name: str, criteria: str = "dummy"):
         if name not in self.added_objectives:
             self.added_objectives.add(name)
 
             self._expr.init_commands.insert(
-                0, f"scoreboard objectives add {name} {criterion}"
+                0, f"scoreboard objectives add {name} {criteria}"
             )
 
     def add_constant(self, node: ConstantScoreSource):
@@ -171,17 +171,18 @@ class Scoreboard:
     def set_score(self, score: ScoreSource, value: GenericValue):
         return self._expr.set(score, value)
 
-    def objective(self, name: str, prefixed=True):
+    def objective(self, name: str, criteria: str = None, prefixed=True):
         """Get a Score instance through the Scoreboard API"""
         if prefixed:
             name = self._expr.opts.objective_prefix + name
+        
+        if criteria:
+            self.add_objective(name, criteria)
+
         return Score(self, name)
 
-    def __call__(self, objective: str, *holders: List[str], prefixed_obj=True):
-        obj = self.objective(objective, prefixed_obj)
-        if len(holders):
-            return obj[holders]
-        return obj
+    def __call__(self, objective: str, criteria: str = None, prefixed=True):
+        return self.objective(objective, criteria, prefixed)
 
     def reset(self, source: ScoreSource):
         cmd = resolver.generate("reset:score", source)
