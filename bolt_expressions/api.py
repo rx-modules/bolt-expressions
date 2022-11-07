@@ -97,6 +97,9 @@ class Expression:
         self.called_init = True
 
     def generate_init(self):
+        if not self.init_commands:
+            return
+
         self.ctx.generate(
             self.opts.init_path,
             Function(
