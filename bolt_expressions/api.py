@@ -8,7 +8,7 @@ from mecha import Mecha
 from pydantic import BaseModel
 
 from . import resolver
-from .ast import ConstantScoreChecker
+from .ast import ConstantScoreChecker, ObjectiveChecker
 from .literals import literal_types
 from .node import ExpressionNode
 from .operations import (
@@ -64,13 +64,6 @@ class Expression:
         Set.on_resolve(self.resolve)
         TempScoreSource.objective = self.opts.temp_objective
         ConstantScoreSource.objective = self.opts.const_objective
-
-        self.init_commands.append(
-            f"scoreboard objectives add {self.opts.temp_objective} dummy"
-        )
-        self.init_commands.append(
-            f"scoreboard objectives add {self.opts.const_objective} dummy"
-        )
 
     @cached_property
     def _runtime(self) -> Runtime:
@@ -132,18 +125,38 @@ class Scoreboard:
     """
 
     ctx: Context
+    objectives: set[str] = field(default_factory=set)
     constants: set[int] = field(default_factory=set)
+
+    added_objectives: set[str] = field(init=False, default_factory=set)
 
     def __post_init__(self):
         self._expr = self.ctx.inject(Expression)
+
+        opts = self._expr.opts
+
+        self.objectives.update((opts.const_objective, opts.temp_objective))
+
         self._expr._mc.check.extend(
             ConstantScoreChecker(
-                objective=self._expr.opts.const_objective, callback=self.add_constant
-            )
+                objective=opts.const_objective, callback=self.add_constant
+            ),
+            ObjectiveChecker(
+                whitelist=self.objectives,
+                callback=self.add_objective,
+            ),
         )
         ScoreSource.on_rebind(self.set_score)
         ScoreSource.attach("reset", self.reset)
         ScoreSource.attach("enable", self.enable)
+
+    def add_objective(self, name: str, criterion: str = "dummy"):
+        if name not in self.added_objectives:
+            self.added_objectives.add(name)
+
+            self._expr.init_commands.insert(
+                0, f"scoreboard objectives add {name} {criterion}"
+            )
 
     def add_constant(self, node: ConstantScoreSource):
         if not node.value in self.constants:

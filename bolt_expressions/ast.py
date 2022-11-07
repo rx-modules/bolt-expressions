@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Callable
+from typing import Callable, Iterable, List
 
 from beet.core.utils import required_field
 from mecha import AstCommand, AstObjective, AstPlayerName, Reducer, rule
@@ -37,3 +37,18 @@ class ConstantScoreChecker(Reducer):
         source = ConstantScoreSource.create(value)
 
         self.callback(source)
+
+
+@dataclass
+class ObjectiveChecker(Reducer):
+    whitelist: Iterable[str] = required_field()
+    callback: Callable = required_field()
+
+    @rule(AstObjective)
+    def objective(self, node: AstObjective):
+        value = node.value
+
+        if value not in self.whitelist:
+            return
+
+        self.callback(value)
