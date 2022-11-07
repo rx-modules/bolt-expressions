@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.8.3 (2022-11-07)
+### Fix
+* Generate init function only when needed ([`01f3193`](https://github.com/rx-modules/bolt-expressions/commit/01f3193d56d79c62608ff239b8f26032c1cc2685))
+* Prevent init function from having unused objectives ([`4b6a490`](https://github.com/rx-modules/bolt-expressions/commit/4b6a490b47345e5ee66e386c839aebc052c22ac4))
+* Prevent init function from having duplicated/unused constants ([`05a2638`](https://github.com/rx-modules/bolt-expressions/commit/05a2638a8e9f637f443b2a98419544b3abd75127))
+
 ## v0.8.2 (2022-08-28)
 ### Fix
 * DataSource._copy doesn't support subclasses. ([`21d1db3`](https://github.com/rx-modules/bolt-expressions/commit/21d1db3447061fa5eefcaf60aae8ac9b755e4d5e))
