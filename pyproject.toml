@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bolt-expressions"
-version = "0.8.3"
+version = "0.9.0"
 description = "Provides pandas-like expressions capabilities to the bolt extension of mecha"
 authors = ["rx97", "TheWii"]
 license = "MIT"

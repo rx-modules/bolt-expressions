@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.9.0 (2022-11-07)
+### Feature
+* Let custom objectives be added to init function ([`99483fb`](https://github.com/rx-modules/bolt-expressions/commit/99483fbbcd4c3653b40cc3eed0c948843699caea))
+
 ## v0.8.3 (2022-11-07)
 ### Fix
 * Generate init function only when needed ([`01f3193`](https://github.com/rx-modules/bolt-expressions/commit/01f3193d56d79c62608ff239b8f26032c1cc2685))
