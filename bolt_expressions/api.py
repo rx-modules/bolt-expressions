@@ -46,6 +46,8 @@ class ExpressionOptions(BaseModel):
     init_path: str = "init_expressions"
     objective_prefix: str = ""
 
+    disable_commands: bool = False
+
 
 @dataclass
 class Expression:
@@ -60,6 +62,9 @@ class Expression:
             self._runtime.expose("min", wrapped_min)
             self._runtime.expose("max", wrapped_max)
             self.activated = True
+
+        if not self.opts.disable_commands:
+            self.ctx.require("bolt_expressions.contrib.commands")
 
         Set.on_resolve(self.resolve)
         TempScoreSource.objective = self.opts.temp_objective
