@@ -2,6 +2,11 @@
 
 <!--next-version-placeholder-->
 
+## v0.10.0 (2022-11-15)
+### Feature
+* Require bolt_expressions.contrib.commands by default ([`f748ee3`](https://github.com/rx-modules/bolt-expressions/commit/f748ee3ea2e6cc5eb9416d295ce39001d03856da))
+* Add bolt_expressions.contrib.commands ([`e40ae95`](https://github.com/rx-modules/bolt-expressions/commit/e40ae9562bae5589a0c541a60884ce79211febf8))
+
 ## v0.9.0 (2022-11-07)
 ### Feature
 * Let custom objectives be added to init function ([`99483fb`](https://github.com/rx-modules/bolt-expressions/commit/99483fbbcd4c3653b40cc3eed0c948843699caea))
