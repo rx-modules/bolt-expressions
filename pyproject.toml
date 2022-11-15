@@ -22,14 +22,14 @@ keywords = [
 # include = ["FIXME/py.typed"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.10,<4.0"
 beet = ">=0.55.0"
-mecha = ">=0.48.1"
+mecha = ">=0.59.2"
 nbtlib = "1.12.1"
 bolt = ">=0.17.7"
 
 [tool.poetry.dev-dependencies]
-black = "^22.3.0"
+black = "^22.10.0"
 isort = "^5.10.1"
 python-semantic-release = "^7.27.0"
 mudkip = ">=0.5.1"
@@ -43,7 +43,7 @@ addopts = "tests bolt_expressions"# --doctest-modules"
 # doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
 
 [tool.black]
-target-version = ["py39"]
+target-version = ["py310"]
 include = '\.pyi?$'
 
 [tool.isort]
