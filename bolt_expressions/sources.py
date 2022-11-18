@@ -38,6 +38,12 @@ class ScoreSource(Source):
     def __repr__(self):
         return f'"{str(self)}"'
 
+    def component(self, **tags):
+        return {
+            "score": {"name": self.scoreholder, "objective": self.objective},
+            **tags,
+        }
+
     @property
     def holder(self):
         return self.scoreholder
@@ -174,3 +180,6 @@ class DataSource(Source):
         compound = parse_compound(value)
         path = self._path[:][compound]
         return self._copy(path=path)
+
+    def component(self, **tags):
+        return {"nbt": str(self._path), self._type: self._target, **tags}
