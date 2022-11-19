@@ -8,7 +8,7 @@ from mecha import Mecha
 from pydantic import BaseModel
 
 from . import resolver
-from .ast import ConstantScoreChecker, ObjectiveChecker
+from .ast import ConstantScoreChecker, ObjectiveChecker, SourceJsonConverter
 from .literals import literal_types
 from .node import ExpressionNode
 from .operations import (
@@ -65,6 +65,10 @@ class Expression:
 
         if not self.opts.disable_commands:
             self.ctx.require("bolt_expressions.contrib.commands")
+
+        helpers = self._runtime.helpers
+
+        helpers["interpolate_json"] = SourceJsonConverter(helpers["interpolate_json"])
 
         Set.on_resolve(self.resolve)
         TempScoreSource.objective = self.opts.temp_objective

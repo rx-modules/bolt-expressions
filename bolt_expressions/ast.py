@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Callable, Iterable, List
+from typing import Any, Callable, Iterable, List
 
 from beet.core.utils import required_field
-from mecha import AstCommand, AstObjective, AstPlayerName, Reducer, rule
+from mecha import AstCommand, AstNode, AstObjective, AstPlayerName, Reducer, rule
 
-from .sources import ConstantScoreSource
+from .sources import ConstantScoreSource, DataSource, ScoreSource, Source
 
 
 @dataclass
@@ -52,3 +52,23 @@ class ObjectiveChecker(Reducer):
             return
 
         self.callback(value)
+
+
+@dataclass
+class SourceJsonConverter:
+    converter: Callable[[Any, AstNode], AstNode]
+
+    def convert(self, obj: Any):
+        if isinstance(obj, Source):
+            return obj.component()
+        if isinstance(obj, list):
+            return [self.convert(value) for value in obj]
+        if isinstance(obj, dict):
+            return {key: self.convert(value) for key, value in obj.items()}
+
+        return obj
+
+    def __call__(self, obj: Any, node: AstNode):
+        obj = self.convert(obj)
+
+        return self.converter(obj, node)
