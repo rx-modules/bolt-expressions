@@ -2,6 +2,11 @@
 
 <!--next-version-placeholder-->
 
+## v0.11.0 (2022-11-19)
+### Feature
+* Implicitly convert sources into text components ([`d27870e`](https://github.com/rx-modules/bolt-expressions/commit/d27870ef068b27dddf054b01d6c418d608a0a61a))
+* Add `component` method to convert sources into text components ([`a22caf9`](https://github.com/rx-modules/bolt-expressions/commit/a22caf9256c234944ff1de41829d48e7c37ddc9b))
+
 ## v0.10.0 (2022-11-15)
 ### Feature
 * Require bolt_expressions.contrib.commands by default ([`f748ee3`](https://github.com/rx-modules/bolt-expressions/commit/f748ee3ea2e6cc5eb9416d295ce39001d03856da))
