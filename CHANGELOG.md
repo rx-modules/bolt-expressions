@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.11.2 (2022-12-27)
+### Fix
+* Import all subpackages in __init__ for conveniency ([`7c2ed2c`](https://github.com/rx-modules/bolt-expressions/commit/7c2ed2c65d80b1e0f91efd970724414c24fd3e91))
+
 ## v0.11.1 (2022-12-27)
 ### Fix
 * Generate negative score constants in init function ([`9ec47cb`](https://github.com/rx-modules/bolt-expressions/commit/9ec47cb3b7aa4e1d0baf865a2fa29a902eae1790))
