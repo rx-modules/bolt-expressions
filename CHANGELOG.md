@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.11.1 (2022-12-27)
+### Fix
+* Generate negative score constants in init function ([`9ec47cb`](https://github.com/rx-modules/bolt-expressions/commit/9ec47cb3b7aa4e1d0baf865a2fa29a902eae1790))
+
 ## v0.11.0 (2022-11-19)
 ### Feature
 * Implicitly convert sources into text components ([`d27870e`](https://github.com/rx-modules/bolt-expressions/commit/d27870ef068b27dddf054b01d6c418d608a0a61a))
