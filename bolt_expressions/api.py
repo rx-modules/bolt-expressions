@@ -36,6 +36,14 @@ from .utils import identifier_generator
 # from rich import print
 # from rich.pretty import pprint
 
+__all__ = [
+    "ExpressionOptions",
+    "Expression",
+    "Scoreboard",
+    "Score",
+    "Data",
+]
+
 
 class ExpressionOptions(BaseModel):
     """Bolt Expressions Options"""

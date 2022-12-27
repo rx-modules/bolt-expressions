@@ -20,6 +20,19 @@ from .sources import ConstantScoreSource, DataSource, ScoreSource, TempScoreSour
 # from rich import print
 # from rich.pretty import pprint
 
+__all__ = [
+    "SmartGenerator",
+    "Optimizer",
+    "dummy",
+    "noncommutative_set_collapsing",
+    "commutative_set_collapsing",
+    "data_set_scaling",
+    "data_get_scaling",
+    "constant_to_literal_replacement",
+    "output_score_replacement",
+    "set_to_self_removal",
+    "set_and_get_cleanup",
+]
 
 if TYPE_CHECKING:
     Rule = Callable[[Iterable[op.Operation]], None]

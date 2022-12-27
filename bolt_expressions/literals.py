@@ -5,6 +5,12 @@ from nbtlib import Base, Byte, Compound, Double, Float, Int, List, Long, Short, 
 
 from .node import ExpressionNode
 
+__all__ = [
+    "Literal",
+    "literal_types",
+    "convert_tag",
+]
+
 literal_types = {
     "byte": Byte,
     "short": Short,

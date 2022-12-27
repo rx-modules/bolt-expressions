@@ -1,6 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Optional, Set, overload
 
+__all__ = [
+    "ExpressionNode",
+]
+
 
 @dataclass(unsafe_hash=True, order=False, eq=False)
 class ExpressionNode:
