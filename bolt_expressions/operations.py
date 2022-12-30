@@ -60,18 +60,11 @@ class Operation(ExpressionNode):
         """Factory method to create new operations"""
 
         if not isinstance(former, ExpressionNode):
-            former = cls._handle_literal(former)
+            former = Literal.create(former)
         if not isinstance(latter, ExpressionNode):
-            latter = cls._handle_literal(latter)
+            latter = Literal.create(latter)
 
         return super().create(former, latter, *args, **kwargs)
-
-    @classmethod
-    def _handle_literal(cls, value: Any):
-        literal = Literal.create(value)
-        if type(literal.value) is Int:
-            return ConstantScoreSource.create(literal.value.real)
-        return literal
 
     def unroll(self) -> Iterable["Operation"]:
         *former_nodes, former_var = self.former.unroll()
@@ -90,11 +83,7 @@ class Operation(ExpressionNode):
 
 
 class DataOperation(Operation):
-    @classmethod
-    def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
-        if not isinstance(latter, ExpressionNode):
-            latter = Literal.create(latter)
-        return super().create(former, latter, *args, **kwargs)
+    ...
 
 
 class Merge(DataOperation):

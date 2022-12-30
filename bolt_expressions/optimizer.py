@@ -28,7 +28,7 @@ __all__ = [
     "commutative_set_collapsing",
     "data_set_scaling",
     "data_get_scaling",
-    "constant_to_literal_replacement",
+    "literal_to_constant_replacement",
     "output_score_replacement",
     "set_to_self_removal",
     "set_and_get_cleanup",
@@ -229,20 +229,28 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
         if (
             isinstance(node, (op.Multiply, op.Divide))
             and isinstance(next_node, op.Set)
-            and isinstance(node.latter, ConstantScoreSource)
+            and isinstance(node.latter, Literal)
             and isinstance(next_node.former, DataSource)
             and node.former == next_node.latter
         ):
-            scale = node.latter.value
+            scale = float(node.latter.value)
+
+            if scale.is_integer():
+                scale = int(scale)
+
             source = next_node.former
             number_type = source._nbt_type
+
             if isinstance(node, op.Divide):
                 scale = 1 / scale
                 number_type = number_type or source._default_floating_point_type
+
             new_source = source._copy(scale=scale, nbt_type=number_type)
             out = op.Set(new_source, node.former)
+
             if operation_node:
                 yield operation_node  # yield the data operation node back in
+
             yield out
         else:
             nodes.push(next_node)
@@ -270,32 +278,20 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
             isinstance(node, op.Set)
             and isinstance(next_node, (op.Multiply, op.Divide))
             and isinstance(node.latter, DataSource)
-            and isinstance(next_node.latter, ConstantScoreSource)
+            and isinstance(next_node.latter, Literal)
             and node.former == next_node.former
         ):
-            scale = next_node.latter.value
+            scale = float(next_node.latter.value)
+
+            if scale.is_integer():
+                scale = int(scale)
+
             if isinstance(next_node, op.Divide):
                 scale = 1 / scale
-            out = op.Set(node.former, node.latter._copy(scale=scale))
-            yield out
+
+            yield op.Set(node.former, node.latter._copy(scale=scale))
         else:
             nodes.push(next_node)
-            yield node
-
-
-@Optimizer.rule
-def constant_to_literal_replacement(
-    nodes: Iterable["op.Operation"],
-) -> Iterable["op.Operation"]:
-    for node in nodes:
-        # print("[bold]constant_to_literal_replacement[/bold]", node)
-        if (
-            isinstance(node, (op.Set, op.Add, op.Subtract))
-            and type(node.latter) is ConstantScoreSource
-        ):
-            literal = node.latter.value
-            yield node.__class__(node.former, Literal.create(literal))
-        else:
             yield node
 
 
@@ -378,4 +374,22 @@ def set_and_get_cleanup(nodes: Iterable["op.Operation"]):
             yield out
         else:
             nodes.push(next_node)
+            yield node
+
+
+@Optimizer.rule
+def literal_to_constant_replacement(
+    nodes: Iterable["op.Operation"],
+) -> Iterable["op.Operation"]:
+    for node in nodes:
+        if (
+            isinstance(node, (op.Multiply, op.Divide, op.Min, op.Max, op.Modulus))
+            and isinstance(node.latter, Literal)
+            and isinstance(node.latter.value, Numeric)
+        ):
+            value = int(node.latter.value)
+            constant = ConstantScoreSource.create(value)
+
+            yield type(node).create(node.former, constant)
+        else:
             yield node
