@@ -357,6 +357,28 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
 
 
 @Optimizer.rule
+def multiply_divide_by_one_removal(nodes: Iterable["op.Operation"]):
+    for node in nodes:
+        if not (
+            isinstance(node, (op.Multiply, op.Divide))
+            and isinstance(node.latter, Literal)
+            and node.latter.value == 1
+        ):
+            yield node
+
+
+@Optimizer.rule
+def add_subtract_by_zero_removal(nodes: Iterable["op.Operation"]):
+    for node in nodes:
+        if not (
+            isinstance(node, (op.Add, op.Subtract))
+            and isinstance(node.latter, Literal)
+            and node.latter.value == 0
+        ):
+            yield node
+
+
+@Optimizer.rule
 def set_to_self_removal(nodes: Iterable["op.Operation"]):
     """Removes Set operations that have the same former and latter source.
     Should run after "output_score_replacement" is applied to clean up
