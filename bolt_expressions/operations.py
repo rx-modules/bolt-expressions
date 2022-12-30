@@ -151,8 +151,12 @@ class Set(Operation):
         return self._resolve(self)
 
 
+class ScoreOperation(Operation):
+    ...
+
+
 @ExpressionNode.link("add", reverse=True)
-class Add(Operation):
+class Add(ScoreOperation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -161,12 +165,12 @@ class Add(Operation):
 
 
 @ExpressionNode.link("sub", reverse=True)
-class Subtract(Operation):
+class Subtract(ScoreOperation):
     ...  # fmt: skip
 
 
 @ExpressionNode.link("mul", reverse=True)
-class Multiply(Operation):
+class Multiply(ScoreOperation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -175,22 +179,22 @@ class Multiply(Operation):
 
 
 @ExpressionNode.link("truediv", reverse=True)
-class Divide(Operation):
+class Divide(ScoreOperation):
     ...
 
 
 @ExpressionNode.link("mod", reverse=True)
-class Modulus(Operation):
+class Modulus(ScoreOperation):
     ...
 
 
 @ExpressionNode.link("min", reverse=True)
-class Min(Operation):
+class Min(ScoreOperation):
     ...
 
 
 @ExpressionNode.link("max", reverse=True)
-class Max(Operation):
+class Max(ScoreOperation):
     ...
 
 
