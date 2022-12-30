@@ -33,20 +33,42 @@ __all__ = [
 GenericValue = Union["Operation", "Source", int, str]
 
 
-def wrapped_min(*args, **kwargs):
-    if isinstance(args[0], ExpressionNode):
-        return args[0].__min__(args[1])
-    elif isinstance(args[1], ExpressionNode):
-        return args[1].__rmin__(args[0])
-    return min(*args, *kwargs)
+def wrapped_min(f, *args, **kwargs):
+    if len(args) == 1:
+        value = args[0]
+
+        if not isinstance(value, Iterable):
+            return value
+
+        args = tuple(value)
+
+    for i, node in enumerate(args):
+        if not isinstance(node, ExpressionNode):
+            continue
+
+        remaining = args[:i] + args[i + 1 :]
+        return Min.create(wrapped_min(f, *remaining, **kwargs), node)
+
+    return f(*args, **kwargs)
 
 
-def wrapped_max(*args, **kwargs):
-    if isinstance(args[0], ExpressionNode):
-        return args[0].__max__(args[1])
-    elif isinstance(args[1], ExpressionNode):
-        return args[1].__rmax__(args[0])
-    return min(*args, *kwargs)
+def wrapped_max(f, *args, **kwargs):
+    if len(args) == 1:
+        value = args[0]
+
+        if not isinstance(value, Iterable):
+            return value
+
+        args = tuple(value)
+
+    for i, node in enumerate(args):
+        if not isinstance(node, ExpressionNode):
+            continue
+
+        remaining = args[:i] + args[i + 1 :]
+        return Max.create(wrapped_max(f, *remaining, **kwargs), node)
+
+    return f(*args, **kwargs)
 
 
 @dataclass(unsafe_hash=False, order=False)
