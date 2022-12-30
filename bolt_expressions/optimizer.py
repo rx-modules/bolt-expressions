@@ -1,3 +1,4 @@
+from fractions import Fraction
 from functools import wraps
 from itertools import chain
 from typing import (
@@ -12,6 +13,8 @@ from typing import (
     TypeVar,
     Union,
 )
+
+from nbtlib import Double, Float, Numeric
 
 from . import operations as op
 from .literals import Literal
@@ -296,40 +299,61 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
 
 
 @Optimizer.rule
+def multiply_divide_by_fraction(nodes: Iterable["op.Operation"]):
+    for node in nodes:
+        if (
+            isinstance(node, (op.Multiply, op.Divide))
+            and isinstance(node.latter, Literal)
+            and isinstance(node.latter.value, (Float, Double))
+        ):
+            value = Fraction(node.latter.value).limit_denominator()
+
+            if isinstance(node, op.Divide):
+                value = 1 / value
+
+            yield op.Multiply.create(node.former, value.numerator)
+            yield op.Divide.create(node.former, value.denominator)
+        else:
+            yield node
+
+
+@Optimizer.rule
 def output_score_replacement(nodes: Iterable["op.Operation"]):
     """Replace the outermost temp score by the output score.
     If expression tree uses the output score, this rule won't be applied.
     """
     all_nodes = list(nodes)
-    # print("[bold]Applying output score replacement on tree:[/bold]")
-    # pprint(all_nodes)
-    last_node = all_nodes[-1]
-    target_var = last_node.latter
-    output_var = last_node.former
-    can_replace = False
-    # print(f"Last node is {last_node}")
-    if (
-        isinstance(output_var, ScoreSource)
-        and type(last_node) is op.Set
-        and len(all_nodes) > 1
-    ):
-        for node in all_nodes[1:]:  # Ignore the first Set operation
-            # print(f"Is {node.latter} equal to {output_var}? {node.latter == output_var}")
-            if node.latter == output_var:
-                break
-        else:
-            can_replace = True
-    # print(f"Can replace output score? {can_replace}")
-    def replace(source):
-        if source == target_var:
-            return output_var
-        return source
 
-    if can_replace:
-        for node in all_nodes:
-            yield node.__class__(replace(node.former), replace(node.latter))
-    else:
-        yield from all_nodes
+    if all_nodes:
+        # print("[bold]Applying output score replacement on tree:[/bold]")
+        # pprint(all_nodes)
+        last_node = all_nodes[-1]
+        target_var = last_node.latter
+        output_var = last_node.former
+        can_replace = False
+        # print(f"Last node is {last_node}")
+        if (
+            isinstance(output_var, ScoreSource)
+            and type(last_node) is op.Set
+            and len(all_nodes) > 1
+        ):
+            for node in all_nodes[1:]:  # Ignore the first Set operation
+                # print(f"Is {node.latter} equal to {output_var}? {node.latter == output_var}")
+                if node.latter == output_var:
+                    break
+            else:
+                can_replace = True
+        # print(f"Can replace output score? {can_replace}")
+        def replace(source):
+            if source == target_var:
+                return output_var
+            return source
+
+        if can_replace:
+            for node in all_nodes:
+                yield node.__class__(replace(node.former), replace(node.latter))
+        else:
+            yield from all_nodes
 
 
 @Optimizer.rule
