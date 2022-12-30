@@ -2,6 +2,14 @@
 
 <!--next-version-placeholder-->
 
+## v0.12.0 (2022-12-30)
+### Feature
+* Support literal floating numbers on score multiplication/division ([`eea20d4`](https://github.com/rx-modules/bolt-expressions/commit/eea20d4d6a587e278f0a8bf8a7cae3a431b00fdd))
+
+### Fix
+* Make wrapped min/max functions behave more like the builtin ones ([`7e3b400`](https://github.com/rx-modules/bolt-expressions/commit/7e3b4003e677bf7a1bd9c4728f332f63e6a12081))
+* Remove commands that multiply/divide by 1, add/subtract by 0 ([`6d8cf88`](https://github.com/rx-modules/bolt-expressions/commit/6d8cf882b029d49b120116ed088ee395d3902132))
+
 ## v0.11.2 (2022-12-27)
 ### Fix
 * Import all subpackages in __init__ for conveniency ([`7c2ed2c`](https://github.com/rx-modules/bolt-expressions/commit/7c2ed2c65d80b1e0f91efd970724414c24fd3e91))
