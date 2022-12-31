@@ -34,38 +34,38 @@ GenericValue = Union["Operation", "Source", int, str]
 
 
 def wrapped_min(f, *args, **kwargs):
+    values = args
+
     if len(args) == 1:
-        value = args[0]
+        if not isinstance(args[0], Iterable):
+            return args[0]
 
-        if not isinstance(value, Iterable):
-            return value
+        values = tuple(args[0])
 
-        args = tuple(value)
-
-    for i, node in enumerate(args):
+    for i, node in enumerate(values):
         if not isinstance(node, ExpressionNode):
             continue
 
-        remaining = args[:i] + args[i + 1 :]
+        remaining = values[:i] + values[i + 1 :]
         return Min.create(wrapped_min(f, *remaining, **kwargs), node)
 
     return f(*args, **kwargs)
 
 
 def wrapped_max(f, *args, **kwargs):
+    values = args
+
     if len(args) == 1:
-        value = args[0]
+        if not isinstance(args[0], Iterable):
+            return args[0]
 
-        if not isinstance(value, Iterable):
-            return value
+        values = tuple(args[0])
 
-        args = tuple(value)
-
-    for i, node in enumerate(args):
+    for i, node in enumerate(values):
         if not isinstance(node, ExpressionNode):
             continue
 
-        remaining = args[:i] + args[i + 1 :]
+        remaining = values[:i] + values[i + 1 :]
         return Max.create(wrapped_max(f, *remaining, **kwargs), node)
 
     return f(*args, **kwargs)
