@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.12.1 (2022-12-31)
+### Fix
+* Preserve key/default logic of builtin min/max functions ([`c127114`](https://github.com/rx-modules/bolt-expressions/commit/c127114beefff5e392cc3e4733b7c113202ccf91))
+
 ## v0.12.0 (2022-12-30)
 ### Feature
 * Support literal floating numbers on score multiplication/division ([`eea20d4`](https://github.com/rx-modules/bolt-expressions/commit/eea20d4d6a587e278f0a8bf8a7cae3a431b00fdd))
