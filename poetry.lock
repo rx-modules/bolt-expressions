@@ -126,11 +126,11 @@ lxml = ["lxml"]
 
 [[package]]
 name = "beet"
-version = "0.79.2"
+version = "0.82.1"
 description = "The Minecraft pack development kit"
 category = "main"
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = ">=3.10,<4.0"
 
 [package.dependencies]
 click = ">=8.1.3,<9.0.0"
@@ -138,7 +138,7 @@ click-help-colors = ">=0.9.1,<0.10.0"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
 Jinja2 = ">=3.1.2,<4.0.0"
 nbtlib = ">=1.12.1,<2.0.0"
-pathspec = ">=0.10.1,<0.11.0"
+pathspec = ">=0.10.2,<0.11.0"
 pydantic = ">=1.10.2,<2.0.0"
 PyYAML = ">=6.0,<7.0"
 toml = ">=0.10.2,<0.11.0"
@@ -2161,8 +2161,8 @@ beautifulsoup4 = [
     {file = "beautifulsoup4-4.11.1.tar.gz", hash = "sha256:ad9aa55b65ef2808eb405f46cf74df7fcb7044d5cbc26487f96eb2ef2e436693"},
 ]
 beet = [
-    {file = "beet-0.79.2-py3-none-any.whl", hash = "sha256:f02e1d14cda88d5c25e84df483aba169a60687e63d1365ff5e0c65a9cfb656da"},
-    {file = "beet-0.79.2.tar.gz", hash = "sha256:ed683d68411b27e639ffd762d5c6a06cd09a040f1e441d6f6f6337b94cec6442"},
+    {file = "beet-0.82.1-py3-none-any.whl", hash = "sha256:21c96a94a854fea0b5f0b8b393b9c11f2e1c38a6c10707fffc5d6db764b6104e"},
+    {file = "beet-0.82.1.tar.gz", hash = "sha256:f4e1b2d542f079282bd39ee5e5cf02117dd0a19ef3369546f5001066ab811843"},
 ]
 black = [
     {file = "black-22.10.0-1fixedarch-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:5cc42ca67989e9c3cf859e84c2bf014f6633db63d1cbdf8fdb666dcd9e77e3fa"},
