@@ -13,21 +13,22 @@
 Bolt is a scripting language which mixes both python and mcfunction. This package amplifies this language by adding an API for creating fluent expressions loosely based off of the `pandas` syntax. These expressions are use for simplifying large bits of scoreboard and storage operation allowing you to swiftly create complex operations with the ease of normal programming.
 
 ```py
-from bolt_expressions import Scoreboard
+from bolt_expressions import Scoreboard, Data
 
 math = Scoreboard.objective("math")
-# or `math = Scoreboard("math")`
+storage = Data.storage(example:temp)
 
-math["@s"] = math["@r"] * 10 + math["@r"] + 100
+stack = storage.hotbar[0]
+
+math["@s"] = stack.Count * math["$cost"] + math["$value"] - stack.tag.discount * 0.75
 ```
 ->
 ```mcfunction
-scoreboard players operations $i0 bolt.expressions.temp = @r math
-scoreboard players operations $i0 bolt.expressions.temp *= #10 bolt.expressions.int
-scoreboard players operations $i1 bolt.expressions.temp = @r math
-scoreboard players add $i1 bolt.expressions.temp 100
-scoreboard players operations $i0 bolt.expressions.temp += $i1 bolt.expressions.temp
-scoreboard players operations @s math = $i0 bolt.expressions.temp
+execute store result score @s math run data get storage example:temp hotbar[0].Count 1
+scoreboard players operation @s math *= $cost math
+scoreboard players operation @s math += $value math
+execute store result score $i1 bolt.expr.temp run data get storage example:temp hotbar[0].tag.discount 0.75
+scoreboard players operation @s math -= $i1 bolt.expr.temp
 ```
 
 ## Installation
@@ -40,36 +41,52 @@ $ pip install bolt-expressions
 
 ## Getting started
 
-This package is designed to be used within any `bolt` script (either a `.mcfunction` or `bolt` file) inside a `bolt` enabled project.
+This package is designed to be used within any `bolt` script (either a `.mcfunction` or `bolt` file) inside a `bolt` enabled project. 
 
 ```yaml
 require:
     - bolt
+    - bolt_expressions
 
 pipeline:
     - mecha
 ```
 
-Once you've enabled bolt, you are able to import the python package directly inside your bolt script.
+Once you've required `bolt` and `bolt_expressions`, you are able to import the python package directly inside your bolt script.
 
 ```py
 from bolt_expressions import Scoreboard, Storage
 ```
-
-Any usage of the `bolt_expressions` package will require you to inject the current beet context into the API objects. Then, you can create an objective and start creating expressions.
+Now you're free to use the API objects. Create objectives, block, storage and entity nbt sources to easily write expressions as simple or complex as you like to make it.
 
 ```py
 math = Scoreboard.objective("math")
-entity_id = Scoreboard.objective("entity_id")
+executor = Data.entity("@s")
+block = Data.block("~ ~ ~")
+storage = Data.storage(example:storage)
 
-math["@s"] += 10
+math["$value"] = math["$points"] + executor.Health*10 + block.Items[0].Count - storage.discount
+
+storage.values.append(math["$value"])
+```
+->
+```mcfunction
+execute store result score $value math run data get entity @s Health 10
+scoreboard players operation $value math += $points math
+execute store result score $i1 bolt.expr.temp run data get block ~ ~ ~ Items[0].Count 1
+scoreboard players operation $value math += $i1 bolt.expr.temp
+execute store result score $i2 bolt.expr.temp run data get storage example:storage discount 1
+scoreboard players operation $value math -= $i2 bolt.expr.temp
+data modify storage example:storage values append value 0
+execute store result storage example:storage values[-1] int 1 run scoreboard players get $value math
 ```
 
 ## Features
 
 - Robust API supporting Scoreboards, Storage, Blocks, and Entities
 - Provides an interface to manipulate large, complex mathematical expressions simplily
-- Allows you to interopt custom variables with normal commands *(soon)*
+- Automatically initializes objectives and score constants
+- Allows you to interopt custom variables with normal commands
 
 Checkout some examples over at our [docs](https://rx-modules.github.io/bolt-expressions/)!
 
