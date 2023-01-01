@@ -2,6 +2,26 @@
 
 <!--next-version-placeholder-->
 
+## v0.12.1 (2022-12-31)
+### Fix
+* Preserve key/default logic of builtin min/max functions ([`c127114`](https://github.com/rx-modules/bolt-expressions/commit/c127114beefff5e392cc3e4733b7c113202ccf91))
+
+## v0.12.0 (2022-12-30)
+### Feature
+* Support literal floating numbers on score multiplication/division ([`eea20d4`](https://github.com/rx-modules/bolt-expressions/commit/eea20d4d6a587e278f0a8bf8a7cae3a431b00fdd))
+
+### Fix
+* Make wrapped min/max functions behave more like the builtin ones ([`7e3b400`](https://github.com/rx-modules/bolt-expressions/commit/7e3b4003e677bf7a1bd9c4728f332f63e6a12081))
+* Remove commands that multiply/divide by 1, add/subtract by 0 ([`6d8cf88`](https://github.com/rx-modules/bolt-expressions/commit/6d8cf882b029d49b120116ed088ee395d3902132))
+
+## v0.11.2 (2022-12-27)
+### Fix
+* Import all subpackages in __init__ for conveniency ([`7c2ed2c`](https://github.com/rx-modules/bolt-expressions/commit/7c2ed2c65d80b1e0f91efd970724414c24fd3e91))
+
+## v0.11.1 (2022-12-27)
+### Fix
+* Generate negative score constants in init function ([`9ec47cb`](https://github.com/rx-modules/bolt-expressions/commit/9ec47cb3b7aa4e1d0baf865a2fa29a902eae1790))
+
 ## v0.11.0 (2022-11-19)
 ### Feature
 * Implicitly convert sources into text components ([`d27870e`](https://github.com/rx-modules/bolt-expressions/commit/d27870ef068b27dddf054b01d6c418d608a0a61a))

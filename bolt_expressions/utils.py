@@ -3,6 +3,10 @@ from typing import Dict
 from beet import Context
 from bolt import Runtime
 
+__all__ = [
+    "identifier_generator",
+]
+
 
 def identifier_generator(ctx: Context):
     runtime = ctx.inject(Runtime)

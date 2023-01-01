@@ -1,17 +1,25 @@
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Iterable, List
+from typing import Any, Callable, Iterable
 
 from beet.core.utils import required_field
 from mecha import AstCommand, AstNode, AstObjective, AstPlayerName, Reducer, rule
 
-from .sources import ConstantScoreSource, DataSource, ScoreSource, Source
+from .sources import ConstantScoreSource, Source
+
+__all__ = [
+    "ConstantScoreChecker",
+    "ObjectiveChecker",
+    "SourceJsonConverter",
+]
 
 
 @dataclass
 class ConstantScoreChecker(Reducer):
     objective: str = required_field()
     callback: Callable = required_field()
+    pattern: re.Pattern[str] = re.compile(r"^\$([-+]?\d+)\b")
 
     @cached_property
     def objective_node(self):
@@ -28,12 +36,12 @@ class ConstantScoreChecker(Reducer):
         if not isinstance(name, AstPlayerName):
             return
 
-        value = name.value
+        match = self.pattern.match(name.value)
 
-        if not (value.startswith("$") and value[1:].isdigit()):
+        if not match:
             return
 
-        value = int(value[1:])
+        value = int(match.group(1))
         source = ConstantScoreSource.create(value)
 
         self.callback(source)

@@ -17,6 +17,22 @@ function ./constants:
     abc["@s"] /= 40
     abc["@s"] %= 50
 
+    abc["$a"] *= 1
+    abc["$a"] *= -1
+
+    abc["$b"] /= 1
+    abc["$b"] /= -1
+
+    abc["$c"] *= 0.5
+    abc["$d"] *= 0.1
+    abc["$e"] *= 0.123
+    abc["$f"] *= 3.14
+    abc["$g"] *= 0.494120
+
+    abc["$h"] /= 0.5
+    abc["$i"] /= 0.33
+    abc["$j"] /= 1.5
+
 
 value = temp["#value"]
 

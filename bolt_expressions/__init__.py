@@ -1,11 +1,18 @@
-__version__ = "0.11.0"
+__version__ = "0.12.1"
 
 from .api import Data as _Data
 from .api import Expression as _Expression
 from .api import Scoreboard as _Scoreboard
-from .plugin import beet_default
-
-__all__ = ["beet_default", "Data", "Expression", "Scoreboard"]
+from .api import *
+from .ast import *
+from .literals import *
+from .node import *
+from .operations import *
+from .optimizer import *
+from .plugin import *
+from .resolver import *
+from .sources import *
+from .utils import *
 
 
 def __monkey_patch():

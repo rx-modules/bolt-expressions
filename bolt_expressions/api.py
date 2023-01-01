@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, partial
 from typing import Iterable, List, Union
 
 from beet import Context, Function, FunctionTag
@@ -36,6 +36,14 @@ from .utils import identifier_generator
 # from rich import print
 # from rich.pretty import pprint
 
+__all__ = [
+    "ExpressionOptions",
+    "Expression",
+    "Scoreboard",
+    "Score",
+    "Data",
+]
+
 
 class ExpressionOptions(BaseModel):
     """Bolt Expressions Options"""
@@ -59,8 +67,12 @@ class Expression:
     def __post_init__(self):
         if not self.activated:
             self.opts = self.ctx.validate("bolt_expressions", ExpressionOptions)
-            self._runtime.expose("min", wrapped_min)
-            self._runtime.expose("max", wrapped_max)
+            self._runtime.expose(
+                "min", partial(wrapped_min, self._runtime.globals.get("min", min))
+            )
+            self._runtime.expose(
+                "max", partial(wrapped_max, self._runtime.globals.get("max", max))
+            )
             self.activated = True
 
         if not self.opts.disable_commands:

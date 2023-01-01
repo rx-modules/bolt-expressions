@@ -1,3 +1,4 @@
+from fractions import Fraction
 from functools import wraps
 from itertools import chain
 from typing import (
@@ -13,6 +14,8 @@ from typing import (
     Union,
 )
 
+from nbtlib import Double, Float, Numeric
+
 from . import operations as op
 from .literals import Literal
 from .sources import ConstantScoreSource, DataSource, ScoreSource, TempScoreSource
@@ -20,6 +23,19 @@ from .sources import ConstantScoreSource, DataSource, ScoreSource, TempScoreSour
 # from rich import print
 # from rich.pretty import pprint
 
+__all__ = [
+    "SmartGenerator",
+    "Optimizer",
+    "dummy",
+    "noncommutative_set_collapsing",
+    "commutative_set_collapsing",
+    "data_set_scaling",
+    "data_get_scaling",
+    "literal_to_constant_replacement",
+    "output_score_replacement",
+    "set_to_self_removal",
+    "set_and_get_cleanup",
+]
 
 if TYPE_CHECKING:
     Rule = Callable[[Iterable[op.Operation]], None]
@@ -104,17 +120,6 @@ def dummy(nodes: Iterable["op.Operation"]):
     yield from nodes
 
 
-ScoreOperations = {
-    op.Add,
-    op.Subtract,
-    op.Multiply,
-    op.Divide,
-    op.Modulus,
-    op.Min,
-    op.Max,
-}
-
-
 @Optimizer.rule
 def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
     """For noncommutative operations:
@@ -138,7 +143,7 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
         further_node = next(nodes, None)
         if (
             type(node) is op.Set
-            and type(next_node) in ScoreOperations
+            and isinstance(next_node, op.ScoreOperation)
             and type(further_node) is op.Set
             and isinstance(further_node.former, ScoreSource)
             and node.latter == further_node.former
@@ -227,20 +232,28 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
         if (
             isinstance(node, (op.Multiply, op.Divide))
             and isinstance(next_node, op.Set)
-            and isinstance(node.latter, ConstantScoreSource)
+            and isinstance(node.latter, Literal)
             and isinstance(next_node.former, DataSource)
             and node.former == next_node.latter
         ):
-            scale = node.latter.value
+            scale = float(node.latter.value)
+
+            if scale.is_integer():
+                scale = int(scale)
+
             source = next_node.former
             number_type = source._nbt_type
+
             if isinstance(node, op.Divide):
                 scale = 1 / scale
                 number_type = number_type or source._default_floating_point_type
+
             new_source = source._copy(scale=scale, nbt_type=number_type)
             out = op.Set(new_source, node.former)
+
             if operation_node:
                 yield operation_node  # yield the data operation node back in
+
             yield out
         else:
             nodes.push(next_node)
@@ -268,31 +281,38 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
             isinstance(node, op.Set)
             and isinstance(next_node, (op.Multiply, op.Divide))
             and isinstance(node.latter, DataSource)
-            and isinstance(next_node.latter, ConstantScoreSource)
+            and isinstance(next_node.latter, Literal)
             and node.former == next_node.former
         ):
-            scale = next_node.latter.value
+            scale = float(next_node.latter.value)
+
+            if scale.is_integer():
+                scale = int(scale)
+
             if isinstance(next_node, op.Divide):
                 scale = 1 / scale
-            out = op.Set(node.former, node.latter._copy(scale=scale))
-            yield out
+
+            yield op.Set(node.former, node.latter._copy(scale=scale))
         else:
             nodes.push(next_node)
             yield node
 
 
 @Optimizer.rule
-def constant_to_literal_replacement(
-    nodes: Iterable["op.Operation"],
-) -> Iterable["op.Operation"]:
+def multiply_divide_by_fraction(nodes: Iterable["op.Operation"]):
     for node in nodes:
-        # print("[bold]constant_to_literal_replacement[/bold]", node)
         if (
-            isinstance(node, (op.Set, op.Add, op.Subtract))
-            and type(node.latter) is ConstantScoreSource
+            isinstance(node, (op.Multiply, op.Divide))
+            and isinstance(node.latter, Literal)
+            and isinstance(node.latter.value, (Float, Double))
         ):
-            literal = node.latter.value
-            yield node.__class__(node.former, Literal.create(literal))
+            value = Fraction(node.latter.value).limit_denominator()
+
+            if isinstance(node, op.Divide):
+                value = 1 / value
+
+            yield op.Multiply.create(node.former, value.numerator)
+            yield op.Divide.create(node.former, value.denominator)
         else:
             yield node
 
@@ -303,35 +323,59 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
     If expression tree uses the output score, this rule won't be applied.
     """
     all_nodes = list(nodes)
-    # print("[bold]Applying output score replacement on tree:[/bold]")
-    # pprint(all_nodes)
-    last_node = all_nodes[-1]
-    target_var = last_node.latter
-    output_var = last_node.former
-    can_replace = False
-    # print(f"Last node is {last_node}")
-    if (
-        isinstance(output_var, ScoreSource)
-        and type(last_node) is op.Set
-        and len(all_nodes) > 1
-    ):
-        for node in all_nodes[1:]:  # Ignore the first Set operation
-            # print(f"Is {node.latter} equal to {output_var}? {node.latter == output_var}")
-            if node.latter == output_var:
-                break
-        else:
-            can_replace = True
-    # print(f"Can replace output score? {can_replace}")
-    def replace(source):
-        if source == target_var:
-            return output_var
-        return source
 
-    if can_replace:
-        for node in all_nodes:
-            yield node.__class__(replace(node.former), replace(node.latter))
-    else:
-        yield from all_nodes
+    if all_nodes:
+        # print("[bold]Applying output score replacement on tree:[/bold]")
+        # pprint(all_nodes)
+        last_node = all_nodes[-1]
+        target_var = last_node.latter
+        output_var = last_node.former
+        can_replace = False
+        # print(f"Last node is {last_node}")
+        if (
+            isinstance(output_var, ScoreSource)
+            and type(last_node) is op.Set
+            and len(all_nodes) > 1
+        ):
+            for node in all_nodes[1:]:  # Ignore the first Set operation
+                # print(f"Is {node.latter} equal to {output_var}? {node.latter == output_var}")
+                if node.latter == output_var:
+                    break
+            else:
+                can_replace = True
+        # print(f"Can replace output score? {can_replace}")
+        def replace(source):
+            if source == target_var:
+                return output_var
+            return source
+
+        if can_replace:
+            for node in all_nodes:
+                yield node.__class__(replace(node.former), replace(node.latter))
+        else:
+            yield from all_nodes
+
+
+@Optimizer.rule
+def multiply_divide_by_one_removal(nodes: Iterable["op.Operation"]):
+    for node in nodes:
+        if not (
+            isinstance(node, (op.Multiply, op.Divide))
+            and isinstance(node.latter, Literal)
+            and node.latter.value == 1
+        ):
+            yield node
+
+
+@Optimizer.rule
+def add_subtract_by_zero_removal(nodes: Iterable["op.Operation"]):
+    for node in nodes:
+        if not (
+            isinstance(node, (op.Add, op.Subtract))
+            and isinstance(node.latter, Literal)
+            and node.latter.value == 0
+        ):
+            yield node
 
 
 @Optimizer.rule
@@ -376,4 +420,22 @@ def set_and_get_cleanup(nodes: Iterable["op.Operation"]):
             yield out
         else:
             nodes.push(next_node)
+            yield node
+
+
+@Optimizer.rule
+def literal_to_constant_replacement(
+    nodes: Iterable["op.Operation"],
+) -> Iterable["op.Operation"]:
+    for node in nodes:
+        if (
+            isinstance(node, (op.Multiply, op.Divide, op.Min, op.Max, op.Modulus))
+            and isinstance(node.latter, Literal)
+            and isinstance(node.latter.value, Numeric)
+        ):
+            value = int(node.latter.value)
+            constant = ConstantScoreSource.create(value)
+
+            yield type(node).create(node.former, constant)
+        else:
             yield node

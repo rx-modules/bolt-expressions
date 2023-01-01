@@ -10,24 +10,65 @@ from .sources import ConstantScoreSource, DataSource, Source, TempScoreSource
 # from rich import print
 # from rich.pretty import pprint
 
+__all__ = [
+    "Operation",
+    "DataOperation",
+    "Merge",
+    "MergeRoot",
+    "Insert",
+    "Append",
+    "Prepend",
+    "Set",
+    "Add",
+    "Subtract",
+    "Multiply",
+    "Divide",
+    "Modulus",
+    "Min",
+    "Max",
+    "wrapped_min",
+    "wrapped_max",
+]
 
 GenericValue = Union["Operation", "Source", int, str]
 
 
-def wrapped_min(*args, **kwargs):
-    if isinstance(args[0], ExpressionNode):
-        return args[0].__min__(args[1])
-    elif isinstance(args[1], ExpressionNode):
-        return args[1].__rmin__(args[0])
-    return min(*args, *kwargs)
+def wrapped_min(f, *args, **kwargs):
+    values = args
+
+    if len(args) == 1:
+        if not isinstance(args[0], Iterable):
+            return args[0]
+
+        values = tuple(args[0])
+
+    for i, node in enumerate(values):
+        if not isinstance(node, ExpressionNode):
+            continue
+
+        remaining = values[:i] + values[i + 1 :]
+        return Min.create(wrapped_min(f, *remaining, **kwargs), node)
+
+    return f(*args, **kwargs)
 
 
-def wrapped_max(*args, **kwargs):
-    if isinstance(args[0], ExpressionNode):
-        return args[0].__max__(args[1])
-    elif isinstance(args[1], ExpressionNode):
-        return args[1].__rmax__(args[0])
-    return min(*args, *kwargs)
+def wrapped_max(f, *args, **kwargs):
+    values = args
+
+    if len(args) == 1:
+        if not isinstance(args[0], Iterable):
+            return args[0]
+
+        values = tuple(args[0])
+
+    for i, node in enumerate(values):
+        if not isinstance(node, ExpressionNode):
+            continue
+
+        remaining = values[:i] + values[i + 1 :]
+        return Max.create(wrapped_max(f, *remaining, **kwargs), node)
+
+    return f(*args, **kwargs)
 
 
 @dataclass(unsafe_hash=False, order=False)
@@ -41,18 +82,11 @@ class Operation(ExpressionNode):
         """Factory method to create new operations"""
 
         if not isinstance(former, ExpressionNode):
-            former = cls._handle_literal(former)
+            former = Literal.create(former)
         if not isinstance(latter, ExpressionNode):
-            latter = cls._handle_literal(latter)
+            latter = Literal.create(latter)
 
         return super().create(former, latter, *args, **kwargs)
-
-    @classmethod
-    def _handle_literal(cls, value: Any):
-        literal = Literal.create(value)
-        if type(literal.value) is Int:
-            return ConstantScoreSource.create(literal.value.real)
-        return literal
 
     def unroll(self) -> Iterable["Operation"]:
         *former_nodes, former_var = self.former.unroll()
@@ -71,11 +105,7 @@ class Operation(ExpressionNode):
 
 
 class DataOperation(Operation):
-    @classmethod
-    def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
-        if not isinstance(latter, ExpressionNode):
-            latter = Literal.create(latter)
-        return super().create(former, latter, *args, **kwargs)
+    ...
 
 
 class Merge(DataOperation):
@@ -132,8 +162,12 @@ class Set(Operation):
         return self._resolve(self)
 
 
+class ScoreOperation(Operation):
+    ...
+
+
 @ExpressionNode.link("add", reverse=True)
-class Add(Operation):
+class Add(ScoreOperation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -142,12 +176,12 @@ class Add(Operation):
 
 
 @ExpressionNode.link("sub", reverse=True)
-class Subtract(Operation):
+class Subtract(ScoreOperation):
     ...  # fmt: skip
 
 
 @ExpressionNode.link("mul", reverse=True)
-class Multiply(Operation):
+class Multiply(ScoreOperation):
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -156,22 +190,22 @@ class Multiply(Operation):
 
 
 @ExpressionNode.link("truediv", reverse=True)
-class Divide(Operation):
+class Divide(ScoreOperation):
     ...
 
 
 @ExpressionNode.link("mod", reverse=True)
-class Modulus(Operation):
+class Modulus(ScoreOperation):
     ...
 
 
 @ExpressionNode.link("min", reverse=True)
-class Min(Operation):
+class Min(ScoreOperation):
     ...
 
 
 @ExpressionNode.link("max", reverse=True)
-class Max(Operation):
+class Max(ScoreOperation):
     ...
 
 

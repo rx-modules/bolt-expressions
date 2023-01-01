@@ -11,6 +11,14 @@ from .node import ExpressionNode
 
 # from rich.pretty import pprint
 
+__all__ = [
+    "Source",
+    "ScoreSource",
+    "ConstantScoreSource",
+    "TempScoreSource",
+    "DataSource",
+    "parse_compound",
+]
 
 SOLO_COLON = slice(None, None, None)
 
