@@ -272,7 +272,7 @@ class Data:
         if not isinstance(value, ExpressionNode):
             value = literal_types[type](value)
         self._expr.set(source, value)
-        return replace(source, _nbt_type=None)
+        return replace(source, datatype=None)
 
     def remove(self, source: DataSource, value: Union[str, int] = None):
         node = source if value is None else source[value]

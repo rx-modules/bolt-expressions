@@ -12,6 +12,7 @@ from .optimizer import *
 from .plugin import *
 from .resolver import *
 from .sources import *
+from .typing import *
 from .utils import *
 
 

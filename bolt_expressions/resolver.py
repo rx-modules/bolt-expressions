@@ -1,6 +1,8 @@
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 
-from .operations import GenericValue, Operation
+from nbtlib import Numeric
+
+from .operations import GenericValue, Operation, Set
 from .sources import DataSource, ScoreSource, Source
 
 __all__ = [
@@ -35,7 +37,7 @@ def get_templates() -> Dict[str, str]:
         "max:score:score": lambda op: f"scoreboard players operation {op.former} > {op.latter}",
         "set:data:literal": lambda op: f"data modify {op.former} set value {op.latter}",
         "set:data:data": resolve_set_data_data,
-        "set:data:score": lambda op: f"execute store result {op.former} {op.former.get_type()} {op.former._scale} run scoreboard players get {op.latter}",
+        "set:data:score": lambda op: f"execute store result {op.former} {get_data_store_type(op.former.datatype)} {op.former._scale} run scoreboard players get {op.latter}",
         "set:score:data": lambda op: f"execute store result score {op.former} run data get {op.latter} {op.latter._scale}",
         "append:data:literal": lambda op: f"data modify {op.former} append value {op.latter}",
         "append:data:data": lambda op: f"data modify {op.former} append from {op.latter}",
@@ -62,6 +64,19 @@ def get_type(node: GenericValue):
     return "literal"
 
 
+def get_data_store_type(value: str | type):
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, type) and issubclass(value, (int, float)):
+        return value.__name__.lower()
+
+    if value is Any:
+        return "int"
+
+    raise ValueError(f"Could not resolve datatype {value!r}")
+
+
 def generate(template_id: str, *args, **kwargs):
     template = get_templates()[template_id]
     return template(*args, *kwargs.values())
@@ -78,16 +93,19 @@ def resolve_execute_store(source: Source):
     if isinstance(source, ScoreSource):
         return f"store result score {source}"
     if isinstance(source, DataSource):
-        return f"store result {source} {source.get_type()} {source._scale}"
+        return f"store result {source} {get_data_store_type(source.datatype)} {source._scale}"
 
 
-def resolve_set_data_data(op: Operation):
+def resolve_set_data_data(op: Set):
     if (
         op.former._scale != 1
         or op.latter._scale != 1
-        or op.former._nbt_type is not None
+        or (op.former.datatype is not Any and op.former.datatype != op.latter.datatype)
     ):
-        return f"execute store result {op.former} {op.former.get_type()} {op.former._scale} run data get {op.latter} {op.latter._scale}"
+        cast_type = get_data_store_type(op.former.datatype)
+
+        return f"execute store result {op.former} {cast_type} {op.former._scale} run data get {op.latter} {op.latter._scale}"
+
     return f"data modify {op.former} set from {op.latter}"
 
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any
 
 from nbtlib import Base, Byte, Compound, Double, Float, Int, List, Long, Short, String
 
@@ -24,7 +24,7 @@ literal_types = {
 }
 
 
-def convert_tag(value):
+def convert_tag(value: Any):
     match value:
         case Base():
             return value

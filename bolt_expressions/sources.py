@@ -1,12 +1,14 @@
 from dataclasses import dataclass, field, replace
 from functools import cache
 from itertools import count
-from typing import Callable, ClassVar, Union
+from types import UnionType
+from typing import Any, Callable, ClassVar, Union, cast
 
-from nbtlib import Compound, Path
+from nbtlib import Compound, Double, Path
 
 from . import operations as op
-from .literals import convert_tag
+from .literals import convert_tag,
+from .typing import convert_type, is_type
 from .node import ExpressionNode
 
 # from rich.pretty import pprint
@@ -91,13 +93,14 @@ def parse_compound(value: Union[str, dict, Path, Compound]):
 
 @dataclass(unsafe_hash=True, order=False)
 class DataSource(Source):
-    _default_nbt_type: ClassVar[str] = "int"
-    _default_floating_point_type: ClassVar[str] = "double"
+    _default_datatype: ClassVar[type] = int
+    _default_floating_point_type: ClassVar[type] = Double
+
     _type: str
     _target: str
     _path: Path = field(default_factory=Path)
     _scale: float = 1
-    _nbt_type: str = None
+    datatype: type = Any
 
     _constructed: bool = field(hash=False, default=False, init=False)
 
@@ -127,10 +130,16 @@ class DataSource(Source):
         child = self.__getitem__(key)
         child._rebind(child, value)
 
-    def __getitem__(self, key: Union[str, int, Path, Compound]) -> "DataSource":
+    def __getitem__(
+        self, key: Union[slice, str, dict[str, Any], int, type, Path]
+    ) -> "DataSource":
         if key is SOLO_COLON:
             # self[:]
             return self.all()
+
+        if is_type(key):
+            return replace(self, datatype=convert_type(key))
+
         if (
             isinstance(key, dict)
             or isinstance(key, str)
@@ -138,6 +147,7 @@ class DataSource(Source):
         ):
             # self[{abc:1b}]
             return self.filtered(key)
+
         # self[0] or self.foo
         path = self._path[key]
         return replace(self, _path=path)
@@ -160,7 +170,7 @@ class DataSource(Source):
             self,
             _path=path,
             _scale=scale if scale is not None else self._scale,
-            _nbt_type=type if type is not None else self._nbt_type,
+            datatype=type if type is not None else self.datatype,
         )
 
     def __str__(self):
@@ -168,9 +178,6 @@ class DataSource(Source):
 
     def __repr__(self):
         return f'"{str(self)}"'
-
-    def get_type(self):
-        return self._nbt_type if self._nbt_type else self._default_nbt_type
 
     def all(self) -> "DataSource":
         path = self._path + "[]"
