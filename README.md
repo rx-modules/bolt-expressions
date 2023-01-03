@@ -55,7 +55,7 @@ pipeline:
 Once you've required `bolt` and `bolt_expressions`, you are able to import the python package directly inside your bolt script.
 
 ```py
-from bolt_expressions import Scoreboard, Storage
+from bolt_expressions import Scoreboard, Data
 ```
 Now you're free to use the API objects. Create objectives, block, storage and entity nbt sources to easily write expressions as simple or complex as you like to make it.
 
