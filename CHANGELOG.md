@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.12.2 (2023-01-08)
+### Fix
+* Fix inheritance of expression nodes and dataclasses.replace ([`bd6ac3d`](https://github.com/rx-modules/bolt-expressions/commit/bd6ac3d478a255603f2d70670337dd158fbefeaf))
+
 ## v0.12.1 (2022-12-31)
 ### Fix
 * Preserve key/default logic of builtin min/max functions ([`c127114`](https://github.com/rx-modules/bolt-expressions/commit/c127114beefff5e392cc3e4733b7c113202ccf91))
