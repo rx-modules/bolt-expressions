@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
 from typing import Iterable, List, Union
 
@@ -220,7 +220,7 @@ class Score:
     objective: str
 
     def __getitem__(self, scoreholder: Union[str, List[str]]) -> ScoreSource:
-        if type(scoreholder) is str:
+        if isinstance(scoreholder, str):
             return ScoreSource.create(scoreholder, self.objective)
         return [ScoreSource.create(holder, self.objective) for holder in scoreholder]
 
@@ -272,7 +272,7 @@ class Data:
         if not isinstance(value, ExpressionNode):
             value = literal_types[type](value)
         self._expr.set(source, value)
-        return source._copy(nbt_type=None)
+        return replace(source, _nbt_type=None)
 
     def remove(self, source: DataSource, value: Union[str, int] = None):
         node = source if value is None else source[value]

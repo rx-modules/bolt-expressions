@@ -25,21 +25,23 @@ literal_types = {
 
 
 def convert_tag(value):
-    if isinstance(value, Base):
-        return value
-    t = type(value)
-    if t is list:
-        return List([convert_tag(x) for x in value])
-    if t is dict:
-        return Compound({key: convert_tag(value) for key, value in value.items()})
-    if t is bool:
-        return Byte(value)
-    if t is int:
-        return Int(value)
-    if t is float:
-        return Float(value)
-    if t is str:
-        return String(value)
+    match value:
+        case Base():
+            return value
+        case list():
+            return List([convert_tag(x) for x in value])
+        case dict():
+            return Compound({key: convert_tag(value) for key, value in value.items()})
+        case bool():
+            return Byte(value)
+        case int():
+            return Int(value)
+        case float():
+            return Float(value)
+        case str():
+            return String(value)
+        case _:
+            return value
 
 
 @dataclass(unsafe_hash=True, order=False)

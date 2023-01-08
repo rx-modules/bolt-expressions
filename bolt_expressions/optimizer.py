@@ -1,3 +1,4 @@
+from dataclasses import replace
 from fractions import Fraction
 from functools import wraps
 from itertools import chain
@@ -142,16 +143,17 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
         next_node = next(nodes, None)
         further_node = next(nodes, None)
         if (
-            type(node) is op.Set
+            isinstance(node, op.Set)
             and isinstance(next_node, op.ScoreOperation)
-            and type(further_node) is op.Set
+            and isinstance(further_node, op.Set)
             and isinstance(further_node.former, ScoreSource)
             and node.latter == further_node.former
             and node.former == next_node.former
             and node.former == further_node.latter
         ):
-            out = next_node.__class__(further_node.former, next_node.latter)
-            yield out
+            yield replace(
+                next_node, former=further_node.former, latter=next_node.latter
+            )
         else:
             nodes.push(further_node)
             nodes.push(next_node)
@@ -176,15 +178,13 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
         # print("next_node", next_node)
 
         if (
-            type(node) in (op.Add, op.Multiply)
-            and type(next_node) is op.Set
+            isinstance(node, (op.Add, op.Multiply))
+            and isinstance(next_node, op.Set)
             and isinstance(next_node.former, ScoreSource)
             and node.former == next_node.latter
             and node.latter == next_node.former
         ):
-            out = node.__class__(next_node.former, next_node.latter)
-            # print("new", out)
-            yield out
+            yield replace(node, former=next_node.former, latter=next_node.latter)
         else:
             # print("old", node)
             nodes.push(next_node)
@@ -248,7 +248,7 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
                 scale = 1 / scale
                 number_type = number_type or source._default_floating_point_type
 
-            new_source = source._copy(scale=scale, nbt_type=number_type)
+            new_source = replace(source, _scale=scale, _nbt_type=number_type)
             out = op.Set(new_source, node.former)
 
             if operation_node:
@@ -292,7 +292,7 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
             if isinstance(next_node, op.Divide):
                 scale = 1 / scale
 
-            yield op.Set(node.former, node.latter._copy(scale=scale))
+            yield op.Set(node.former, replace(node.latter, _scale=scale))
         else:
             nodes.push(next_node)
             yield node
@@ -334,7 +334,7 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
         # print(f"Last node is {last_node}")
         if (
             isinstance(output_var, ScoreSource)
-            and type(last_node) is op.Set
+            and isinstance(last_node, op.Set)
             and len(all_nodes) > 1
         ):
             for node in all_nodes[1:]:  # Ignore the first Set operation
@@ -344,14 +344,18 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
             else:
                 can_replace = True
         # print(f"Can replace output score? {can_replace}")
-        def replace(source):
+        def replace_source(source):
             if source == target_var:
                 return output_var
             return source
 
         if can_replace:
             for node in all_nodes:
-                yield node.__class__(replace(node.former), replace(node.latter))
+                yield replace(
+                    node,
+                    former=replace_source(node.former),
+                    latter=replace_source(node.latter),
+                )
         else:
             yield from all_nodes
 
@@ -385,7 +389,7 @@ def set_to_self_removal(nodes: Iterable["op.Operation"]):
     all the reduntant Sets created by the previous rule.
     """
     for node in nodes:
-        if type(node) is op.Set:
+        if isinstance(node, op.Set):
             if node.former != node.latter:
                 yield node
         else:
@@ -436,6 +440,6 @@ def literal_to_constant_replacement(
             value = int(node.latter.value)
             constant = ConstantScoreSource.create(value)
 
-            yield type(node).create(node.former, constant)
+            yield replace(node, former=node.former, latter=constant)
         else:
             yield node

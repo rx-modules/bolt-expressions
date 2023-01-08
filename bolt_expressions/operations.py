@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterable, List, Tuple, Union
 
 from nbtlib import Int
@@ -95,12 +95,12 @@ class Operation(ExpressionNode):
         yield from former_nodes
         yield from latter_nodes
 
-        if type(former_var) is TempScoreSource:
+        if isinstance(former_var, TempScoreSource):
             temp_var = former_var
         else:
             temp_var = TempScoreSource.create()
             yield Set.create(temp_var, former_var)
-        yield self.__class__.create(temp_var, latter_var)
+        yield replace(self, former=temp_var, latter=latter_var)
         yield temp_var
 
 
@@ -122,12 +122,12 @@ class Insert(DataOperation):
     index: int = 0
 
     def unroll(self):
-        if type(self.latter) in (DataSource, Literal):
+        if isinstance(self.latter, (DataSource, Literal)):
             yield self
         else:
             *latter_nodes, latter_var = self.latter.unroll()
             yield from latter_nodes
-            yield self.__class__.create(self.former, 0, index=self.index)
+            yield replace(self, latter=Literal.create(0))
             yield Set.create(self.former[self.index], latter_var)
 
 
@@ -151,7 +151,7 @@ class Set(Operation):
     def unroll(self) -> Iterable["Operation"]:
         TempScoreSource.count = -1
 
-        if type(self.latter) is DataSource:
+        if isinstance(self.latter, DataSource):
             yield Set.create(self.former, self.latter)
         else:
             *latter_nodes, latter_var = self.latter.unroll()

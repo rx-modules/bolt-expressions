@@ -92,7 +92,7 @@ def resolve_set_data_data(op: Operation):
 
 
 def resolve_node(node: Operation):
-    id = node.__class__.__name__.lower()  # TODO Operation should have an id property
+    id = type(node).__name__.lower()  # TODO Operation should have an id property
     former_type = get_type(node.former)
     latter_type = get_type(node.latter)
     template_id = f"{id}:{former_type}:{latter_type}"
