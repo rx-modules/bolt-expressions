@@ -862,14 +862,14 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "mecha"
-version = "0.60.3"
+version = "0.62.0"
 description = "A powerful Minecraft command library"
 category = "main"
 optional = false
 python-versions = ">=3.10,<4.0"
 
 [package.dependencies]
-beet = ">=0.79.0"
+beet = ">=0.80.1"
 tokenstream = ">=1.4.2,<2.0.0"
 
 [[package]]
@@ -2098,7 +2098,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "f1535ac8d1d3b99e7f90a6c4792d45c2f9ce00664b41d5f33af08426d9efa46c"
+content-hash = "9ed554c984027d1e87bfdd0674583f6871f4fc061619cc4fefc6101e7fb8e1e6"
 
 [metadata.files]
 alabaster = [
@@ -2584,8 +2584,8 @@ mdurl = [
     {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
 ]
 mecha = [
-    {file = "mecha-0.60.3-py3-none-any.whl", hash = "sha256:ebd153ccb9f87591bdea6f14c3b23c7a49027e4b9b6632ed05b6b3b17b400766"},
-    {file = "mecha-0.60.3.tar.gz", hash = "sha256:95c00787203219efd9349e4dc77153f10c6d8b058c0b452445334b0762a86bdd"},
+    {file = "mecha-0.62.0-py3-none-any.whl", hash = "sha256:367d74c139e7e98aaa2026ba038f14605cf991cc2ee7160a222059a882b87999"},
+    {file = "mecha-0.62.0.tar.gz", hash = "sha256:cde519c63f35a92ac5248959d6f022086c0699c8f7f9e752970e5d471e76af3e"},
 ]
 mistune = [
     {file = "mistune-2.0.4-py2.py3-none-any.whl", hash = "sha256:182cc5ee6f8ed1b807de6b7bb50155df7b66495412836b9a74c8fbdfc75fe36d"},
