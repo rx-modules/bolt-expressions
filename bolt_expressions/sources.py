@@ -1,15 +1,14 @@
 from dataclasses import dataclass, field, replace
 from functools import cache
 from itertools import count
-from types import UnionType
 from typing import Any, Callable, ClassVar, Union, cast
 
 from nbtlib import Compound, Double, Path
 
 from . import operations as op
-from .literals import convert_tag,
-from .typing import convert_type, is_type
+from .literals import convert_tag
 from .node import ExpressionNode
+from .typing import Accessor, DataType, convert_type, get_property_type, is_type
 
 # from rich.pretty import pprint
 
@@ -93,16 +92,20 @@ def parse_compound(value: Union[str, dict, Path, Compound]):
 
 @dataclass(unsafe_hash=True, order=False)
 class DataSource(Source):
-    _default_datatype: ClassVar[type] = int
-    _default_floating_point_type: ClassVar[type] = Double
-
     _type: str
     _target: str
     _path: Path = field(default_factory=Path)
     _scale: float = 1
-    datatype: type = Any
+
+    writetype: DataType = Any
 
     _constructed: bool = field(hash=False, default=False, init=False)
+
+    _default_floating_point_type: ClassVar[type] = Double
+
+    @property
+    def readtype(self) -> DataType:
+        return self.writetype
 
     def __post_init__(self):
         self._constructed = True
@@ -131,26 +134,29 @@ class DataSource(Source):
         child._rebind(child, value)
 
     def __getitem__(
-        self, key: Union[slice, str, dict[str, Any], int, type, Path]
+        self, key: Union[slice, str, dict[str, Any], int, DataType, Path]
     ) -> "DataSource":
-        if key is SOLO_COLON:
-            # self[:]
-            return self.all()
-
         if is_type(key):
-            return replace(self, datatype=convert_type(key))
+            key = cast(DataType, key)
+            return self._cast(key)
 
-        if (
+        if key is SOLO_COLON:
+            path = self._path + "[]"
+        elif (
             isinstance(key, dict)
             or isinstance(key, str)
             and (key[0], key[-1]) == ("{", "}")
         ):
-            # self[{abc:1b}]
-            return self.filtered(key)
+            compound = parse_compound(key)
+            path = self._path[:][compound]
+        else:
+            path = self._path[key]
 
-        # self[0] or self.foo
-        path = self._path[key]
-        return replace(self, _path=path)
+        writetype = self._get_property_type(self.writetype, path)
+
+        # TODO: validate by readtype
+
+        return replace(self, _path=path, writetype=writetype)
 
     __getattr__ = __getitem__
 
@@ -158,11 +164,12 @@ class DataSource(Source):
         self,
         matching: Union[str, Path, Compound] = None,
         scale: float = None,
-        type: str = None,
+        type: DataType | str = None,
     ) -> "DataSource":
         """Create a new DataSource with modified properties."""
         if matching is not None:
             path = self._path[parse_compound(matching)]
+            type = self._get_property_type(self.writetype, path)
         else:
             path = self._path
 
@@ -170,23 +177,24 @@ class DataSource(Source):
             self,
             _path=path,
             _scale=scale if scale is not None else self._scale,
-            datatype=type if type is not None else self.datatype,
+            writetype=type if type is not None else self.writetype,
         )
+
+    def _cast(self, type: DataType) -> "DataSource":
+        type = convert_type(type)
+
+        return replace(self, writetype=type)
+
+    def _get_property_type(self, data_type: DataType, child_path: Path):
+        relative = cast(tuple[Accessor, ...], tuple(child_path)[len(self._path) :])
+
+        return get_property_type(data_type, relative)
 
     def __str__(self):
         return f"{self._type} {self._target} {self._path}"
 
     def __repr__(self):
         return f'"{str(self)}"'
-
-    def all(self) -> "DataSource":
-        path = self._path + "[]"
-        return replace(self, _path=path)
-
-    def filtered(self, value: Union[str, Path, Compound]):
-        compound = parse_compound(value)
-        path = self._path[:][compound]
-        return replace(self, _path=path)
 
     def component(self, **tags):
         return {"nbt": str(self._path), self._type: self._target, **tags}

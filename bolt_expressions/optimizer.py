@@ -242,7 +242,7 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
                 scale = int(scale)
 
             source = next_node.former
-            number_type = source.datatype
+            number_type = source.writetype
 
             if isinstance(node, op.Divide):
                 scale = 1 / scale
@@ -250,7 +250,7 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
                 if number_type is Any:
                     number_type = source._default_floating_point_type
 
-            new_source = replace(source, _scale=scale, datatype=number_type)
+            new_source = replace(source, _scale=scale, writetype=number_type)
             out = op.Set(new_source, node.former)
 
             if operation_node:

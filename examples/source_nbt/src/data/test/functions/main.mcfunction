@@ -62,9 +62,9 @@ function ./paths:
     data modify storage val._target val[{id: 0}]._path set value 0
 
     #> Selecting all elements in an array
-    say temp.item.tag.Enchantments.all()
+    say temp.item.tag.Enchantments[]
     say temp.item.tag.Enchantments[:]
-    say temp.items.all().ids.all().literal["all"].key
+    say temp.items[].ids[].literal["all"].key
     say temp.items[:].ids[:].literal[":"].key
 
     #> Interpolating named tags
