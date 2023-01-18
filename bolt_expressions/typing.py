@@ -29,8 +29,8 @@ from typing import Any, Iterable, TypedDict, Union, _UnionGenericAlias, get_args
 __all__ = [
     "is_type",
     "convert_type",
-    "get_property_type",
-    "get_subtype_from_accessor",
+    "get_property_type_by_path",
+    "get_subtype_by_accessor",
     "check_type",
     "check_union_type",
     "check_typeddict_type",
@@ -99,6 +99,9 @@ def convert_type(value: DataType) -> DataType:
 
         converted = tuple(convert_type(arg) for arg in args)
         origin = convert_type(value.__origin__)
+
+        if issubclass(origin, Compound):
+            converted = (converted[-1],)
 
         if len(converted) == 1:
             converted = converted[0]
@@ -256,22 +259,24 @@ def check_type(write: DataType, read: DataType) -> bool:
 #################
 
 
-def get_property_type(type: DataType, path: Path | tuple[Accessor, ...]) -> DataType:
+def get_property_type_by_path(
+    type: DataType, path: Path | tuple[Accessor, ...]
+) -> DataType:
     new_accessors: tuple[Accessor, ...] = tuple(path)
 
     for accessor in new_accessors:
-        type = get_subtype_from_accessor(accessor, type)
+        type = get_subtype_by_accessor(accessor, type)
 
     return type
 
 
-def get_subtype_from_accessor(accessor: Accessor, current_type: DataType) -> DataType:
+def get_subtype_by_accessor(accessor: Accessor, current_type: DataType) -> DataType:
     if current_type is NoneType:
         return None
 
     if isinstance(current_type, _UnionGenericAlias):
         args = get_args(current_type)
-        subtypes = tuple(get_subtype_from_accessor(accessor, arg) for arg in args)
+        subtypes = tuple(get_subtype_by_accessor(accessor, arg) for arg in args)
 
         return Union[subtypes]  # type: ignore
 

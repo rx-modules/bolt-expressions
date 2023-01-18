@@ -8,7 +8,7 @@ from nbtlib import Compound, Double, Path
 from . import operations as op
 from .literals import convert_tag
 from .node import ExpressionNode
-from .typing import Accessor, DataType, convert_type, get_property_type, is_type
+from .typing import Accessor, DataType, convert_type, get_property_type_by_path, is_type
 
 # from rich.pretty import pprint
 
@@ -188,7 +188,7 @@ class DataSource(Source):
     def _get_property_type(self, data_type: DataType, child_path: Path):
         relative = cast(tuple[Accessor, ...], tuple(child_path)[len(self._path) :])
 
-        return get_property_type(data_type, relative)
+        return get_property_type_by_path(data_type, relative)
 
     def __str__(self):
         return f"{self._type} {self._target} {self._path}"
