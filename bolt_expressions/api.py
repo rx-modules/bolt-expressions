@@ -23,7 +23,20 @@ from .operations import (
     wrapped_max,
     wrapped_min,
 )
-from .optimizer import Optimizer
+from .optimizer import (
+    Optimizer,
+    add_subtract_by_zero_removal,
+    commutative_set_collapsing,
+    data_get_scaling,
+    data_set_scaling,
+    literal_to_constant_replacement,
+    multiply_divide_by_fraction,
+    multiply_divide_by_one_removal,
+    noncommutative_set_collapsing,
+    output_score_replacement,
+    set_and_get_cleanup,
+    set_to_self_removal,
+)
 from .sources import (
     ConstantScoreSource,
     DataSource,
@@ -60,20 +73,19 @@ class ExpressionOptions(BaseModel):
 @dataclass
 class Expression:
     ctx: Context
-    activated: bool = False
     called_init: bool = False
     init_commands: List[str] = field(default_factory=list)
 
+    optimizer: Optimizer = field(init=False)
+
     def __post_init__(self):
-        if not self.activated:
-            self.opts = self.ctx.validate("bolt_expressions", ExpressionOptions)
-            self._runtime.expose(
-                "min", partial(wrapped_min, self._runtime.globals.get("min", min))
-            )
-            self._runtime.expose(
-                "max", partial(wrapped_max, self._runtime.globals.get("max", max))
-            )
-            self.activated = True
+        self.opts = self.ctx.validate("bolt_expressions", ExpressionOptions)
+        self._runtime.expose(
+            "min", partial(wrapped_min, self._runtime.globals.get("min", min))
+        )
+        self._runtime.expose(
+            "max", partial(wrapped_max, self._runtime.globals.get("max", max))
+        )
 
         if not self.opts.disable_commands:
             self.ctx.require("bolt_expressions.contrib.commands")
@@ -81,6 +93,25 @@ class Expression:
         helpers = self._runtime.helpers
 
         helpers["interpolate_json"] = SourceJsonConverter(helpers["interpolate_json"])
+
+        self.optimizer = Optimizer()
+
+        self.optimizer.add_rules(
+            # features
+            data_set_scaling,
+            data_get_scaling,
+            multiply_divide_by_fraction,
+            # optimize
+            noncommutative_set_collapsing,
+            commutative_set_collapsing,
+            output_score_replacement,
+            # cleanup
+            multiply_divide_by_one_removal,
+            add_subtract_by_zero_removal,
+            set_to_self_removal,
+            set_and_get_cleanup,
+            literal_to_constant_replacement,
+        )
 
         Set.on_resolve(self.resolve)
         TempScoreSource.objective = self.opts.temp_objective
@@ -101,7 +132,7 @@ class Expression:
         # pprint(nodes)
         nodes = list(nodes.unroll())
         # pprint(nodes)
-        nodes = list(Optimizer.optimize(nodes))
+        nodes = list(self.optimizer(nodes))
         # pprint(nodes)
         cmds = list(resolver.resolve(nodes))
         # pprint(cmds, expand_all=True)
