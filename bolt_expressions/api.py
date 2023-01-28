@@ -25,6 +25,7 @@ from .operations import (
 )
 from .optimizer import (
     Optimizer,
+    TypeChecker,
     add_subtract_by_zero_removal,
     commutative_set_collapsing,
     data_get_scaling,
@@ -111,6 +112,8 @@ class Expression:
             set_to_self_removal,
             set_and_get_cleanup,
             literal_to_constant_replacement,
+            # check
+            TypeChecker(self.ctx),
         )
 
         Set.on_resolve(self.resolve)
@@ -307,10 +310,14 @@ class Data:
 
     def remove(self, source: DataSource, value: Union[str, int] = None):
         node = source if value is None else source[value]
+
         if not len(node._path):
             raise ValueError(
                 f'Cannot remove the root of {node._type} "{node._target}".'
             )
+
+        node._namespace.pop(node._path)
+
         cmd = resolver.generate("remove:data", value=node)
         self._expr._inject_command(cmd)
 

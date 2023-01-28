@@ -3,12 +3,20 @@ from functools import cache
 from itertools import count
 from typing import Any, Callable, ClassVar, Union, cast
 
-from nbtlib import Compound, Double, Path
+from nbtlib import Compound, Double, Int, Numeric, Path
 
 from . import operations as op
 from .literals import convert_tag
 from .node import ExpressionNode
-from .typing import Accessor, DataType, convert_type, get_property_type_by_path, is_type
+from .typing import (
+    Accessor,
+    DataNode,
+    DataType,
+    check_type,
+    convert_type,
+    get_property_type_by_path,
+    is_type,
+)
 
 # from rich.pretty import pprint
 
@@ -32,6 +40,9 @@ class Source(ExpressionNode):
 class ScoreSource(Source):
     scoreholder: str
     objective: str
+
+    writetype: ClassVar[type] = Int
+    readtype: ClassVar[type] = Int
 
     @classmethod
     def on_rebind(cls, callback: Callable):
@@ -96,22 +107,24 @@ class DataSource(Source):
     _target: str
     _path: Path = field(default_factory=Path)
     _scale: float = 1
+    _namespace: DataNode = field(default_factory=lambda: DataNode(type=Compound[Any]))  # type: ignore
 
-    writetype: DataType = Any
+    writetype: type = Any
 
     _constructed: bool = field(hash=False, default=False, init=False)
+    _rebind: Callable[["DataSource", Any], None] = field(hash=False, init=False)
 
     _default_floating_point_type: ClassVar[type] = Double
 
     @property
-    def readtype(self) -> DataType:
-        return self.writetype
+    def readtype(self) -> type:
+        return self._namespace.get_type(self._path)  # type: ignore
 
     def __post_init__(self):
         self._constructed = True
 
     @classmethod
-    def on_rebind(cls, callback: Callable):
+    def on_rebind(cls, callback: Callable[["DataSource", Any], None]):
         cls._rebind = callback
 
     def unroll(self):
@@ -119,7 +132,7 @@ class DataSource(Source):
         yield op.Set.create(temp_var, self)
         yield temp_var
 
-    def __rebind__(self, other):
+    def __rebind__(self, other: Any):
         self._rebind(self, other)
         return self
 
@@ -183,12 +196,22 @@ class DataSource(Source):
     def _cast(self, type: DataType) -> "DataSource":
         type = convert_type(type)
 
+        node = self._namespace.get_or_create(self._path)
+
+        # type widening
+        if not node.type or check_type(
+            type, node.type, numeric_widening=False, numeric_narrowing=False
+        ):
+            node.set_type(type)
+
         return replace(self, writetype=type)
 
     def _get_property_type(self, data_type: DataType, child_path: Path):
         relative = cast(tuple[Accessor, ...], tuple(child_path)[len(self._path) :])
 
-        return get_property_type_by_path(data_type, relative)
+        type = get_property_type_by_path(data_type, relative)
+
+        return type or Any
 
     def __str__(self):
         return f"{self._type} {self._target} {self._path}"

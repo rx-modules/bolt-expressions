@@ -73,12 +73,12 @@ def wrapped_max(f, *args, **kwargs):
 
 @dataclass(unsafe_hash=False, order=False)
 class Operation(ExpressionNode):
-    former: GenericValue
-    latter: GenericValue
-    store: Tuple[Source] = field(default_factory=tuple)
+    former: Source
+    latter: Source | Literal
+    store: tuple[Source, ...] = ()
 
     @classmethod
-    def create(cls, former: GenericValue, latter: GenericValue, *args, **kwargs):
+    def create(cls, former: Any, latter: Any, *args, **kwargs):
         """Factory method to create new operations"""
 
         if not isinstance(former, ExpressionNode):
@@ -143,7 +143,10 @@ class Prepend(Insert):
         return super().create(former, latter, index=0)
 
 
+@dataclass(order=False)
 class Set(Operation):
+    cast: type | None = field(default=None)
+
     @classmethod
     def on_resolve(cls, callback: Callable):
         cls._resolve = callback

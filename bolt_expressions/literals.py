@@ -46,7 +46,7 @@ def convert_tag(value: Any):
 
 @dataclass(unsafe_hash=True, order=False)
 class Literal(ExpressionNode):
-    value: Base
+    value: Any
 
     @classmethod
     def create(cls, value: Base):

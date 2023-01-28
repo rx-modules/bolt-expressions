@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
+from functools import cached_property
 from types import TracebackType
 from typing import (
     Any,
@@ -8,14 +9,20 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Protocol,
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
-from nbtlib import Double, Float, Numeric
+from beet import Context
+from nbtlib import Double, Float, Int, Numeric
+from rich import print
+from rich.pretty import pprint
 
 from .literals import Literal
+from .log import BoltLogger
 from .operations import (
     Add,
     DataOperation,
@@ -30,9 +37,15 @@ from .operations import (
     Subtract,
 )
 from .sources import ConstantScoreSource, DataSource, ScoreSource, Source
-
-# from rich import print
-# from rich.pretty import pprint
+from .typing import (
+    DataNode,
+    DataType,
+    cast_value,
+    check_type,
+    infer_type,
+    is_numeric,
+    type_name,
+)
 
 __all__ = [
     "Rule",
@@ -141,9 +154,6 @@ class Optimizer:
 
     rules: List[Rule[Operation]] = field(default_factory=list)
 
-    def __post_init__(self):
-        self.add_rules(lambda nodes: (n for n in nodes))
-
     def add_rules(self, *funcs: Rule[Operation], index: int | None = None):
         """Registers new rules, also converts the decorated generator into a `SmartGenerator`"""
 
@@ -164,6 +174,100 @@ class Optimizer:
         yield from nodes
 
     __call__ = optimize
+
+
+@dataclass
+class TypeChecker:
+    ctx: Context
+
+    @cached_property
+    def log(self) -> BoltLogger:
+        return self.ctx.inject(BoltLogger)
+
+    @staticmethod
+    def get_type(value: Any) -> DataType:
+        if type := getattr(value, "readtype", None):
+            return type
+
+        if isinstance(value, Literal):
+            value = value.value
+
+        return infer_type(value)
+
+    def __call__(self, nodes: Iterable[Operation]) -> Iterable[Operation]:
+        nodes = self.cast(nodes)
+        nodes = self.check(nodes)
+
+        yield from nodes
+
+    def cast(self, nodes: Iterable[Operation]) -> Iterable[Operation]:
+        for node in nodes:
+            if isinstance(node, Set) and isinstance(node.former, DataSource):
+                former, latter, cast_type = node.former, node.latter, node.cast
+
+                changed = False
+
+                write = former.writetype
+                read = self.get_type(latter)
+
+                if isinstance(latter, Literal):
+                    if value := cast_value(write, latter.value):
+                        latter = replace(latter, value=value)
+                        changed = True
+                elif is_numeric(write) and write != read:
+                    cast_type = write
+                    changed = True
+
+                if changed:
+                    node = replace(node, cast=cast_type, latter=latter)
+
+            yield node
+
+    def check(self, nodes: Iterable[Operation]) -> Iterable[Operation]:
+        for node in nodes:
+            if isinstance(node, Set) and isinstance(node.former, DataSource):
+                node = self.set(node)
+
+            yield node
+
+    def set(self, node: Set):
+        former, latter = cast(DataSource, node.former), node.latter
+
+        write = former.writetype
+        read = self.get_type(latter)
+
+        result_type = write
+        result_children = {}
+
+        match = check_type(write, read)
+
+        if not match:
+            if isinstance(latter, DataSource):
+                msg = f"data source '{latter}' with read type '{type_name(read)}'"
+            elif isinstance(latter, ScoreSource):
+                msg = f"score '{latter}'"
+            else:
+                msg = f"value of type '{type_name(read)}'"
+
+            self.log(
+                "warn",
+                f"Data source '{former}' with write type '{type_name(write)}' "
+                + f"cannot be assigned to {msg}.",
+            )
+
+        if write is Any or (not match and not node.cast):
+            result_type = read
+
+        if isinstance(latter, DataSource):
+            latter_node = latter._namespace.get_or_create(latter._path)  # type: ignore
+            result_children = latter_node.children
+
+        data_node = former._namespace.get_or_create(former._path)  # type: ignore
+
+        data_node.set_type(result_type)
+        data_node.set_children(result_children)
+
+        return node
 
 
 @use_smart_generator

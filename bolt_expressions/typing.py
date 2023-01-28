@@ -1,5 +1,20 @@
-import sys
+from dataclasses import dataclass, field, replace
 from types import GenericAlias, NoneType, UnionType
+from typing import _UnionGenericAlias  # type: ignore
+from typing import (
+    Any,
+    Iterable,
+    Literal,
+    Type,
+    TypedDict,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+    is_typeddict,
+    overload,
+)
 
 from nbtlib import (  # type: ignore
     Array,
@@ -16,31 +31,58 @@ from nbtlib import (  # type: ignore
     Long,
     NamedKey,
     Numeric,
-    Path,
     Short,
     String,
 )
 
 from .literals import convert_tag
 
-from typing import Any, Iterable, TypedDict, Union, _UnionGenericAlias, get_args, get_origin, get_type_hints, is_typeddict  # type: ignore isort: skip
-
-
 __all__ = [
+    "DataType",
+    "Accessor",
+    "type_name",
+    "is_union",
+    "is_optional",
+    "is_alias",
+    "is_numeric",
+    "get_optional_type",
     "is_type",
     "convert_type",
-    "get_property_type_by_path",
-    "get_subtype_by_accessor",
-    "check_type",
+    "NumericValue",
+    "NbtValue",
+    "infer_dict",
+    "infer_list",
+    "infer_type",
+    "cast_dict",
+    "cast_list",
+    "cast_numeric",
+    "cast_string",
+    "cast_value",
     "check_union_type",
     "check_typeddict_type",
     "check_expandable_compound_type",
+    "check_list_type",
+    "check_numeric_type",
+    "check_type",
+    "get_property_type_by_path",
+    "get_subtype_by_accessor",
+    "DataNode",
 ]
 
 
 DataType = Union[type, GenericAlias, UnionType, TypedDict, dict[str, "DataType"], None]
 
 Accessor = Union[NamedKey, ListIndex, CompoundMatch]
+
+
+def type_name(t: DataType) -> str:
+    if not isinstance(t, type):
+        return repr(t)
+
+    if issubclass(t, (bool, int, float, str, list, dict, Base)):
+        return t.__name__
+
+    return f"{t.__module__}.{t.__name__}"
 
 
 def is_union(value: Any) -> bool:
@@ -54,17 +96,26 @@ def is_optional(value: Any) -> bool:
     return NoneType in get_args(value)
 
 
-def is_alias(value: Any, origin: type | Iterable[type] = None) -> bool:
+def is_alias(value: Any, origin: type | tuple[type] | None = None) -> bool:
     if not isinstance(value, GenericAlias):
         return False
 
     if origin is not None:
-        return issubclass(get_origin(value), origin)
+        value_origin = get_origin(value)
+
+        if not isinstance(value_origin, type):
+            return False
+
+        return issubclass(value_origin, origin)
 
     return True
 
 
-def get_optional_type(value: UnionType):
+def is_numeric(value: Any) -> bool:
+    return isinstance(value, type) and issubclass(value, Numeric)
+
+
+def get_optional_type(value: UnionType) -> DataType:
     if not is_union(value):
         return value
 
@@ -80,9 +131,37 @@ def is_type(value: DataType | Any) -> bool:
     )
 
 
-def convert_type(value: DataType) -> DataType:
+@overload
+def convert_type(
+    value: dict[str, DataType], typeddict: Literal[True] = True
+) -> Type[TypedDict]:
+    ...
+
+
+@overload
+def convert_type(
+    value: dict[str, DataType], typeddict: Literal[False]
+) -> dict[str, DataType]:
+    ...
+
+
+@overload
+def convert_type(value: type, typeddict: bool = True) -> type:
+    ...
+
+
+@overload
+def convert_type(value: DataType, typeddict: bool = True) -> DataType:
+    ...
+
+
+def convert_type(value: DataType, typeddict: bool = True) -> DataType:
     if isinstance(value, dict):
-        value = {key: convert_type(v) for key, v in value.items()}
+        value = {key: convert_type(v, typeddict=typeddict) for key, v in value.items()}
+
+        if not typeddict:
+            return value
+
         return TypedDict("TypedDict", value)  # type: ignore
 
     if is_typeddict(value):
@@ -128,29 +207,152 @@ def convert_type(value: DataType) -> DataType:
 
 
 ################
+# TYPE INFERENCE
+################
+
+NumericValue = Byte | Short | Int | Long | Float | Double
+
+NbtValue = dict[str, "NbtValue"] | list["NbtValue"] | String | NumericValue
+
+
+def infer_dict(value: dict[str, NbtValue]) -> DataType:
+    return convert_type({key: infer_type(val) for key, val in value.items()})
+
+
+def infer_list(value: list[NbtValue]) -> DataType:
+    if not len(value):
+        return List
+
+    options = tuple(infer_type(element) for element in value)
+
+    return List[Union[options]]  # type: ignore
+
+
+def infer_type(value: NbtValue) -> DataType:
+    if isinstance(value, dict):
+        return infer_dict(value)
+
+    if isinstance(value, list):
+        return infer_list(value)
+
+    return convert_type(type(value))
+
+
+################
+# TYPE CASTING
+################
+
+
+def cast_dict(type: DataType, value: dict[Any, Any]) -> Compound | None:
+    result: dict[Any, Any] = {}
+
+    for key, val in value.items():
+        subtype = get_subtype_by_accessor(NamedKey(key), type)
+
+        if subtype is None:
+            return None
+
+        val = cast_value(subtype, val)
+
+        if val is None:
+            return None
+
+        result[key] = val
+
+    return Compound(result)
+
+
+def cast_list(datatype: DataType, value: list[Any] | Array) -> List | Array | None:
+    if not (isinstance(datatype, type) and issubclass(datatype, (List, Array))):
+        return None
+
+    result: list[Any] = []
+
+    for i, element in enumerate(value):
+        subtype = get_subtype_by_accessor(ListIndex(i), datatype)
+
+        if subtype is None:
+            return None
+
+        element = cast_value(subtype, element)
+
+        if element is None:
+            return None
+
+        result.append(element)
+
+    datatype = datatype if issubclass(datatype, Array) else List
+
+    try:
+        return datatype(result)
+    except:
+        return None
+
+
+def cast_numeric(datatype: DataType, value: int | float) -> Numeric | None:
+    if not is_numeric(datatype):
+        return None
+
+    datatype = cast(Type[NumericValue], datatype)
+
+    try:
+        return datatype(value)
+    except:
+        return None
+
+
+def cast_string(datatype: DataType, value: str) -> String | None:
+    if isinstance(datatype, type) and issubclass(datatype, str):
+        return String(value)
+
+    return None
+
+
+def cast_value(datatype: DataType, value: NbtValue | Any) -> Any | None:
+    if datatype in (Any, None, NoneType) or is_union(datatype):
+        return convert_tag(value)
+
+    if isinstance(value, dict):
+        return cast_dict(datatype, value)
+
+    if isinstance(value, list):
+        return cast_list(datatype, value)
+
+    if isinstance(value, (int, float)):
+        return cast_numeric(datatype, value)
+
+    if isinstance(value, str):
+        return cast_string(datatype, value)
+
+    return convert_tag(value)
+
+
+################
 # TYPE CHECKING
 ################
 
 NUMERIC_ORDER = (Byte, Short, Int, Long, Float, Double)
 
 
-def check_union_type(write: DataType, read: DataType) -> bool:
+def check_union_type(write: DataType, read: DataType, **flags: bool) -> bool:
     if is_union(read):
-        return all(check_type(write, r) for r in get_args(read))
+        return all(check_type(write, r, **flags) for r in get_args(read))
 
     if is_union(write):
-        return any(check_type(w, read) for w in get_args(write))
+        return any(check_type(w, read, **flags) for w in get_args(write))
 
     return False
 
 
-def check_typeddict_type(write: TypedDict, read: DataType) -> bool:
+def check_typeddict_type(write: Type[TypedDict], read: DataType, **flags: bool) -> bool:
     if not is_typeddict(read):
         # read value is not a compound with fixed keys
         return False
 
     if write is read:
         return True
+
+    flags = {**flags, "numeric_widening": False, "numeric_narrowing": False}
 
     write_annotations = write.__annotations__
     read_annotations = read.__annotations__
@@ -168,7 +370,7 @@ def check_typeddict_type(write: TypedDict, read: DataType) -> bool:
             # missing required key
             return False
 
-        if not check_type(write_annotations[key], read_annotations[key]):
+        if not check_type(write_annotations[key], read_annotations[key], **flags):
             # type of key is not compatible with write key type
             return False
 
@@ -180,20 +382,24 @@ def check_typeddict_type(write: TypedDict, read: DataType) -> bool:
     return True
 
 
-def check_expandable_compound_type(write: GenericAlias, read: DataType) -> bool:
+def check_expandable_compound_type(
+    write: GenericAlias, read: DataType, **flags: bool
+) -> bool:
+    flags = {**flags, "numeric_widening": False, "numeric_narrowing": False}
+
     child_type = get_args(write)[0]
 
     if is_alias(read, Compound):
         read_child_type = get_args(read)[0]
 
-        return check_type(child_type, read_child_type)
+        return check_type(child_type, read_child_type, **flags)
 
     if is_typeddict(read):
         for type in read.__annotations__.values():
             if is_optional(type):
                 type = get_optional_type(type)
 
-            if not check_type(child_type, type):
+            if not check_type(child_type, type, **flags):
                 return False
 
         return True
@@ -201,33 +407,38 @@ def check_expandable_compound_type(write: GenericAlias, read: DataType) -> bool:
     return False
 
 
-def check_list_type(write: List | Array, read: DataType) -> bool:
-    subtype = write.subtype if issubclass(write, List) else write.wrapper
+def check_list_type(write: Type[List | Array], read: DataType, **flags: bool) -> bool:
+    subtype = get_subtype_by_accessor(ListIndex(None), write)
 
-    if issubclass(read, List):
-        read_subtype = read.subtype
-    elif issubclass(read, Array):
-        read_subtype = read.wrapper
-    else:
+    read_subtype = get_subtype_by_accessor(ListIndex(None), read)
+
+    if read_subtype is None:
         # read is not list/array
         return False
 
-    return check_type(subtype, read_subtype)
+    return check_type(subtype, read_subtype, **flags)
 
 
-def check_numeric_type(write: Numeric, read: Any) -> bool:
+def check_numeric_type(write: Type[Numeric], read: Any, **flags: bool) -> bool:
     if not issubclass(read, Numeric):
         # read is not a number
         return False
 
-    if NUMERIC_ORDER.index(write) < NUMERIC_ORDER.index(read):
+    write_order = NUMERIC_ORDER.index(write)
+    read_order = NUMERIC_ORDER.index(read)
+
+    if not flags.get("numeric_narrowing", True) and write_order < read_order:
         # read type cannot be represented by write type (loss of magnitude)
+        return False
+
+    if not flags.get("numeric_widening", True) and read_order < write_order:
+        # cannot implicitly widen read type to write type
         return False
 
     return True
 
 
-def check_type(write: DataType, read: DataType) -> bool:
+def check_type(write: DataType, read: DataType, **flags: bool) -> bool:
     """Checks if the type `read` is compatible with the type `write`."""
 
     if write is None:
@@ -237,19 +448,22 @@ def check_type(write: DataType, read: DataType) -> bool:
         return True
 
     if is_union(write) or is_union(read):
-        return check_union_type(write, read)
+        return check_union_type(write, read, **flags)
 
     if is_typeddict(write):
-        return check_typeddict_type(write, read)
+        write = cast(Type[TypedDict], write)
+        return check_typeddict_type(write, read, **flags)
 
     if is_alias(write, Compound):
-        return check_expandable_compound_type(write, read)
+        write = cast(GenericAlias, write)
+        return check_expandable_compound_type(write, read, **flags)
 
-    if issubclass(write, (List, Array)):
-        return check_list_type(write, read)
+    if isinstance(write, type):
+        if issubclass(write, (List, Array)):
+            return check_list_type(write, read, **flags)
 
-    if issubclass(write, Numeric):
-        return check_numeric_type(write, read)
+        if issubclass(write, Numeric):
+            return check_numeric_type(write, read, **flags)
 
     return convert_type(write) == convert_type(read)
 
@@ -259,9 +473,7 @@ def check_type(write: DataType, read: DataType) -> bool:
 #################
 
 
-def get_property_type_by_path(
-    type: DataType, path: Path | tuple[Accessor, ...]
-) -> DataType:
+def get_property_type_by_path(type: DataType, path: Iterable[Accessor]) -> DataType:
     new_accessors: tuple[Accessor, ...] = tuple(path)
 
     for accessor in new_accessors:
@@ -271,7 +483,7 @@ def get_property_type_by_path(
 
 
 def get_subtype_by_accessor(accessor: Accessor, current_type: DataType) -> DataType:
-    if current_type is NoneType:
+    if current_type in (None, NoneType):
         return None
 
     if isinstance(current_type, _UnionGenericAlias):
@@ -298,26 +510,29 @@ def get_subtype_by_accessor(accessor: Accessor, current_type: DataType) -> DataT
                     # TODO: emit warning: Key '{key}' is not present on compound of type {current_type}
                     ...
 
-                return convert_type(fields.get(key, Any))
+                return convert_type(fields.get(key))
             case value if value is Any:
                 return Any
             case _:
                 # TODO: emit warning: Cannot access named keys from type {current_type}
-                return Any
+                return None
 
     if isinstance(accessor, ListIndex):
         # index = accessor.index
 
         match current_type:
             case type() as list if issubclass(list, List):
-                return list.subtype if not issubclass(list.subtype, End) else Any  # type: ignore
+                if isinstance(list.subtype, type) and issubclass(list.subtype, End):  # type: ignore
+                    return Any
+                else:
+                    return list.subtype
             case type() as array if issubclass(array, Array):
                 return array.wrapper if array.wrapper is not None else Any
             case value if value is Any:
                 return Any
             case _:
                 # TODO: emit warning: Cannot access elements by index from type {current_type}
-                return Any
+                return None
 
     # CompoundMatch
     match current_type:
@@ -329,4 +544,73 @@ def get_subtype_by_accessor(accessor: Accessor, current_type: DataType) -> DataT
             return Any
         case _:
             # TODO: emit warning: Cannot match compound from type {current_type}
-            return Any
+            return None
+
+
+@dataclass
+class DataNode:
+    type: DataType = None
+    children: dict[Accessor, "DataNode"] = field(default_factory=dict)
+
+    def get(self, path: Iterable[Accessor]) -> Union["DataNode", None]:
+        node: DataNode | None = self
+
+        for accessor in path:
+            node = node.children.get(accessor)
+
+            if not node:
+                return None
+
+        return node
+
+    def get_or_create(self, path: Iterable[Accessor] = ()) -> "DataNode":
+        node: DataNode = self
+
+        for accessor in path:
+            if not accessor in node.children:
+                child_type = get_subtype_by_accessor(accessor, node.type)
+                node.children[accessor] = DataNode(type=child_type)
+
+            node = node.children[accessor]
+
+        return node
+
+    def get_type(self, path: Iterable[Accessor] = ()) -> DataType:
+        path = tuple(path)
+
+        if not path:
+            return convert_type(self.type)
+
+        child = self.children.get(path[0])
+
+        if child is None:
+            return get_property_type_by_path(self.type, path)
+
+        return child.get_type(path[1:])
+
+    def pop(self, path: Iterable[Accessor]):
+        *parent_path, child_accessor = path
+
+        parent = self.get(parent_path)
+
+        if not parent:
+            return
+
+        return parent.children.pop(child_accessor, None)
+
+    def copy(self):
+        return replace(
+            self,
+            children={key: child.copy() for key, child in self.children.items()},
+        )
+
+    def set_type(self, type: DataType):
+        self.type = type
+        self.children = {}
+
+    def set_children(self, children: dict[Accessor, "DataNode"]):
+        self.children = {key: child.copy() for key, child in children.items()}
+
+    def set_from(self, node: "DataNode"):
+        self.set_type(node.type)
+        self.set_children(node.children)

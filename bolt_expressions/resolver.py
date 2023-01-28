@@ -66,16 +66,16 @@ def get_type(node: GenericValue):
     return "literal"
 
 
-def get_data_store_type(source: DataSource):
-    value = source.writetype
-
+def get_data_store_type(value: type):
     if isinstance(value, type) and issubclass(value, (int, float)):
         return value.__name__.lower()
 
     if value is Any:
         return "int"
 
-    raise ValueError(f"Could not resolve datatype {value!r}")
+    return "int"
+
+    # raise ValueError(f"Could not resolve datatype {value!r}")
 
 
 def generate(template_id: str, *args, **kwargs):
@@ -98,12 +98,8 @@ def resolve_execute_store(source: Source):
 
 
 def resolve_set_data_data(op: Set):
-    if (
-        op.former._scale != 1
-        or op.latter._scale != 1
-        or not check_type(op.former.writetype, op.latter.readtype)
-    ):
-        cast_type = get_data_store_type(op.former)
+    if op.former._scale != 1 or op.latter._scale != 1 or op.cast:
+        cast_type = get_data_store_type(op.cast)
 
         return f"execute store result {op.former} {cast_type} {op.former._scale} run data get {op.latter} {op.latter._scale}"
 
