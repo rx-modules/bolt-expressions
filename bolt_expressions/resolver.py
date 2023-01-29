@@ -39,7 +39,7 @@ def get_templates() -> Dict[str, Callable]:
         "max:score:score": lambda op: f"scoreboard players operation {op.former} > {op.latter}",
         "set:data:literal": lambda op: f"data modify {op.former} set value {op.latter}",
         "set:data:data": resolve_set_data_data,
-        "set:data:score": lambda op: f"execute store result {op.former} {get_data_store_type(op.former)} {op.former._scale} run scoreboard players get {op.latter}",
+        "set:data:score": lambda op: f"execute store result {op.former} {get_data_store_type(op.cast)} {op.former._scale} run scoreboard players get {op.latter}",
         "set:score:data": lambda op: f"execute store result score {op.former} run data get {op.latter} {op.latter._scale}",
         "append:data:literal": lambda op: f"data modify {op.former} append value {op.latter}",
         "append:data:data": lambda op: f"data modify {op.former} append from {op.latter}",
