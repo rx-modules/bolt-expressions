@@ -21,6 +21,7 @@ from nbtlib import Double, Float, Int, Numeric
 from rich import print
 from rich.pretty import pprint
 
+from .exceptions import TypeCheckError, get_exception_chain
 from .literals import Literal
 from .log import BoltLogger
 from .operations import (
@@ -42,9 +43,9 @@ from .typing import (
     DataType,
     cast_value,
     check_type,
+    format_type,
     infer_type,
     is_numeric,
-    type_name,
 )
 
 __all__ = [
@@ -239,20 +240,27 @@ class TypeChecker:
         result_type = write
         result_children = {}
 
-        match = check_type(write, read)
+        match = None
+        errors = ()
+
+        try:
+            match = check_type(write, read)
+        except TypeCheckError as exc:
+            errors = get_exception_chain(exc)
 
         if not match:
             if isinstance(latter, DataSource):
-                msg = f"data source '{latter}' with read type '{type_name(read)}'"
+                msg = f"data source '{latter}' with read type '{format_type(read)}'"
             elif isinstance(latter, ScoreSource):
                 msg = f"score '{latter}'"
             else:
-                msg = f"value of type '{type_name(read)}'"
+                msg = f"value of type '{format_type(read)}'"
 
             self.log(
                 "warn",
-                f"Data source '{former}' with write type '{type_name(write)}' "
-                + f"cannot be assigned to {msg}.",
+                f"Data source '{former}' with write type '{format_type(write)}' "
+                + f"cannot be assigned to {msg}. "
+                + " ".join(str(err) for err in errors),
             )
 
         if write is Any or (not match and not node.cast):

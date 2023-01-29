@@ -1,3 +1,4 @@
+from contextlib import nullcontext, suppress
 from dataclasses import dataclass, field, replace
 from types import GenericAlias, NoneType, UnionType
 from typing import _UnionGenericAlias  # type: ignore
@@ -35,12 +36,14 @@ from nbtlib import (  # type: ignore
     String,
 )
 
+from .exceptions import TypeCheckError
 from .literals import convert_tag
 
 __all__ = [
     "DataType",
     "Accessor",
     "type_name",
+    "format_type",
     "is_union",
     "is_optional",
     "is_alias",
@@ -73,16 +76,6 @@ __all__ = [
 DataType = Union[type, GenericAlias, UnionType, TypedDict, dict[str, "DataType"], None]
 
 Accessor = Union[NamedKey, ListIndex, CompoundMatch]
-
-
-def type_name(t: DataType) -> str:
-    if not isinstance(t, type):
-        return repr(t)
-
-    if issubclass(t, (bool, int, float, str, list, dict, Base)):
-        return t.__name__
-
-    return f"{t.__module__}.{t.__name__}"
 
 
 def is_union(value: Any) -> bool:
@@ -129,6 +122,51 @@ def is_type(value: DataType | Any) -> bool:
     return value in (Any, None) or isinstance(
         value, (type, UnionType, _UnionGenericAlias, GenericAlias)
     )
+
+
+def type_name(t: DataType) -> str:
+    if not isinstance(t, type):
+        return repr(t)
+
+    if issubclass(t, (bool, int, float, str, list, dict, Base)):
+        return t.__name__
+
+    return f"{t.__module__}.{t.__name__}"
+
+
+def format_type(t: DataType, *, __refs: Any = None) -> str:
+    if __refs is None:
+        __refs = []
+
+    circular_ref = t in __refs
+    __refs.append(t)
+
+    if is_union(t):
+        return " | ".join(format_type(x, __refs=__refs) for x in get_args(t))
+
+    if is_alias(t):
+        origin = format_type(get_origin(t), __refs=__refs)
+        args = (format_type(x, __refs=__refs) for x in get_args(t))
+
+        if circular_ref:
+            return f"{origin}[...]"
+
+        return f"{origin}[{', '.join(args)}]"
+
+    if is_typeddict(t) and type_name(t) == "TypedDict":
+        if circular_ref:
+            return "{...}"
+
+        return (
+            "{"
+            + ", ".join(
+                f"{key}: {format_type(val, __refs=__refs)}"
+                for key, val in t.__annotations__.items()
+            )
+            + "}"
+        )
+
+    return type_name(t)
 
 
 @overload
@@ -339,15 +377,23 @@ def check_union_type(write: DataType, read: DataType, **flags: bool) -> bool:
         return all(check_type(write, r, **flags) for r in get_args(read))
 
     if is_union(write):
-        return any(check_type(w, read, **flags) for w in get_args(write))
+        flags = {**flags, "suppress": True}
+
+        if not any(check_type(w, read, **flags) for w in get_args(write)):
+            raise TypeCheckError(
+                f"'{format_type(read)}' is not compatible with '{format_type(write)}'."
+            )
+
+        return True
 
     return False
 
 
 def check_typeddict_type(write: Type[TypedDict], read: DataType, **flags: bool) -> bool:
     if not is_typeddict(read):
-        # read value is not a compound with fixed keys
-        return False
+        raise TypeCheckError(
+            f"'{format_type(read)}' is not a compound type with fixed keys and is not compatible with '{format_type(write)}'."
+        )
 
     if write is read:
         return True
@@ -362,22 +408,29 @@ def check_typeddict_type(write: Type[TypedDict], read: DataType, **flags: bool) 
         name for name, type in write_annotations.items() if is_optional(type)
     )
 
-    for key in write_annotations:
+    for key, key_type in write_annotations.items():
         if key not in read_annotations:
             if key in opt_keys:
                 continue
 
-            # missing required key
-            return False
+            raise TypeCheckError(
+                f"'{format_type(read)}' is missing required key '{key}' of type '{format_type(key_type)}'."
+            )
 
-        if not check_type(write_annotations[key], read_annotations[key], **flags):
-            # type of key is not compatible with write key type
-            return False
+        try:
+            if not check_type(write_annotations[key], read_annotations[key], **flags):
+                return False
+        except TypeCheckError as cause_exc:
+            exc = TypeCheckError(
+                f"'{format_type(read)}' key '{key}' is incompatible with key of '{format_type(write)}':"
+            )
+            raise exc from cause_exc
 
     for key in read_annotations:
         if key not in write_annotations:
-            # type has extra key
-            return False
+            raise TypeCheckError(
+                f"'{format_type(read)}' has extra key '{key}' not present in '{format_type(write)}'."
+            )
 
     return True
 
@@ -392,19 +445,33 @@ def check_expandable_compound_type(
     if is_alias(read, Compound):
         read_child_type = get_args(read)[0]
 
-        return check_type(child_type, read_child_type, **flags)
+        try:
+            return check_type(child_type, read_child_type, **flags)
+        except TypeCheckError as cause_exc:
+            exc = TypeCheckError(
+                f"'{format_type(read)}' and '{format_type(write)}' have incompatible key types:"
+            )
+            raise exc from cause_exc
 
     if is_typeddict(read):
-        for type in read.__annotations__.values():
+        for key, type in read.__annotations__.items():
             if is_optional(type):
                 type = get_optional_type(type)
 
-            if not check_type(child_type, type, **flags):
-                return False
+            try:
+                if not check_type(child_type, type, **flags):
+                    return False
+            except TypeCheckError as cause_exc:
+                exc = TypeCheckError(
+                    f"'{format_type(read)}' key '{key}' is not valid key of '{format_type(write)}':"
+                )
+                raise exc from cause_exc
 
         return True
 
-    return False
+    raise TypeCheckError(
+        f"'{format_type(read)}' is not a compound type and is not compatible with '{format_type(write)}'."
+    )
 
 
 def check_list_type(write: Type[List | Array], read: DataType, **flags: bool) -> bool:
@@ -413,27 +480,37 @@ def check_list_type(write: Type[List | Array], read: DataType, **flags: bool) ->
     read_subtype = get_subtype_by_accessor(ListIndex(None), read)
 
     if read_subtype is None:
-        # read is not list/array
-        return False
+        raise TypeCheckError(
+            f"'{format_type(read)}' is not list/array type and is not compatible with '{format_type(write)}'."
+        )
 
-    return check_type(subtype, read_subtype, **flags)
+    try:
+        return check_type(subtype, read_subtype, **flags)
+    except TypeCheckError as cause_exc:
+        exc = TypeCheckError(
+            f"'{format_type(read)}' and '{format_type(write)}' element types are not compatible:"
+        )
+        raise exc from cause_exc
 
 
 def check_numeric_type(write: Type[Numeric], read: Any, **flags: bool) -> bool:
     if not issubclass(read, Numeric):
-        # read is not a number
-        return False
+        raise TypeCheckError(
+            f"'{format_type(read)}' is not a numeric type and is not compatible with '{format_type(write)}'."
+        )
 
     write_order = NUMERIC_ORDER.index(write)
     read_order = NUMERIC_ORDER.index(read)
 
     if not flags.get("numeric_narrowing", True) and write_order < read_order:
-        # read type cannot be represented by write type (loss of magnitude)
-        return False
+        raise TypeCheckError(
+            f"'{format_type(read)}' cannot be implicitly narrowed to '{format_type(write)}'."
+        )
 
     if not flags.get("numeric_widening", True) and read_order < write_order:
-        # cannot implicitly widen read type to write type
-        return False
+        raise TypeCheckError(
+            f"'{format_type(read)}' cannot be implicitly converted to '{format_type(write)}'."
+        )
 
     return True
 
@@ -441,31 +518,44 @@ def check_numeric_type(write: Type[Numeric], read: Any, **flags: bool) -> bool:
 def check_type(write: DataType, read: DataType, **flags: bool) -> bool:
     """Checks if the type `read` is compatible with the type `write`."""
 
-    if write is None:
-        return False
+    ctx = suppress(TypeCheckError) if flags.get("suppress") else nullcontext()
+    flags = {**flags, "suppress": False}
 
-    if write is Any or read is Any:
-        return True
+    result = False
 
-    if is_union(write) or is_union(read):
-        return check_union_type(write, read, **flags)
+    with ctx:
+        if write is None:
+            return False
 
-    if is_typeddict(write):
-        write = cast(Type[TypedDict], write)
-        return check_typeddict_type(write, read, **flags)
+        if write is Any or read is Any:
+            return True
 
-    if is_alias(write, Compound):
-        write = cast(GenericAlias, write)
-        return check_expandable_compound_type(write, read, **flags)
+        if is_union(write) or is_union(read):
+            return check_union_type(write, read, **flags)
 
-    if isinstance(write, type):
-        if issubclass(write, (List, Array)):
-            return check_list_type(write, read, **flags)
+        if is_typeddict(write):
+            write = cast(Type[TypedDict], write)
+            return check_typeddict_type(write, read, **flags)
 
-        if issubclass(write, Numeric):
-            return check_numeric_type(write, read, **flags)
+        if is_alias(write, Compound):
+            write = cast(GenericAlias, write)
+            return check_expandable_compound_type(write, read, **flags)
 
-    return convert_type(write) == convert_type(read)
+        if isinstance(write, type):
+            if issubclass(write, (List, Array)):
+                return check_list_type(write, read, **flags)
+
+            if issubclass(write, Numeric):
+                return check_numeric_type(write, read, **flags)
+
+        if convert_type(write) != convert_type(read):
+            raise TypeCheckError(
+                f"'{format_type(read)}' does not match '{format_type(write)}'."
+            )
+
+        result = True
+
+    return result
 
 
 #################

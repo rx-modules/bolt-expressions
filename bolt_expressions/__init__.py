@@ -5,6 +5,7 @@ from .api import Expression as _Expression
 from .api import Scoreboard as _Scoreboard
 from .api import *
 from .ast import *
+from .exceptions import *
 from .literals import *
 from .node import *
 from .operations import *
