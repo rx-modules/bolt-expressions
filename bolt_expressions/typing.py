@@ -285,17 +285,14 @@ def cast_dict(type: DataType, value: dict[Any, Any]) -> Compound | None:
     result: dict[Any, Any] = {}
 
     for key, val in value.items():
+        cast_val = val
+
         subtype = get_subtype_by_accessor(NamedKey(key), type)
 
-        if subtype is None:
-            return None
+        if subtype and (v := cast_value(subtype, val)):
+            cast_val = v
 
-        val = cast_value(subtype, val)
-
-        if val is None:
-            return None
-
-        result[key] = val
+        result[key] = cast_val
 
     return Compound(result)
 
@@ -398,7 +395,7 @@ def check_typeddict_type(write: Type[TypedDict], read: DataType, **flags: bool) 
     if write is read:
         return True
 
-    flags = {**flags, "numeric_widening": False, "numeric_narrowing": False}
+    flags = {"numeric_widening": False, "numeric_narrowing": False, **flags}
 
     write_annotations = write.__annotations__
     read_annotations = read.__annotations__
@@ -438,7 +435,7 @@ def check_typeddict_type(write: Type[TypedDict], read: DataType, **flags: bool) 
 def check_expandable_compound_type(
     write: GenericAlias, read: DataType, **flags: bool
 ) -> bool:
-    flags = {**flags, "numeric_widening": False, "numeric_narrowing": False}
+    flags = {"numeric_widening": False, "numeric_narrowing": False, **flags}
 
     child_type = get_args(write)[0]
 
@@ -475,6 +472,8 @@ def check_expandable_compound_type(
 
 
 def check_list_type(write: Type[List | Array], read: DataType, **flags: bool) -> bool:
+    flags = {"numeric_widening": False, "numeric_narrowing": False, **flags}
+
     subtype = get_subtype_by_accessor(ListIndex(None), write)
 
     read_subtype = get_subtype_by_accessor(ListIndex(None), read)
