@@ -108,11 +108,16 @@ def is_numeric(value: Any) -> bool:
     return isinstance(value, type) and issubclass(value, Numeric)
 
 
-def get_optional_type(value: UnionType) -> DataType:
+def get_optional_type(value: Any) -> DataType:
     if not is_union(value):
-        return value
+        return None
 
-    return Union[tuple(v for v in get_args(value) if v is not NoneType)]  # type: ignore
+    args = get_args(value)
+
+    if NoneType not in args:
+        return None
+
+    return Union[tuple(v for v in args if v is not NoneType)]  # type: ignore
 
 
 def is_type(value: DataType | Any) -> bool:
@@ -353,6 +358,9 @@ def cast_string(datatype: DataType, value: str) -> String | None:
 
 
 def cast_value(datatype: DataType, value: NbtValue | Any) -> Any | None:
+    if opt_datatype := get_optional_type(datatype):
+        datatype = opt_datatype
+
     if datatype in (Any, None, NoneType) or is_union(datatype):
         return convert_tag(value)
 

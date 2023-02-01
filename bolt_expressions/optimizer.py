@@ -44,6 +44,7 @@ from .typing import (
     cast_value,
     check_type,
     format_type,
+    get_optional_type,
     infer_type,
     is_numeric,
 )
@@ -211,6 +212,9 @@ class TypeChecker:
                 write = former.writetype
                 read = self.get_type(latter)
 
+                if opt_write := get_optional_type(write):
+                    write = opt_write
+
                 if isinstance(latter, Literal):
                     if value := cast_value(write, latter.value):
                         latter = replace(latter, value=value)
@@ -242,9 +246,10 @@ class TypeChecker:
 
         match = None
         errors = ()
+        flags = {"numeric_match": isinstance(latter, Literal)}
 
         try:
-            match = check_type(write, read)
+            match = check_type(write, read, **flags)
         except TypeCheckError as exc:
             errors = get_exception_chain(exc)
 
