@@ -200,11 +200,7 @@ class DataSource(Source):
 
         # type widening
         if not node.type or check_type(
-            type,
-            node.type,
-            suppress=True,
-            numeric_widening=False,
-            numeric_narrowing=False,
+            type, node.type, suppress=True, numeric_match=True
         ):
             node.set_type(type)
 

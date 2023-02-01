@@ -89,7 +89,7 @@ def is_optional(value: Any) -> bool:
     return NoneType in get_args(value)
 
 
-def is_alias(value: Any, origin: type | tuple[type] | None = None) -> bool:
+def is_alias(value: Any, origin: type | tuple[type, ...] | None = None) -> bool:
     if not isinstance(value, GenericAlias):
         return False
 
@@ -128,7 +128,7 @@ def type_name(t: DataType) -> str:
     if not isinstance(t, type):
         return repr(t)
 
-    if issubclass(t, (bool, int, float, str, list, dict, Base)):
+    if issubclass(t, (bool, int, float, str, list, dict, NoneType, Base)):
         return t.__name__
 
     return f"{t.__module__}.{t.__name__}"
@@ -137,6 +137,10 @@ def type_name(t: DataType) -> str:
 def format_type(t: DataType, *, __refs: Any = None) -> str:
     if __refs is None:
         __refs = []
+
+    # Anonymous typed dicts are treated like plain dicts
+    if is_typeddict(t) and type_name(t) == "TypedDict":
+        t = t.__annotations__
 
     circular_ref = t in __refs
     __refs.append(t)
@@ -153,15 +157,14 @@ def format_type(t: DataType, *, __refs: Any = None) -> str:
 
         return f"{origin}[{', '.join(args)}]"
 
-    if is_typeddict(t) and type_name(t) == "TypedDict":
+    if isinstance(t, dict):
         if circular_ref:
             return "{...}"
 
         return (
             "{"
             + ", ".join(
-                f"{key}: {format_type(val, __refs=__refs)}"
-                for key, val in t.__annotations__.items()
+                f"{key}: {format_type(val, __refs=__refs)}" for key, val in t.items()
             )
             + "}"
         )
@@ -184,16 +187,20 @@ def convert_type(
 
 
 @overload
-def convert_type(value: type, typeddict: bool = True) -> type:
+def convert_type(value: type, typeddict: bool = True, is_origin: bool = False) -> type:
     ...
 
 
 @overload
-def convert_type(value: DataType, typeddict: bool = True) -> DataType:
+def convert_type(
+    value: DataType, typeddict: bool = True, is_origin: bool = False
+) -> DataType:
     ...
 
 
-def convert_type(value: DataType, typeddict: bool = True) -> DataType:
+def convert_type(
+    value: DataType, typeddict: bool = True, is_origin: bool = False
+) -> DataType:
     if isinstance(value, dict):
         value = {key: convert_type(v, typeddict=typeddict) for key, v in value.items()}
 
@@ -215,7 +222,7 @@ def convert_type(value: DataType, typeddict: bool = True) -> DataType:
         args = get_args(value)
 
         converted = tuple(convert_type(arg) for arg in args)
-        origin = convert_type(value.__origin__)
+        origin = convert_type(value.__origin__, is_origin=True)
 
         if issubclass(origin, Compound):
             converted = (converted[-1],)
@@ -237,9 +244,9 @@ def convert_type(value: DataType, typeddict: bool = True) -> DataType:
         if issubclass(value, float):
             return Float
         if issubclass(value, dict):
-            return Compound
+            return Compound if is_origin else Compound[Any]  # type: ignore
         if issubclass(value, list):
-            return List
+            return list if is_origin else list[Any]  # type: ignore
 
     return value
 
@@ -259,11 +266,11 @@ def infer_dict(value: dict[str, NbtValue]) -> DataType:
 
 def infer_list(value: list[NbtValue]) -> DataType:
     if not len(value):
-        return List
+        return list[Any]
 
     options = tuple(infer_type(element) for element in value)
 
-    return List[Union[options]]  # type: ignore
+    return list[Union[options]]  # type: ignore
 
 
 def infer_type(value: NbtValue) -> DataType:
@@ -298,7 +305,11 @@ def cast_dict(type: DataType, value: dict[Any, Any]) -> Compound | None:
 
 
 def cast_list(datatype: DataType, value: list[Any] | Array) -> List | Array | None:
-    if not (isinstance(datatype, type) and issubclass(datatype, (List, Array))):
+    if is_alias(datatype, list):
+        cast_type = List
+    elif isinstance(datatype, type) and issubclass(datatype, Array):
+        cast_type = datatype
+    else:
         return None
 
     result: list[Any] = []
@@ -316,10 +327,8 @@ def cast_list(datatype: DataType, value: list[Any] | Array) -> List | Array | No
 
         result.append(element)
 
-    datatype = datatype if issubclass(datatype, Array) else List
-
     try:
-        return datatype(result)
+        return cast_type(result)
     except:
         return None
 
@@ -395,7 +404,7 @@ def check_typeddict_type(write: Type[TypedDict], read: DataType, **flags: bool) 
     if write is read:
         return True
 
-    flags = {"numeric_widening": False, "numeric_narrowing": False, **flags}
+    flags = {"numeric_match": True, **flags}
 
     write_annotations = write.__annotations__
     read_annotations = read.__annotations__
@@ -435,7 +444,7 @@ def check_typeddict_type(write: Type[TypedDict], read: DataType, **flags: bool) 
 def check_expandable_compound_type(
     write: GenericAlias, read: DataType, **flags: bool
 ) -> bool:
-    flags = {"numeric_widening": False, "numeric_narrowing": False, **flags}
+    flags = {"numeric_match": True, **flags}
 
     child_type = get_args(write)[0]
 
@@ -471,8 +480,10 @@ def check_expandable_compound_type(
     )
 
 
-def check_list_type(write: Type[List | Array], read: DataType, **flags: bool) -> bool:
-    flags = {"numeric_widening": False, "numeric_narrowing": False, **flags}
+def check_list_type(
+    write: Type[list[Any] | Array], read: DataType, **flags: bool
+) -> bool:
+    flags = {"numeric_match": True, **flags}
 
     subtype = get_subtype_by_accessor(ListIndex(None), write)
 
@@ -498,15 +509,17 @@ def check_numeric_type(write: Type[Numeric], read: Any, **flags: bool) -> bool:
             f"'{format_type(read)}' is not a numeric type and is not compatible with '{format_type(write)}'."
         )
 
+    numeric_match = flags.get("numeric_match", False)
+
     write_order = NUMERIC_ORDER.index(write)
     read_order = NUMERIC_ORDER.index(read)
 
-    if not flags.get("numeric_narrowing", True) and write_order < read_order:
+    if numeric_match and write_order < read_order:
         raise TypeCheckError(
             f"'{format_type(read)}' cannot be implicitly narrowed to '{format_type(write)}'."
         )
 
-    if not flags.get("numeric_widening", True) and read_order < write_order:
+    if numeric_match and read_order < write_order:
         raise TypeCheckError(
             f"'{format_type(read)}' cannot be implicitly converted to '{format_type(write)}'."
         )
@@ -540,12 +553,14 @@ def check_type(write: DataType, read: DataType, **flags: bool) -> bool:
             write = cast(GenericAlias, write)
             return check_expandable_compound_type(write, read, **flags)
 
-        if isinstance(write, type):
-            if issubclass(write, (List, Array)):
-                return check_list_type(write, read, **flags)
+        is_type = isinstance(write, type)
 
-            if issubclass(write, Numeric):
-                return check_numeric_type(write, read, **flags)
+        if is_alias(write, list) or is_type and issubclass(write, Array):
+            write = cast(Type[list[Any] | Array], write)
+            return check_list_type(write, read, **flags)
+
+        if is_type and issubclass(write, Numeric):
+            return check_numeric_type(write, read, **flags)
 
         if convert_type(write) != convert_type(read):
             raise TypeCheckError(
@@ -610,11 +625,13 @@ def get_subtype_by_accessor(accessor: Accessor, current_type: DataType) -> DataT
         # index = accessor.index
 
         match current_type:
-            case type() as list if issubclass(list, List):
-                if isinstance(list.subtype, type) and issubclass(list.subtype, End):  # type: ignore
+            case l if is_alias(l, list):
+                arg = get_args(l)
+                return arg[0] if arg else Any
+            case type() as l if issubclass(l, List):
+                if l.subtype is End:
                     return Any
-                else:
-                    return list.subtype
+                return l.subtype
             case type() as array if issubclass(array, Array):
                 return array.wrapper if array.wrapper is not None else Any
             case value if value is Any:
