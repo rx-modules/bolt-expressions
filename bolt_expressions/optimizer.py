@@ -5,6 +5,7 @@ from types import TracebackType
 from typing import (
     Any,
     Callable,
+    ClassVar,
     Generator,
     Iterable,
     Iterator,
@@ -17,7 +18,7 @@ from typing import (
 )
 
 from beet import Context
-from nbtlib import Double, Float, Int, Numeric
+from nbtlib import Double, Float, Int, ListIndex, Numeric, Path
 from rich import print
 from rich.pretty import pprint
 
@@ -26,17 +27,22 @@ from .literals import Literal
 from .log import BoltLogger
 from .operations import (
     Add,
+    Append,
     DataOperation,
     Divide,
+    Insert,
     Max,
+    Merge,
     Min,
     Modulus,
     Multiply,
     Operation,
+    Prepend,
     ScoreOperation,
     Set,
     Subtract,
 )
+from .options import ExpressionOptions, expression_options
 from .sources import ConstantScoreSource, DataSource, ScoreSource, Source
 from .typing import (
     DataNode,
@@ -45,8 +51,10 @@ from .typing import (
     check_type,
     format_type,
     get_optional_type,
+    get_subtype_by_accessor,
     infer_type,
     is_numeric,
+    is_type,
 )
 
 __all__ = [
@@ -186,6 +194,10 @@ class TypeChecker:
     def log(self) -> BoltLogger:
         return self.ctx.inject(BoltLogger)
 
+    @cached_property
+    def opts(self) -> ExpressionOptions:
+        return self.ctx.inject(expression_options)
+
     @staticmethod
     def get_type(value: Any) -> DataType:
         if type := getattr(value, "readtype", None):
@@ -202,85 +214,238 @@ class TypeChecker:
 
         yield from nodes
 
+    def unwrap_optional(self, datatype: DataType):
+        if opt := get_optional_type(datatype):
+            return opt
+
+        return datatype
+
+    def cast_literal(self, latter: Literal, write: DataType, read: DataType = None):
+        if read is None:
+            read = self.get_type(latter)
+
+        value = cast_value(write, latter.value)
+        if value is not None:
+            return replace(latter, value=value)
+
+        return None
+
     def cast(self, nodes: Iterable[Operation]) -> Iterable[Operation]:
         for node in nodes:
-            if isinstance(node, Set) and isinstance(node.former, DataSource):
-                former, latter, cast_type = node.former, node.latter, node.cast
+            data_source = isinstance(node.former, DataSource)
 
-                changed = False
+            if data_source and isinstance(node, Set):
+                yield from self.cast_set(node)
+            elif data_source and isinstance(node, Insert):
+                yield from self.cast_insert(node)
+            elif data_source and isinstance(node, Merge):
+                yield from self.cast_merge(node)
+            else:
+                yield node
 
-                write = former.writetype
-                read = self.get_type(latter)
+    def cast_set(self, node: Set) -> Iterable[Operation]:
+        former = cast(DataSource, node.former)
+        latter = node.latter
 
-                if opt_write := get_optional_type(write):
-                    write = opt_write
-
-                if isinstance(latter, Literal):
-                    if value := cast_value(write, latter.value):
-                        latter = replace(latter, value=value)
-                        changed = True
-                elif is_numeric(write) and write != read:
-                    cast_type = write
-                    changed = True
-
-                if changed:
-                    node = replace(node, cast=cast_type, latter=latter)
-
-            yield node
-
-    def check(self, nodes: Iterable[Operation]) -> Iterable[Operation]:
-        for node in nodes:
-            if isinstance(node, Set) and isinstance(node.former, DataSource):
-                node = self.set(node)
-
-            yield node
-
-    def set(self, node: Set):
-        former, latter = cast(DataSource, node.former), node.latter
-
-        write = former.writetype
+        write = self.unwrap_optional(former.writetype)
         read = self.get_type(latter)
 
-        result_type = write
-        result_children = {}
+        if isinstance(latter, Literal):
+            new_latter = self.cast_literal(latter, write, read)
+            if new_latter is not None:
+                node = replace(node, latter=new_latter)
 
-        match = None
-        errors = ()
-        flags = {"numeric_match": isinstance(latter, Literal)}
+            yield node
+        elif is_numeric(write) and write != read:
+            yield replace(node, cast=write)
+        else:
+            yield node
+
+    def cast_merge(self, node: Merge) -> Iterable[Operation]:
+        former = cast(DataSource, node.former)
+        latter = node.latter
+
+        write = self.unwrap_optional(former.writetype)
+        read = self.get_type(latter)
+
+        if isinstance(latter, Literal):
+            new_latter = self.cast_literal(latter, write, read)
+            if new_latter is not None:
+                node = replace(node, latter=new_latter)
+
+            yield node
+        else:
+            yield node
+
+    def cast_insert(self, node: Insert) -> Iterable[Operation]:
+        former, latter = cast(DataSource, node.former), node.latter
+
+        write = self.unwrap_optional(
+            get_subtype_by_accessor(ListIndex(None), former.writetype)
+        )
+        read = self.get_type(latter)
+
+        if isinstance(latter, Literal):
+            new_latter = self.cast_literal(latter, write, read)
+            if new_latter is not None:
+                node = replace(node, latter=new_latter)
+
+            yield node
+        elif (
+            isinstance(latter, DataSource)
+            and is_numeric(write)
+            and write != read
+            and check_type(write, read, suppress=True)
+        ):
+            temp_source = DataSource.create(
+                _type="storage",
+                _target=self.opts.temp_storage,
+                _path=Path("cast"),
+                writetype=write,
+            )
+            yield Set.create(former=temp_source, latter=latter, cast=write)
+            yield replace(node, latter=temp_source)
+        else:
+            yield node
+
+    def format_latter(self, latter: Source | Literal, read: DataType = None):
+        if read is None:
+            read = self.get_type(latter)
+
+        if isinstance(latter, DataSource):
+            return f"data source '{latter}' with read type '{format_type(read)}'"
+
+        if isinstance(latter, ScoreSource):
+            return f"score '{latter}'"
+
+        return f"value of type '{format_type(read)}'"
+
+    def format(self, msg: str, *args: str | DataType | tuple[Any] | Any) -> str:
+        values: list[str] = []
+
+        for arg in args:
+            if is_type(arg):
+                arg = cast(DataType, arg)
+                value = format_type(arg)
+            elif isinstance(arg, tuple):
+                value = " ".join(str(el) for el in arg)
+            else:
+                value = str(arg)
+
+            values.append(value)
+
+        return msg % tuple(values)
+
+    def check_type(
+        self,
+        former: DataSource,
+        latter: Source | Literal,
+        write: DataType = ...,
+        read: DataType = ...,
+        flags: dict[str, bool] = {},
+    ) -> tuple[bool, tuple[BaseException, ...]]:
+        if write is ...:
+            write = former.writetype
+        if read is ...:
+            read = self.get_type(latter)
+
+        match = False
+        errors: tuple[BaseException, ...] = ()
+        flags = {"numeric_match": isinstance(latter, Literal), **flags}
 
         try:
             match = check_type(write, read, **flags)
         except TypeCheckError as exc:
             errors = get_exception_chain(exc)
 
-        if not match:
-            if isinstance(latter, DataSource):
-                msg = f"data source '{latter}' with read type '{format_type(read)}'"
-            elif isinstance(latter, ScoreSource):
-                msg = f"score '{latter}'"
-            else:
-                msg = f"value of type '{format_type(read)}'"
+        return match, errors
 
-            self.log(
-                "warn",
-                f"Data source '{former}' with write type '{format_type(write)}' "
-                + f"cannot be assigned to {msg}. "
-                + " ".join(str(err) for err in errors),
+    def check(self, nodes: Iterable[Operation]) -> Iterable[Operation]:
+        for node in nodes:
+            data_source = isinstance(node.former, DataSource)
+
+            if data_source and isinstance(node, Set):
+                self.check_set(node)
+            elif data_source and isinstance(node, Insert):
+                self.check_insert(node)
+            elif data_source and isinstance(node, Merge):
+                self.check_merge(node)
+
+            yield node
+
+    def check_set(self, node: Set) -> None:
+        former, latter = cast(DataSource, node.former), node.latter
+
+        write = former.writetype
+        read = self.get_type(latter)
+
+        matched, errors = self.check_type(former, latter, write, read)
+
+        if not matched:
+            msg = self.format(
+                "Data source '%s' with write type '%s' cannot be assigned to %s. %s",
+                former,
+                write,
+                self.format_latter(latter, read),
+                errors,
             )
+            self.log("warn", msg)
 
-        if write is Any or (not match and not node.cast):
+        result_type = write
+        if write is Any or (not matched and not node.cast):
             result_type = read
-
-        if isinstance(latter, DataSource):
-            latter_node = latter._namespace.get_or_create(latter._path)  # type: ignore
-            result_children = latter_node.children
 
         data_node = former._namespace.get_or_create(former._path)  # type: ignore
 
         data_node.set_type(result_type)
-        data_node.set_children(result_children)
 
-        return node
+        if isinstance(latter, DataSource):
+            latter_node = latter._namespace.get_or_create(latter._path)  # type: ignore
+            data_node.set_children(latter_node.children)
+
+    def check_merge(self, node: Merge) -> None:
+        former, latter = cast(DataSource, node.former), node.latter
+
+        write = former.writetype
+        read = self.get_type(latter)
+
+        matched, errors = self.check_type(former, latter, write, read)
+
+        if not matched:
+            msg = self.format(
+                "Data source '%s' with write type '%s' cannot be merged with %s. %s",
+                former,
+                write,
+                self.format_latter(latter, read),
+                errors,
+            )
+            self.log("warn", msg)
+
+    def check_insert(self, node: Insert) -> None:
+        former, latter = cast(DataSource, node.former), node.latter
+
+        write = former.writetype
+        element_write = get_subtype_by_accessor(ListIndex(None), write)
+
+        matched, errors = self.check_type(former, latter, element_write)
+
+        if not matched:
+            if isinstance(node, Append):
+                op_msg = "appended by"
+            elif isinstance(node, Prepend):
+                op_msg = "prepended by"
+            else:
+                op_msg = "inserted by"
+
+            msg = self.format(
+                "Data source '%s' with write type '%s' cannot be %s %s. %s",
+                former,
+                write,
+                op_msg,
+                self.format_latter(latter),
+                errors,
+            )
+            self.log("warn", msg)
 
 
 @use_smart_generator

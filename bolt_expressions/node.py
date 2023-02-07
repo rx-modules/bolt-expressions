@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Callable, Iterable, Optional, Set, overload
+from typing import Any, Callable, Iterable, Optional, Set, overload
 
 __all__ = [
     "ExpressionNode",
@@ -39,7 +39,7 @@ class ExpressionNode:
         cls.attached_methods.add(method_name)
 
     @classmethod
-    def create(cls, *args, **kwargs):
+    def create(cls, *args: Any, **kwargs: Any):
         return cls(*args, **kwargs)
 
     def unroll(self):

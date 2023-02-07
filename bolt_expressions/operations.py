@@ -78,7 +78,7 @@ class Operation(ExpressionNode):
     store: tuple[Source, ...] = ()
 
     @classmethod
-    def create(cls, former: Any, latter: Any, *args, **kwargs):
+    def create(cls, former: Any, latter: Any, *args: Any, **kwargs: Any):
         """Factory method to create new operations"""
 
         if not isinstance(former, ExpressionNode):
@@ -105,7 +105,8 @@ class Operation(ExpressionNode):
 
 
 class DataOperation(Operation):
-    ...
+    former: DataSource
+    latter: Literal | Source
 
 
 class Merge(DataOperation):

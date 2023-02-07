@@ -49,7 +49,7 @@ class Literal(ExpressionNode):
     value: Any
 
     @classmethod
-    def create(cls, value: Base):
+    def create(cls, value: Any):
         tag = convert_tag(value)
         if tag is None:
             raise ValueError(f'Invalid expression node of type {type(value)} "{value}"')

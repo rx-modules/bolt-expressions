@@ -5,7 +5,6 @@ from typing import Iterable, List, Union
 from beet import Context, Function, FunctionTag
 from bolt import Runtime
 from mecha import Mecha
-from pydantic import BaseModel
 
 from . import resolver
 from .ast import ConstantScoreChecker, ObjectiveChecker, SourceJsonConverter
@@ -38,6 +37,7 @@ from .optimizer import (
     set_and_get_cleanup,
     set_to_self_removal,
 )
+from .options import expression_options
 from .sources import (
     ConstantScoreSource,
     DataSource,
@@ -51,24 +51,11 @@ from .utils import identifier_generator
 # from rich.pretty import pprint
 
 __all__ = [
-    "ExpressionOptions",
     "Expression",
     "Scoreboard",
     "Score",
     "Data",
 ]
-
-
-class ExpressionOptions(BaseModel):
-    """Bolt Expressions Options"""
-
-    temp_objective: str = "bolt.expr.temp"
-    const_objective: str = "bolt.expr.const"
-    temp_storage: str = "bolt.expr:temp"
-    init_path: str = "init_expressions"
-    objective_prefix: str = ""
-
-    disable_commands: bool = False
 
 
 @dataclass
@@ -80,7 +67,7 @@ class Expression:
     optimizer: Optimizer = field(init=False)
 
     def __post_init__(self):
-        self.opts = self.ctx.validate("bolt_expressions", ExpressionOptions)
+        self.opts = self.ctx.inject(expression_options)
         self._runtime.expose(
             "min", partial(wrapped_min, self._runtime.globals.get("min", min))
         )
