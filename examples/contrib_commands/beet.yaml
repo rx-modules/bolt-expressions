@@ -1,6 +1,7 @@
 name: bolt-expressions-commands
 
 data_pack:
+  pack_format: 10
   load:
     data/test/functions: src
 

@@ -2,6 +2,7 @@ name: bolt-expressions-nbt
 
 data_pack:
   load: [src]
+  pack_format: 10
 
 require:
   - bolt
