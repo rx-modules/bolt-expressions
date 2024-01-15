@@ -1,50 +1,60 @@
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
-from functools import wraps
-from itertools import chain
+from types import TracebackType
 from typing import (
-    TYPE_CHECKING,
-    Any,
     Callable,
-    Dict,
     Generator,
     Iterable,
+    Iterator,
     List,
-    Optional,
     TypeVar,
     Union,
 )
 
-from nbtlib import Double, Float, Numeric
+from nbtlib import Double, Float, Numeric # type:ignore
 
-from . import operations as op
-from .literals import Literal
-from .sources import ConstantScoreSource, DataSource, ScoreSource, TempScoreSource
 
-# from rich import print
-# from rich.pretty import pprint
+from .operations import (
+    Add,
+    DataOperation,
+    Divide,
+    Max,
+    Min,
+    Modulus,
+    Multiply,
+    Operation,
+    ScoreOperation,
+    Set,
+    Subtract,
+)
+from .sources import ConstantScoreSource, DataSource, ScoreSource
+from . import literals as l
+
 
 __all__ = [
+    "Rule",
+    "SmartRule",
     "SmartGenerator",
     "Optimizer",
-    "dummy",
+    "use_smart_generator",
+    "smart_generator",
     "noncommutative_set_collapsing",
     "commutative_set_collapsing",
     "data_set_scaling",
     "data_get_scaling",
-    "literal_to_constant_replacement",
+    "multiply_divide_by_fraction",
     "output_score_replacement",
+    "multiply_divide_by_one_removal",
+    "add_subtract_by_zero_removal",
     "set_to_self_removal",
     "set_and_get_cleanup",
+    "literal_to_constant_replacement",
 ]
-
-if TYPE_CHECKING:
-    Rule = Callable[[Iterable[op.Operation]], None]
 
 T = TypeVar("T")
 
 
-class SmartGenerator(Generator):
+class SmartGenerator(Generator[T, None, None]):
     """Implements `.push(val)` which allows you to 'prepend' values to a generator.
     Allows you to peek values in the future, and return them to be consumed later.
 
@@ -55,34 +65,63 @@ class SmartGenerator(Generator):
     0
     """
 
-    def __init__(self, func):
-        self._func: Callable[..., Generator] = func
+    _values: Iterator[T]
+    _pre: List[T]
+
+    def __init__(self, values: Iterable[T]):
+        self._values = iter(values)
+        self._pre = []
 
     def __iter__(self):
-        self._pre: List[T] = []
         return self
 
     def __next__(self) -> T:
         if self._pre:
             return self._pre.pop()
 
-        return next(self._values)  # raises StopIteration for us
+        return next(self._values)
 
-    def __call__(self, values) -> Iterable[T]:
-        self._values: Iterable[T] = self._func(values)
-        return self
-
-    def push(self, val: T):
-        if val != None:
+    def push(self, val: T | None):
+        if val is not None:
             self._pre.append(val)
+    
+    def send(self, __value: None) -> T:
+        ...
 
-    def send(self, val: T):
-        return self._values.send(val)
+    def throw(
+        self,
+        __typ: BaseException | type[BaseException],
+        __val: BaseException | object = None,
+        __tb: TracebackType | None = None
+    ) -> T: ...
 
-    def throw(self, val: T):
-        raise self._values.throw(val)
 
 
+Rule = Callable[[Iterable[T]], Iterable[T]]
+
+SmartRule = Callable[[SmartGenerator[T]], Iterable[T]]
+
+
+def use_smart_generator(func: SmartRule[T]) -> Rule[T]:
+    """
+    Provides a `SmartGenerator` object as first argument to the decorated rule.
+    Returned function still takes an `Iterable` object.
+    """
+
+    def rule(arg: Iterable[T]) -> Iterable[T]:
+        return func(SmartGenerator(arg))
+
+    return rule
+
+
+def smart_generator(func: Rule[T]) -> Callable[[Iterable[T]], SmartGenerator[T]]:
+    def rule(arg: Iterable[T]):
+        return SmartGenerator(func(arg))
+
+    return rule
+
+
+@dataclass
 class Optimizer:
     """Handles the operation of various optimization rules.
 
@@ -90,39 +129,38 @@ class Optimizer:
     must take and return a generator of Operation nodes. This usually involves a loop which
     steps through the generator and performs optimizations across the nodes.
 
-    Each rule is converted into a `SmartGenerator`, which adds a `.push(value)` method allowing
-    you to "peek" ahead by consuming value and prepending it back to the generator. Note, calling
-    `next` manually in the loop will essentially consume the node, deleting it from the final output.
-
     The optimizer runs the nodes through the rules like a conveyor belt and each rule acts as a worker.
     The rules can perform transformations, take nodes off and add different ones on, or even collect
     all nodes, and put on a completely different set of nodes. This metaphor should be considered when
     writing new rules.
     """
 
-    rules: List["Rule"] = []
+    rules: List[Rule[Operation]] = field(default_factory=list)
 
-    @classmethod
-    def rule(cls, f: Iterable["op.Operation"]):
+    def add_rules(self, *funcs: Rule[Operation], index: int | None = None):
         """Registers new rules, also converts the decorated generator into a `SmartGenerator`"""
-        cls.rules.append(SmartGenerator(f))
 
-    @classmethod
-    def optimize(cls, nodes: Iterable["op.Operation"]):
+        if index is None:
+            index = len(self.rules)
+
+        index = min(len(self.rules), index)
+
+        for f in funcs[::-1]:
+            self.rules.insert(index, f)
+
+    def optimize(self, nodes: Iterable[Operation]):
         """Performs the optimization by sending all nodes through the rules."""
-        for rule in cls.rules:
+
+        for rule in self.rules:
             nodes = rule(nodes)
 
         yield from nodes
 
-
-@Optimizer.rule
-def dummy(nodes: Iterable["op.Operation"]):
-    yield from nodes
+    __call__ = optimize
 
 
-@Optimizer.rule
-def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
+@use_smart_generator
+def noncommutative_set_collapsing(nodes: SmartGenerator[Operation]):
     """For noncommutative operations:
     ```
     scoreboard players operation $i1 temp = @s rx.uid
@@ -143,9 +181,9 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
         next_node = next(nodes, None)
         further_node = next(nodes, None)
         if (
-            isinstance(node, op.Set)
-            and isinstance(next_node, op.ScoreOperation)
-            and isinstance(further_node, op.Set)
+            isinstance(node, Set)
+            and isinstance(next_node, ScoreOperation)
+            and isinstance(further_node, Set)
             and isinstance(further_node.former, ScoreSource)
             and node.latter == further_node.former
             and node.former == next_node.former
@@ -160,8 +198,8 @@ def noncommutative_set_collapsing(nodes: Iterable["op.Operation"]):
             yield node
 
 
-@Optimizer.rule
-def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
+@use_smart_generator
+def commutative_set_collapsing(nodes: SmartGenerator[Operation]):
     """For commutative operations:
     ```
     scoreboard players operation $i1 temp += $i0 temp
@@ -173,13 +211,13 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
     ```
     """
     for node in nodes:
-        next_node: Union["op.Operation", None] = next(nodes, None)
+        next_node: Union["Operation", None] = next(nodes, None)
         # print("node", node)
         # print("next_node", next_node)
 
         if (
-            isinstance(node, (op.Add, op.Multiply))
-            and isinstance(next_node, op.Set)
+            isinstance(node, (Add, Multiply))
+            and isinstance(next_node, Set)
             and isinstance(next_node.former, ScoreSource)
             and node.former == next_node.latter
             and node.latter == next_node.former
@@ -191,8 +229,8 @@ def commutative_set_collapsing(nodes: Iterable["op.Operation"]):
             yield node
 
 
-@Optimizer.rule
-def data_set_scaling(nodes: Iterable["op.Operation"]):
+@use_smart_generator
+def data_set_scaling(nodes: SmartGenerator[Operation]):
     """
     Turns a multiplication/division of a temp score followed by a
     data set operation into a single set operation with a scale argument.
@@ -226,13 +264,13 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
         next_node = next(nodes, None)
         # skip data operation node (just so we can get to
         # the actual Set node)
-        if isinstance(next_node, op.DataOperation):
+        if isinstance(next_node, DataOperation):
             operation_node = next_node
             next_node = next(nodes, None)
         if (
-            isinstance(node, (op.Multiply, op.Divide))
-            and isinstance(next_node, op.Set)
-            and isinstance(node.latter, Literal)
+            isinstance(node, (Multiply, Divide))
+            and isinstance(next_node, Set)
+            and isinstance(node.latter, l.Literal)
             and isinstance(next_node.former, DataSource)
             and node.former == next_node.latter
         ):
@@ -244,12 +282,12 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
             source = next_node.former
             number_type = source._nbt_type
 
-            if isinstance(node, op.Divide):
+            if isinstance(node, Divide):
                 scale = 1 / scale
                 number_type = number_type or source._default_floating_point_type
 
             new_source = replace(source, _scale=scale, _nbt_type=number_type)
-            out = op.Set(new_source, node.former)
+            out = Set(new_source, node.former)
 
             if operation_node:
                 yield operation_node  # yield the data operation node back in
@@ -261,8 +299,8 @@ def data_set_scaling(nodes: Iterable["op.Operation"]):
             yield node
 
 
-@Optimizer.rule
-def data_get_scaling(nodes: Iterable["op.Operation"]):
+@use_smart_generator
+def data_get_scaling(nodes: SmartGenerator[Operation]):
     """
     ````
     execute store result score $i0 temp run data get storage demo value 1
@@ -278,10 +316,10 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
     for node in nodes:
         next_node = next(nodes, None)
         if (
-            isinstance(node, op.Set)
-            and isinstance(next_node, (op.Multiply, op.Divide))
+            isinstance(node, Set)
+            and isinstance(next_node, (Multiply, Divide))
             and isinstance(node.latter, DataSource)
-            and isinstance(next_node.latter, Literal)
+            and isinstance(next_node.latter, l.Literal)
             and node.former == next_node.former
         ):
             scale = float(next_node.latter.value)
@@ -289,36 +327,34 @@ def data_get_scaling(nodes: Iterable["op.Operation"]):
             if scale.is_integer():
                 scale = int(scale)
 
-            if isinstance(next_node, op.Divide):
+            if isinstance(next_node, Divide):
                 scale = 1 / scale
 
-            yield op.Set(node.former, replace(node.latter, _scale=scale))
+            yield Set(node.former, replace(node.latter, _scale=scale))
         else:
             nodes.push(next_node)
             yield node
 
 
-@Optimizer.rule
-def multiply_divide_by_fraction(nodes: Iterable["op.Operation"]):
+def multiply_divide_by_fraction(nodes: Iterable[Operation]):
     for node in nodes:
         if (
-            isinstance(node, (op.Multiply, op.Divide))
-            and isinstance(node.latter, Literal)
+            isinstance(node, (Multiply, Divide))
+            and isinstance(node.latter, l.Literal)
             and isinstance(node.latter.value, (Float, Double))
         ):
             value = Fraction(node.latter.value).limit_denominator()
 
-            if isinstance(node, op.Divide):
+            if isinstance(node, Divide):
                 value = 1 / value
 
-            yield op.Multiply.create(node.former, value.numerator)
-            yield op.Divide.create(node.former, value.denominator)
+            yield Multiply.create(node.former, value.numerator)
+            yield Divide.create(node.former, value.denominator)
         else:
             yield node
 
 
-@Optimizer.rule
-def output_score_replacement(nodes: Iterable["op.Operation"]):
+def output_score_replacement(nodes: Iterable[Operation]):
     """Replace the outermost temp score by the output score.
     If expression tree uses the output score, this rule won't be applied.
     """
@@ -334,7 +370,7 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
         # print(f"Last node is {last_node}")
         if (
             isinstance(output_var, ScoreSource)
-            and isinstance(last_node, op.Set)
+            and isinstance(last_node, Set)
             and len(all_nodes) > 1
         ):
             for node in all_nodes[1:]:  # Ignore the first Set operation
@@ -360,44 +396,41 @@ def output_score_replacement(nodes: Iterable["op.Operation"]):
             yield from all_nodes
 
 
-@Optimizer.rule
-def multiply_divide_by_one_removal(nodes: Iterable["op.Operation"]):
+def multiply_divide_by_one_removal(nodes: Iterable[Operation]):
     for node in nodes:
         if not (
-            isinstance(node, (op.Multiply, op.Divide))
-            and isinstance(node.latter, Literal)
+            isinstance(node, (Multiply, Divide))
+            and isinstance(node.latter, l.Literal)
             and node.latter.value == 1
         ):
             yield node
 
 
-@Optimizer.rule
-def add_subtract_by_zero_removal(nodes: Iterable["op.Operation"]):
+def add_subtract_by_zero_removal(nodes: Iterable[Operation]):
     for node in nodes:
         if not (
-            isinstance(node, (op.Add, op.Subtract))
-            and isinstance(node.latter, Literal)
+            isinstance(node, (Add, Subtract))
+            and isinstance(node.latter, l.Literal)
             and node.latter.value == 0
         ):
             yield node
 
 
-@Optimizer.rule
-def set_to_self_removal(nodes: Iterable["op.Operation"]):
+def set_to_self_removal(nodes: Iterable[Operation]):
     """Removes Set operations that have the same former and latter source.
     Should run after "output_score_replacement" is applied to clean up
     all the reduntant Sets created by the previous rule.
     """
     for node in nodes:
-        if isinstance(node, op.Set):
+        if isinstance(node, Set):
             if node.former != node.latter:
                 yield node
         else:
             yield node
 
 
-@Optimizer.rule
-def set_and_get_cleanup(nodes: Iterable["op.Operation"]):
+@use_smart_generator
+def set_and_get_cleanup(nodes: SmartGenerator[Operation]):
     """
     Removes unnecessary temp vars possibly originated from previous
     optimizations.
@@ -416,25 +449,24 @@ def set_and_get_cleanup(nodes: Iterable["op.Operation"]):
     for node in nodes:
         next_node = next(nodes, None)
         if (
-            isinstance(node, op.Set)
-            and isinstance(next_node, op.Set)
+            isinstance(node, Set)
+            and isinstance(next_node, Set)
             and node.former == next_node.latter
         ):
-            out = op.Set(next_node.former, node.latter)
+            out = Set(next_node.former, node.latter)
             yield out
         else:
             nodes.push(next_node)
             yield node
 
 
-@Optimizer.rule
 def literal_to_constant_replacement(
-    nodes: Iterable["op.Operation"],
-) -> Iterable["op.Operation"]:
+    nodes: Iterable[Operation],
+) -> Iterable[Operation]:
     for node in nodes:
         if (
-            isinstance(node, (op.Multiply, op.Divide, op.Min, op.Max, op.Modulus))
-            and isinstance(node.latter, Literal)
+            isinstance(node, (Multiply, Divide, Min, Max, Modulus))
+            and isinstance(node.latter, l.Literal)
             and isinstance(node.latter.value, Numeric)
         ):
             value = int(node.latter.value)
