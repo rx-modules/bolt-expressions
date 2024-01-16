@@ -1,5 +1,8 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Iterable, Optional, Set, overload
+from typing import Any, Callable, Iterable, Optional, Set, overload
+
+from .optimizer import IrLiteral, IrOperation, IrSource
 
 __all__ = [
     "ExpressionNode",
@@ -7,7 +10,7 @@ __all__ = [
 
 
 @dataclass(unsafe_hash=True, order=False, eq=False)
-class ExpressionNode:
+class ExpressionNode(ABC):
     attached_methods = set()
 
     @classmethod
@@ -39,8 +42,9 @@ class ExpressionNode:
         cls.attached_methods.add(method_name)
 
     @classmethod
-    def create(cls, *args, **kwargs):
+    def create(cls, *args: Any, **kwargs: Any):
         return cls(*args, **kwargs)
 
-    def unroll(self):
-        yield self
+    @abstractmethod
+    def unroll(self) -> tuple[Iterable[IrOperation], IrSource | IrLiteral]:
+        ...

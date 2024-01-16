@@ -27,6 +27,7 @@ from .optimizer import (
     Optimizer,
     add_subtract_by_zero_removal,
     commutative_set_collapsing,
+    convert_data_arithmetic,
     data_get_scaling,
     data_set_scaling,
     literal_to_constant_replacement,
@@ -46,8 +47,8 @@ from .sources import (
 )
 from .utils import identifier_generator
 
-# from rich import print
-# from rich.pretty import pprint
+from rich import print
+from rich.pretty import pprint
 
 __all__ = [
     "ExpressionOptions",
@@ -71,6 +72,38 @@ class ExpressionOptions(BaseModel):
 
 
 @dataclass
+class TempScoreManager:
+    objective: str
+
+    counter: int = field(default=0, init=False)
+
+    def __call__(self) -> tuple[str, str]:
+        name = f"$s{self.counter}"
+        self.counter += 1
+
+        return (name, self.objective)
+    
+    def reset(self):
+        self.counter = 0
+
+@dataclass
+class ConstScoreManager:
+    objective: str
+
+    constants: set[int] = field(default_factory=set, init=False)
+
+    def format(self, value: int) -> str:
+        return f"${value}"
+    
+    def create(self, value: int) -> tuple[str, str]:
+        self.constants.add(value)
+
+        return (self.format(value), self.objective)
+    
+    __call__ = create
+
+
+@dataclass
 class Expression:
     ctx: Context
     activated: bool = False
@@ -78,6 +111,9 @@ class Expression:
     init_commands: List[str] = field(default_factory=list)
 
     optimizer: Optimizer = field(init=False)
+
+    temp_score: TempScoreManager = field(init=False)
+    const_score: ConstScoreManager = field(init=False)
 
     def __post_init__(self):
         self.opts = self.ctx.validate("bolt_expressions", ExpressionOptions)
@@ -89,9 +125,16 @@ class Expression:
         )
         if not self.opts.disable_commands:
             self.ctx.require("bolt_expressions.contrib.commands")
+        
+        self.temp_score = TempScoreManager(self.opts.temp_objective)
+        self.const_score = ConstScoreManager(self.opts.const_objective)
 
-        self.optimizer = Optimizer()
+        self.optimizer = Optimizer(
+            temp_score=self.temp_score,
+            const_score=self.const_score,
+        )
         self.optimizer.add_rules(
+            partial(convert_data_arithmetic, self.optimizer),
             # features
             data_set_scaling,
             data_get_scaling,
@@ -105,7 +148,7 @@ class Expression:
             add_subtract_by_zero_removal,
             set_to_self_removal,
             set_and_get_cleanup,
-            literal_to_constant_replacement,
+            partial(literal_to_constant_replacement, self.optimizer),
         )
 
         helpers = self._runtime.helpers
@@ -127,17 +170,22 @@ class Expression:
 
     def _inject_command(self, cmd: str):
         self._runtime.commands.append(self._mc.parse(cmd, using="command"))
-
+    
     def resolve(self, nodes: Operation):
-        # pprint(nodes)
-        nodes = list(nodes.unroll())
-        # pprint(nodes)
-        nodes = list(self.optimizer(nodes))
-        # pprint(nodes)
-        cmds = list(resolver.resolve(nodes))
-        # pprint(cmds, expand_all=True)
-        for cmd in cmds:
-            self._inject_command(cmd)
+        TempScoreSource.count = -1
+        self.temp_score.reset()
+
+        pprint(nodes)
+
+        unrolled_nodes, _ = nodes.unroll()
+        pprint(unrolled_nodes)
+
+        optimized_nodes = list(self.optimizer(unrolled_nodes))
+        pprint(optimized_nodes)
+        # cmds = list(resolver.resolve(nodes))
+        # # pprint(cmds, expand_all=True)
+        # for cmd in cmds:
+        #     self._inject_command(cmd)
 
     def set(self, source: Source, value: GenericValue):
         Set.create(source, value).resolve()

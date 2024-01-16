@@ -1,7 +1,9 @@
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any, ClassVar, Iterable
 
 from nbtlib import Base, Byte, Compound, Double, Float, Int, List, Long, Short, String
+
+from .optimizer import IrLiteral
 
 from .node import ExpressionNode
 
@@ -46,7 +48,7 @@ def convert_tag(value):
 
 @dataclass(unsafe_hash=True, order=False)
 class Literal(ExpressionNode):
-    value: Base
+    value: Any
 
     @classmethod
     def create(cls, value: Base):
@@ -60,3 +62,6 @@ class Literal(ExpressionNode):
 
     def __repr__(self):
         return self.value.snbt()
+
+    def unroll(self):
+        return (), IrLiteral(value=self.value)

@@ -2,33 +2,21 @@ from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from types import TracebackType
 from typing import (
+    Any,
     Callable,
     Generator,
     Iterable,
     Iterator,
     List,
+    Literal,
+    Protocol,
+    TypeGuard,
     TypeVar,
     Union,
 )
+from mecha import AbstractNode
 
-from nbtlib import Double, Float, Numeric # type:ignore
-
-
-from .operations import (
-    Add,
-    DataOperation,
-    Divide,
-    Max,
-    Min,
-    Modulus,
-    Multiply,
-    Operation,
-    ScoreOperation,
-    Set,
-    Subtract,
-)
-from .sources import ConstantScoreSource, DataSource, ScoreSource
-from . import literals as l
+from nbtlib import Double, Float, Numeric, Path  # type:ignore
 
 
 __all__ = [
@@ -49,9 +37,99 @@ __all__ = [
     "set_to_self_removal",
     "set_and_get_cleanup",
     "literal_to_constant_replacement",
+    "StoreValue",
+    "DataTargetType",
+    "IrNode",
+    "IrSource",
+    "IrScore",
+    "IrLiteral",
+    "IrOperation",
+    "IrUnary",
+    "IrBinary",
+    "is_op",
+    "is_unary",
+    "is_binary",
 ]
 
 T = TypeVar("T")
+
+
+class IrNode(AbstractNode):
+    ...
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrSource(IrNode):
+    temp: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrScore(IrSource):
+    holder: str
+    obj: str
+
+
+DataTargetType = Literal["storage", "entity", "block"]
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrData(IrSource):
+    type: DataTargetType
+    target: str
+    path: Path
+    nbt_type: Any = None
+    scale: float | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrLiteral(IrNode):
+    value: float | Float | Double
+
+
+StoreValue = tuple[Literal["result", "success"], IrSource]
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrOperation(IrNode):
+    op: str
+    store: tuple[StoreValue, ...] = ()
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrUnary(IrOperation):
+    target: IrSource
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrBinary(IrOperation):
+    left: IrSource
+    right: IrSource | IrLiteral
+
+
+def is_op(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrOperation]:
+    if not isinstance(obj, IrOperation):
+        return False
+
+    if op is None:
+        return True
+
+    if isinstance(op, str):
+        op = (op,)
+
+    return obj.op in op
+
+
+def is_unary(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrUnary]:
+    return is_op(obj, op) and isinstance(obj, IrUnary)
+
+
+def is_binary(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrBinary]:
+    return is_op(obj, op) and isinstance(obj, IrBinary)
+
+
+SCORE_OPERATIONS = ("set", "add", "sub", "mul", "div", "mod", "min", "max")
+
+DATA_OPERATIONS = ("set", "remove", "insert", "append", "prepend", "merge")
 
 
 class SmartGenerator(Generator[T, None, None]):
@@ -84,7 +162,7 @@ class SmartGenerator(Generator[T, None, None]):
     def push(self, val: T | None):
         if val is not None:
             self._pre.append(val)
-    
+
     def send(self, __value: None) -> T:
         ...
 
@@ -92,9 +170,9 @@ class SmartGenerator(Generator[T, None, None]):
         self,
         __typ: BaseException | type[BaseException],
         __val: BaseException | object = None,
-        __tb: TracebackType | None = None
-    ) -> T: ...
-
+        __tb: TracebackType | None = None,
+    ) -> T:
+        ...
 
 
 Rule = Callable[[Iterable[T]], Iterable[T]]
@@ -121,6 +199,16 @@ def smart_generator(func: Rule[T]) -> Callable[[Iterable[T]], SmartGenerator[T]]
     return rule
 
 
+class TempScoreProvider(Protocol):
+    def __call__(self) -> tuple[str, str]:
+        ...
+
+
+class ConstScoreProvider(Protocol):
+    def __call__(self, value: int) -> tuple[str, str]:
+        ...
+
+
 @dataclass
 class Optimizer:
     """Handles the operation of various optimization rules.
@@ -135,9 +223,12 @@ class Optimizer:
     writing new rules.
     """
 
-    rules: List[Rule[Operation]] = field(default_factory=list)
+    temp_score: TempScoreProvider
+    const_score: ConstScoreProvider
 
-    def add_rules(self, *funcs: Rule[Operation], index: int | None = None):
+    rules: List[Rule[IrOperation]] = field(default_factory=list)
+
+    def add_rules(self, *funcs: Rule[IrOperation], index: int | None = None):
         """Registers new rules, also converts the decorated generator into a `SmartGenerator`"""
 
         if index is None:
@@ -148,7 +239,7 @@ class Optimizer:
         for f in funcs[::-1]:
             self.rules.insert(index, f)
 
-    def optimize(self, nodes: Iterable[Operation]):
+    def optimize(self, nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
         """Performs the optimization by sending all nodes through the rules."""
 
         for rule in self.rules:
@@ -158,9 +249,43 @@ class Optimizer:
 
     __call__ = optimize
 
+    def generate_score(self) -> IrScore:
+        holder, obj = self.temp_score()
+        return IrScore(holder=holder, obj=obj, temp=True)
+
+    def generate_const(self, value: int) -> IrScore:
+        holder, obj = self.const_score(value)
+        return IrScore(holder=holder, obj=obj)
+
+
+"""
+Insert score
+
+latter_nodes, latter_var = self.latter.unroll()
+yield replace(self, latter=Literal.create(0))
+yield Set.create(self.former[self.index], latter_var)
+"""
+
+
+def convert_data_arithmetic(opt: Optimizer, nodes: Iterable[IrOperation]):
+    for node in nodes:
+        if (
+            is_binary(node, SCORE_OPERATIONS)
+            and not is_binary(node, DATA_OPERATIONS)
+            and isinstance(node.right, IrData)
+        ):
+            temp_score = opt.generate_score()
+
+            yield IrBinary(op="set", left=temp_score, right=node.right)
+            yield replace(node, right=temp_score)
+
+            continue
+
+        yield node
+
 
 @use_smart_generator
-def noncommutative_set_collapsing(nodes: SmartGenerator[Operation]):
+def noncommutative_set_collapsing(nodes: SmartGenerator[IrOperation]):
     """For noncommutative operations:
     ```
     scoreboard players operation $i1 temp = @s rx.uid
@@ -181,17 +306,15 @@ def noncommutative_set_collapsing(nodes: SmartGenerator[Operation]):
         next_node = next(nodes, None)
         further_node = next(nodes, None)
         if (
-            isinstance(node, Set)
-            and isinstance(next_node, ScoreOperation)
-            and isinstance(further_node, Set)
-            and isinstance(further_node.former, ScoreSource)
-            and node.latter == further_node.former
-            and node.former == next_node.former
-            and node.former == further_node.latter
+            is_binary(node, "set")
+            and is_binary(next_node, SCORE_OPERATIONS)
+            and is_binary(further_node, "set")
+            and isinstance(further_node.left, IrScore)
+            and node.right == further_node.left
+            and node.left == next_node.left
+            and node.left == further_node.right
         ):
-            yield replace(
-                next_node, former=further_node.former, latter=next_node.latter
-            )
+            yield replace(next_node, left=further_node.left, right=next_node.right)
         else:
             nodes.push(further_node)
             nodes.push(next_node)
@@ -199,7 +322,9 @@ def noncommutative_set_collapsing(nodes: SmartGenerator[Operation]):
 
 
 @use_smart_generator
-def commutative_set_collapsing(nodes: SmartGenerator[Operation]):
+def commutative_set_collapsing(
+    nodes: SmartGenerator[IrOperation],
+) -> Iterable[IrOperation]:
     """For commutative operations:
     ```
     scoreboard players operation $i1 temp += $i0 temp
@@ -211,18 +336,18 @@ def commutative_set_collapsing(nodes: SmartGenerator[Operation]):
     ```
     """
     for node in nodes:
-        next_node: Union["Operation", None] = next(nodes, None)
+        next_node: Union[IrOperation, None] = next(nodes, None)
         # print("node", node)
         # print("next_node", next_node)
 
         if (
-            isinstance(node, (Add, Multiply))
-            and isinstance(next_node, Set)
-            and isinstance(next_node.former, ScoreSource)
-            and node.former == next_node.latter
-            and node.latter == next_node.former
+            is_binary(node, ("add", "mul"))
+            and is_binary(next_node, "set")
+            and isinstance(next_node.left, IrScore)
+            and node.left == next_node.right
+            and node.right == next_node.left
         ):
-            yield replace(node, former=next_node.former, latter=next_node.latter)
+            yield replace(node, left=next_node.left, right=next_node.right)
         else:
             # print("old", node)
             nodes.push(next_node)
@@ -230,7 +355,7 @@ def commutative_set_collapsing(nodes: SmartGenerator[Operation]):
 
 
 @use_smart_generator
-def data_set_scaling(nodes: SmartGenerator[Operation]):
+def data_set_scaling(nodes: SmartGenerator[IrOperation]):
     """
     Turns a multiplication/division of a temp score followed by a
     data set operation into a single set operation with a scale argument.
@@ -264,30 +389,30 @@ def data_set_scaling(nodes: SmartGenerator[Operation]):
         next_node = next(nodes, None)
         # skip data operation node (just so we can get to
         # the actual Set node)
-        if isinstance(next_node, DataOperation):
+        if is_binary(next_node, ("insert", "append", "prepend")):
             operation_node = next_node
             next_node = next(nodes, None)
         if (
-            isinstance(node, (Multiply, Divide))
-            and isinstance(next_node, Set)
-            and isinstance(node.latter, l.Literal)
-            and isinstance(next_node.former, DataSource)
-            and node.former == next_node.latter
+            is_binary(node, ("mul", "div"))
+            and is_binary(next_node, "set")
+            and isinstance(node.right, IrLiteral)
+            and isinstance(next_node.left, IrData)
+            and node.left == next_node.right
         ):
-            scale = float(node.latter.value)
+            scale = float(node.right.value)
 
             if scale.is_integer():
                 scale = int(scale)
 
-            source = next_node.former
-            number_type = source._nbt_type
+            source = next_node.left
+            number_type = source.nbt_type
 
-            if isinstance(node, Divide):
+            if is_binary(node, "div"):
                 scale = 1 / scale
-                number_type = number_type or source._default_floating_point_type
+                number_type = number_type or "double"
 
-            new_source = replace(source, _scale=scale, _nbt_type=number_type)
-            out = Set(new_source, node.former)
+            new_source = replace(source, scale=scale, nbt_type=number_type)
+            out = IrBinary(op="set", left=new_source, right=node.left)
 
             if operation_node:
                 yield operation_node  # yield the data operation node back in
@@ -300,7 +425,7 @@ def data_set_scaling(nodes: SmartGenerator[Operation]):
 
 
 @use_smart_generator
-def data_get_scaling(nodes: SmartGenerator[Operation]):
+def data_get_scaling(nodes: SmartGenerator[IrOperation]):
     """
     ````
     execute store result score $i0 temp run data get storage demo value 1
@@ -316,45 +441,50 @@ def data_get_scaling(nodes: SmartGenerator[Operation]):
     for node in nodes:
         next_node = next(nodes, None)
         if (
-            isinstance(node, Set)
-            and isinstance(next_node, (Multiply, Divide))
-            and isinstance(node.latter, DataSource)
-            and isinstance(next_node.latter, l.Literal)
-            and node.former == next_node.former
+            is_binary(node, "set")
+            and is_binary(next_node, ("mul", "div"))
+            and isinstance(node.right, IrData)
+            and isinstance(next_node.right, IrLiteral)
+            and node.left == next_node.left
         ):
-            scale = float(next_node.latter.value)
+            scale = float(next_node.right.value)
 
             if scale.is_integer():
                 scale = int(scale)
 
-            if isinstance(next_node, Divide):
+            if is_binary(next_node, "div"):
                 scale = 1 / scale
 
-            yield Set(node.former, replace(node.latter, _scale=scale))
+            yield IrBinary(
+                op="set", left=node.left, right=replace(node.right, scale=scale)
+            )
         else:
             nodes.push(next_node)
             yield node
 
 
-def multiply_divide_by_fraction(nodes: Iterable[Operation]):
+def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
     for node in nodes:
         if (
-            isinstance(node, (Multiply, Divide))
-            and isinstance(node.latter, l.Literal)
-            and isinstance(node.latter.value, (Float, Double))
+            is_binary(node, ("mul", "div"))
+            and isinstance(node.right, IrLiteral)
+            and isinstance(node.right.value, (Float, Double))
         ):
-            value = Fraction(node.latter.value).limit_denominator()
+            value = Fraction(node.right.value).limit_denominator()
 
-            if isinstance(node, Divide):
+            if is_binary(node, "div"):
                 value = 1 / value
 
-            yield Multiply.create(node.former, value.numerator)
-            yield Divide.create(node.former, value.denominator)
+            numerator = IrLiteral(value=value.numerator)
+            denominator = IrLiteral(value=value.denominator)
+
+            yield IrBinary(op="mul", left=node.left, right=numerator)
+            yield IrBinary(op="div", left=node.left, right=denominator)
         else:
             yield node
 
 
-def output_score_replacement(nodes: Iterable[Operation]):
+def output_score_replacement(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     """Replace the outermost temp score by the output score.
     If expression tree uses the output score, this rule won't be applied.
     """
@@ -364,73 +494,82 @@ def output_score_replacement(nodes: Iterable[Operation]):
         # print("[bold]Applying output score replacement on tree:[/bold]")
         # pprint(all_nodes)
         last_node = all_nodes[-1]
-        target_var = last_node.latter
-        output_var = last_node.former
+
+        if not is_binary(last_node, "set"):
+            yield from nodes
+            return
+
+        target_var = last_node.right
+        output_var = last_node.left
         can_replace = False
         # print(f"Last node is {last_node}")
-        if (
-            isinstance(output_var, ScoreSource)
-            and isinstance(last_node, Set)
-            and len(all_nodes) > 1
-        ):
+        if isinstance(output_var, IrScore) and len(all_nodes) > 1:
             for node in all_nodes[1:]:  # Ignore the first Set operation
-                # print(f"Is {node.latter} equal to {output_var}? {node.latter == output_var}")
-                if node.latter == output_var:
+                # print(f"Is {node.right} equal to {output_var}? {node.right == output_var}")
+                if not is_binary(node):
+                    continue
+
+                if node.right == output_var:
                     break
             else:
                 can_replace = True
         # print(f"Can replace output score? {can_replace}")
-        def replace_source(source):
+        def replace_source(source: IrSource | IrLiteral):
             if source == target_var:
                 return output_var
             return source
 
         if can_replace:
             for node in all_nodes:
-                yield replace(
-                    node,
-                    former=replace_source(node.former),
-                    latter=replace_source(node.latter),
-                )
+                if is_binary(node):
+                    yield replace(
+                        node,
+                        left=replace_source(node.left),
+                        right=replace_source(node.right),
+                    )
+                elif is_unary(node):
+                    yield replace(node, target=replace_source(node.target))
+                else:
+                    yield node
         else:
             yield from all_nodes
 
 
-def multiply_divide_by_one_removal(nodes: Iterable[Operation]):
+def multiply_divide_by_one_removal(nodes: Iterable[IrOperation]):
     for node in nodes:
         if not (
-            isinstance(node, (Multiply, Divide))
-            and isinstance(node.latter, l.Literal)
-            and node.latter.value == 1
+            is_binary(node, ("mul", "div"))
+            and isinstance(node.right, IrLiteral)
+            and node.right.value == 1
         ):
             yield node
 
 
-def add_subtract_by_zero_removal(nodes: Iterable[Operation]):
+def add_subtract_by_zero_removal(nodes: Iterable[IrOperation]):
     for node in nodes:
         if not (
-            isinstance(node, (Add, Subtract))
-            and isinstance(node.latter, l.Literal)
-            and node.latter.value == 0
+            is_binary(node, ("add", "sub"))
+            and isinstance(node.right, IrLiteral)
+            and node.right.value == 0
         ):
             yield node
 
 
-def set_to_self_removal(nodes: Iterable[Operation]):
+def set_to_self_removal(nodes: Iterable[IrOperation]):
     """Removes Set operations that have the same former and latter source.
     Should run after "output_score_replacement" is applied to clean up
     all the reduntant Sets created by the previous rule.
     """
     for node in nodes:
-        if isinstance(node, Set):
-            if node.former != node.latter:
+        if is_binary(node, "set"):
+            if node.left != node.right:
                 yield node
         else:
             yield node
 
 
 @use_smart_generator
-def set_and_get_cleanup(nodes: SmartGenerator[Operation]):
+def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]):
     """
     Removes unnecessary temp vars possibly originated from previous
     optimizations.
@@ -449,11 +588,11 @@ def set_and_get_cleanup(nodes: SmartGenerator[Operation]):
     for node in nodes:
         next_node = next(nodes, None)
         if (
-            isinstance(node, Set)
-            and isinstance(next_node, Set)
-            and node.former == next_node.latter
+            is_binary(node, "set")
+            and is_binary(next_node, "set")
+            and node.left == next_node.right
         ):
-            out = Set(next_node.former, node.latter)
+            out = IrBinary(op="set", left=next_node.left, right=node.right)
             yield out
         else:
             nodes.push(next_node)
@@ -461,17 +600,18 @@ def set_and_get_cleanup(nodes: SmartGenerator[Operation]):
 
 
 def literal_to_constant_replacement(
-    nodes: Iterable[Operation],
-) -> Iterable[Operation]:
+    opt: Optimizer,
+    nodes: Iterable[IrOperation],
+) -> Iterable[IrOperation]:
     for node in nodes:
         if (
-            isinstance(node, (Multiply, Divide, Min, Max, Modulus))
-            and isinstance(node.latter, l.Literal)
-            and isinstance(node.latter.value, Numeric)
+            is_binary(node, ("mul", "div", "min", "max", "mod"))
+            and isinstance(node.right, IrLiteral)
+            and isinstance(node.right.value, Numeric)
         ):
-            value = int(node.latter.value)
-            constant = ConstantScoreSource.create(value)
+            value = int(node.right.value)
+            constant = opt.generate_const(value)
 
-            yield replace(node, former=node.former, latter=constant)
+            yield replace(node, right=constant)
         else:
             yield node

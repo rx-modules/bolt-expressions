@@ -5,7 +5,9 @@ from typing import Callable, ClassVar, Union
 
 from nbtlib import Compound, Path
 
+
 from . import operations as op
+from .optimizer import IrBinary, IrData, IrScore, NbtSourceType
 from .literals import convert_tag
 from .node import ExpressionNode
 
@@ -52,6 +54,9 @@ class ScoreSource(Source):
             **tags,
         }
 
+    def unroll(self):
+        return (), IrScore(holder=self.scoreholder, obj=self.objective)
+
     @property
     def holder(self):
         return self.scoreholder
@@ -80,6 +85,9 @@ class TempScoreSource(ScoreSource):
         cls.count += 1
         return super().create(f"$i{cls.count}", cls.objective)
 
+    def unroll(self):
+        return (), IrScore(holder=self.scoreholder, obj=self.objective, temp=True)
+
 
 def parse_compound(value: Union[str, dict, Path, Compound]):
     if isinstance(value, (Path, Compound)):
@@ -93,7 +101,7 @@ def parse_compound(value: Union[str, dict, Path, Compound]):
 class DataSource(Source):
     _default_nbt_type: ClassVar[str] = "int"
     _default_floating_point_type: ClassVar[str] = "double"
-    _type: str
+    _type: NbtSourceType
     _target: str
     _path: Path = field(default_factory=Path)
     _scale: float = 1
@@ -109,9 +117,14 @@ class DataSource(Source):
         cls._rebind = callback
 
     def unroll(self):
-        temp_var = TempScoreSource.create()
-        yield op.Set.create(temp_var, self)
-        yield temp_var
+        node = IrData(
+            type=self._type,
+            target=self._target,
+            path=self._path,
+            nbt_type=self._nbt_type,
+            scale=self._scale,
+        )
+        return (), node
 
     def __rebind__(self, other):
         self._rebind(self, other)

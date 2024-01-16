@@ -1,11 +1,19 @@
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, Iterable, List, Tuple, Union
+from typing import Any, Callable, ClassVar, Iterable, List, Tuple, Union
 
 from nbtlib import Int
 
+from .optimizer import IrBinary, IrLiteral, IrOperation, IrScore, IrSource
+
 from .literals import Literal
 from .node import ExpressionNode
-from .sources import ConstantScoreSource, DataSource, Source, TempScoreSource
+from .sources import (
+    ConstantScoreSource,
+    DataSource,
+    ScoreSource,
+    Source,
+    TempScoreSource,
+)
 
 # from rich import print
 # from rich.pretty import pprint
@@ -30,7 +38,7 @@ __all__ = [
     "wrapped_max",
 ]
 
-GenericValue = Union["Operation", "Source", int, str]
+GenericValue = Union["Operation", ScoreSource, DataSource, Literal]
 
 
 def wrapped_min(f, *args, **kwargs):
@@ -73,12 +81,14 @@ def wrapped_max(f, *args, **kwargs):
 
 @dataclass(unsafe_hash=False, order=False)
 class Operation(ExpressionNode):
-    former: GenericValue
-    latter: GenericValue
+    former: ExpressionNode
+    latter: ExpressionNode
     store: Tuple[Source] = field(default_factory=tuple)
 
+    op: ClassVar[str] = ""
+
     @classmethod
-    def create(cls, former: GenericValue, latter: GenericValue, *args, **kwargs):
+    def create(cls, former: Any, latter: Any, *args: Any, **kwargs: Any):
         """Factory method to create new operations"""
 
         if not isinstance(former, ExpressionNode):
@@ -88,20 +98,26 @@ class Operation(ExpressionNode):
 
         return super().create(former, latter, *args, **kwargs)
 
-    def unroll(self) -> Iterable["Operation"]:
-        *former_nodes, former_var = self.former.unroll()
-        *latter_nodes, latter_var = self.latter.unroll()
+    def unroll(self) -> tuple[Iterable[IrOperation], IrSource]:
+        former_nodes, former_value = self.former.unroll()
+        latter_nodes, latter_value = self.latter.unroll()
 
-        yield from former_nodes
-        yield from latter_nodes
+        if isinstance(former_value, IrLiteral):
+            node = replace(self, former=self.latter, latter=self.former)
+            return node.unroll()
 
-        if isinstance(former_var, TempScoreSource):
-            temp_var = former_var
+        operations: list[IrOperation] = [*former_nodes, *latter_nodes]
+
+        if former_value.temp:
+            temp_var = former_value
         else:
-            temp_var = TempScoreSource.create()
-            yield Set.create(temp_var, former_var)
-        yield replace(self, former=temp_var, latter=latter_var)
-        yield temp_var
+            t = TempScoreSource.create()
+            temp_var = IrScore(holder=t.holder, obj=t.obj, temp=True)
+            operations.append(IrBinary(op="set", left=temp_var, right=former_value))
+
+        operations.append(IrBinary(op=self.op, left=temp_var, right=latter_value))
+
+        return operations, temp_var
 
 
 class DataOperation(Operation):
@@ -109,54 +125,52 @@ class DataOperation(Operation):
 
 
 class Merge(DataOperation):
-    def unroll(self):
-        yield self
+    op: ClassVar[str] = "merge"
 
 
 class MergeRoot(Merge):
-    ...
+    op: ClassVar[str] = "merge"
 
 
 @dataclass(unsafe_hash=False, order=False)
 class Insert(DataOperation):
+    op: ClassVar[str] = "insert"
     index: int = 0
-
-    def unroll(self):
-        if isinstance(self.latter, (DataSource, Literal)):
-            yield self
-        else:
-            *latter_nodes, latter_var = self.latter.unroll()
-            yield from latter_nodes
-            yield replace(self, latter=Literal.create(0))
-            yield Set.create(self.former[self.index], latter_var)
 
 
 class Append(Insert):
+    op: ClassVar[str] = "append"
+
     @classmethod
     def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
         return super().create(former, latter, index=-1)
 
 
 class Prepend(Insert):
+    op: ClassVar[str] = "prepend"
+
     @classmethod
     def create(cls, former: DataSource, latter: GenericValue, *args, **kwargs):
         return super().create(former, latter, index=0)
 
 
 class Set(Operation):
+    op: ClassVar[str] = "set"
+
     @classmethod
     def on_resolve(cls, callback: Callable):
         cls._resolve = callback
 
-    def unroll(self) -> Iterable["Operation"]:
-        TempScoreSource.count = -1
+    def unroll(self):
+        _, former_var = self.former.unroll()
+        latter, latter_var = self.latter.unroll()
 
-        if isinstance(self.latter, DataSource):
-            yield Set.create(self.former, self.latter)
-        else:
-            *latter_nodes, latter_var = self.latter.unroll()
-            yield from latter_nodes
-            yield Set.create(self.former, latter_var)
+        if not isinstance(former_var, IrSource):
+            raise ValueError("Left side of set operation cannot be literal.")
+
+        op = IrBinary(op="set", left=former_var, right=latter_var)
+
+        return (*latter, op), former_var
 
     def resolve(self):
         return self._resolve(self)
@@ -168,6 +182,8 @@ class ScoreOperation(Operation):
 
 @ExpressionNode.link("add", reverse=True)
 class Add(ScoreOperation):
+    op: ClassVar[str] = "add"
+
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -177,11 +193,13 @@ class Add(ScoreOperation):
 
 @ExpressionNode.link("sub", reverse=True)
 class Subtract(ScoreOperation):
-    ...  # fmt: skip
+    op: ClassVar[str] = "sub"
 
 
 @ExpressionNode.link("mul", reverse=True)
 class Multiply(ScoreOperation):
+    op: ClassVar[str] = "mul"
+
     @classmethod
     def create(cls, former: GenericValue, latter: GenericValue):
         if not isinstance(former, Operation) and isinstance(latter, Operation):
@@ -191,22 +209,22 @@ class Multiply(ScoreOperation):
 
 @ExpressionNode.link("truediv", reverse=True)
 class Divide(ScoreOperation):
-    ...
+    op: ClassVar[str] = "div"
 
 
 @ExpressionNode.link("mod", reverse=True)
 class Modulus(ScoreOperation):
-    ...
+    op: ClassVar[str] = "mod"
 
 
 @ExpressionNode.link("min", reverse=True)
 class Min(ScoreOperation):
-    ...
+    op: ClassVar[str] = "min"
 
 
 @ExpressionNode.link("max", reverse=True)
 class Max(ScoreOperation):
-    ...
+    op: ClassVar[str] = "max"
 
 
 @ExpressionNode.link("if")
