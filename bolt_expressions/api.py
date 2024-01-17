@@ -29,6 +29,7 @@ from .optimizer import (
     commutative_set_collapsing,
     convert_data_arithmetic,
     data_get_scaling,
+    data_insert_score,
     data_set_scaling,
     literal_to_constant_replacement,
     multiply_divide_by_fraction,
@@ -45,6 +46,7 @@ from .sources import (
     Source,
     TempScoreSource,
 )
+from .serializer import IrSerializer
 from .utils import identifier_generator
 
 from rich import print
@@ -82,9 +84,10 @@ class TempScoreManager:
         self.counter += 1
 
         return (name, self.objective)
-    
+
     def reset(self):
         self.counter = 0
+
 
 @dataclass
 class ConstScoreManager:
@@ -94,12 +97,12 @@ class ConstScoreManager:
 
     def format(self, value: int) -> str:
         return f"${value}"
-    
+
     def create(self, value: int) -> tuple[str, str]:
         self.constants.add(value)
 
         return (self.format(value), self.objective)
-    
+
     __call__ = create
 
 
@@ -111,6 +114,7 @@ class Expression:
     init_commands: List[str] = field(default_factory=list)
 
     optimizer: Optimizer = field(init=False)
+    serializer: IrSerializer = field(init=False)
 
     temp_score: TempScoreManager = field(init=False)
     const_score: ConstScoreManager = field(init=False)
@@ -125,7 +129,7 @@ class Expression:
         )
         if not self.opts.disable_commands:
             self.ctx.require("bolt_expressions.contrib.commands")
-        
+
         self.temp_score = TempScoreManager(self.opts.temp_objective)
         self.const_score = ConstScoreManager(self.opts.const_objective)
 
@@ -134,6 +138,7 @@ class Expression:
             const_score=self.const_score,
         )
         self.optimizer.add_rules(
+            data_insert_score,
             partial(convert_data_arithmetic, self.optimizer),
             # features
             data_set_scaling,
@@ -151,10 +156,11 @@ class Expression:
             partial(literal_to_constant_replacement, self.optimizer),
         )
 
+        self.serializer = IrSerializer()
+
         helpers = self._runtime.helpers
 
         helpers["interpolate_json"] = SourceJsonConverter(helpers["interpolate_json"])
-
 
         Set.on_resolve(self.resolve)
         TempScoreSource.objective = self.opts.temp_objective
@@ -168,9 +174,10 @@ class Expression:
     def _mc(self) -> Mecha:
         return self.ctx.inject(Mecha)
 
-    def _inject_command(self, cmd: str):
-        self._runtime.commands.append(self._mc.parse(cmd, using="command"))
-    
+    def inject_command(self, *cmds: str):
+        for cmd in cmds:
+            self._runtime.commands.append(self._mc.parse(cmd, using="command"))
+
     def resolve(self, nodes: Operation):
         TempScoreSource.count = -1
         self.temp_score.reset()
@@ -182,10 +189,11 @@ class Expression:
 
         optimized_nodes = list(self.optimizer(unrolled_nodes))
         pprint(optimized_nodes)
-        # cmds = list(resolver.resolve(nodes))
-        # # pprint(cmds, expand_all=True)
-        # for cmd in cmds:
-        #     self._inject_command(cmd)
+
+        cmds = self.serializer(optimized_nodes)
+        pprint(cmds, expand_all=True)
+
+        self.inject_command(*cmds)
 
     def set(self, source: Source, value: GenericValue):
         Set.create(source, value).resolve()
@@ -193,7 +201,7 @@ class Expression:
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
         path = self.ctx.generate.path(self.opts.init_path)
-        self._inject_command(f"function {path}")
+        self.inject_command(f"function {path}")
         self.called_init = True
 
     def generate_init(self):
@@ -286,11 +294,11 @@ class Scoreboard:
 
     def reset(self, source: ScoreSource):
         cmd = resolver.generate("reset:score", source)
-        self._expr._inject_command(cmd)
+        self._expr.inject_command(cmd)
 
     def enable(self, source: ScoreSource):
         cmd = resolver.generate("enable:score", source)
-        self._expr._inject_command(cmd)
+        self._expr.inject_command(cmd)
 
 
 @dataclass
@@ -360,7 +368,7 @@ class Data:
                 f'Cannot remove the root of {node._type} "{node._target}".'
             )
         cmd = resolver.generate("remove:data", value=node)
-        self._expr._inject_command(cmd)
+        self._expr.inject_command(cmd)
 
     def append(self, source: DataSource, value: GenericValue):
         self._expr.resolve(Append.create(source, value))
@@ -372,5 +380,4 @@ class Data:
         self._expr.resolve(Insert.create(source, value, index=index))
 
     def merge(self, source: DataSource, value: GenericValue):
-        Operation = Merge if len(source._path) else MergeRoot
-        self._expr.resolve(Operation.create(source, value))
+        self._expr.resolve(Merge.create(source, value))

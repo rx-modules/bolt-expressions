@@ -7,7 +7,7 @@ from nbtlib import Compound, Path
 
 
 from . import operations as op
-from .optimizer import IrBinary, IrData, IrScore, NbtSourceType
+from .optimizer import IrData, IrScore, DataTargetType
 from .literals import convert_tag
 from .node import ExpressionNode
 
@@ -101,7 +101,7 @@ def parse_compound(value: Union[str, dict, Path, Compound]):
 class DataSource(Source):
     _default_nbt_type: ClassVar[str] = "int"
     _default_floating_point_type: ClassVar[str] = "double"
-    _type: NbtSourceType
+    _type: DataTargetType
     _target: str
     _path: Path = field(default_factory=Path)
     _scale: float = 1

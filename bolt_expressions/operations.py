@@ -1,14 +1,12 @@
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, ClassVar, Iterable, List, Tuple, Union
+from typing import Any, Callable, ClassVar, Iterable, List, Tuple, Union, cast
 
-from nbtlib import Int
 
-from .optimizer import IrBinary, IrLiteral, IrOperation, IrScore, IrSource
+from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrOperation, IrScore, IrSource
 
 from .literals import Literal
 from .node import ExpressionNode
 from .sources import (
-    ConstantScoreSource,
     DataSource,
     ScoreSource,
     Source,
@@ -121,7 +119,19 @@ class Operation(ExpressionNode):
 
 
 class DataOperation(Operation):
-    ...
+    def unroll(self):
+        _, former_var = self.former.unroll()
+        latter_nodes, latter_value = self.latter.unroll()
+
+        if not isinstance(former_var, IrData):
+            raise ValueError("Left side of data operation cannot be data source.")
+
+        if isinstance(self, IrInsert):
+            node = IrInsert(left=former_var, right=latter_value, index=self.index)
+        else:
+            node = IrBinary(op=self.op, left=former_var, right=latter_value)
+
+        return (*latter_nodes, node), former_var
 
 
 class Merge(DataOperation):

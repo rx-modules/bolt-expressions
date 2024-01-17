@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Any, Dict
 
 from beet import Context
 from bolt import Runtime
@@ -6,6 +6,9 @@ from bolt import Runtime
 __all__ = [
     "identifier_generator",
 ]
+
+def type_name(obj: Any) -> str:
+    return type(obj).__name__
 
 
 def identifier_generator(ctx: Context):

@@ -7,7 +7,6 @@ from typing import (
     Generator,
     Iterable,
     Iterator,
-    List,
     Literal,
     Protocol,
     TypeGuard,
@@ -16,7 +15,7 @@ from typing import (
 )
 from mecha import AbstractNode
 
-from nbtlib import Double, Float, Numeric, Path  # type:ignore
+from nbtlib import Byte, Short, Int, Double, Float, String, List, Array, Compound, Numeric, Path  # type:ignore
 
 
 __all__ = [
@@ -70,7 +69,7 @@ class IrScore(IrSource):
 
 
 DataTargetType = Literal["storage", "entity", "block"]
-
+NbtType = Byte | Short | Int | Float | Double | String | List | Array | Compound
 
 @dataclass(frozen=True, kw_only=True)
 class IrData(IrSource):
@@ -83,7 +82,7 @@ class IrData(IrSource):
 
 @dataclass(frozen=True, kw_only=True)
 class IrLiteral(IrNode):
-    value: float | Float | Double
+    value: NbtType
 
 
 StoreValue = tuple[Literal["result", "success"], IrSource]
@@ -104,6 +103,11 @@ class IrUnary(IrOperation):
 class IrBinary(IrOperation):
     left: IrSource
     right: IrSource | IrLiteral
+
+@dataclass(frozen=True, kw_only=True)
+class IrInsert(IrBinary):
+    op: str = field(default="insert", init=False)
+    index: int
 
 
 def is_op(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrOperation]:
@@ -144,7 +148,7 @@ class SmartGenerator(Generator[T, None, None]):
     """
 
     _values: Iterator[T]
-    _pre: List[T]
+    _pre: list[T]
 
     def __init__(self, values: Iterable[T]):
         self._values = iter(values)
@@ -226,7 +230,7 @@ class Optimizer:
     temp_score: TempScoreProvider
     const_score: ConstScoreProvider
 
-    rules: List[Rule[IrOperation]] = field(default_factory=list)
+    rules: list[Rule[IrOperation]] = field(default_factory=list)
 
     def add_rules(self, *funcs: Rule[IrOperation], index: int | None = None):
         """Registers new rules, also converts the decorated generator into a `SmartGenerator`"""
@@ -261,10 +265,28 @@ class Optimizer:
 """
 Insert score
 
-latter_nodes, latter_var = self.latter.unroll()
-yield replace(self, latter=Literal.create(0))
-yield Set.create(self.former[self.index], latter_var)
 """
+def data_insert_score(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    for node in nodes:
+        if (
+            is_binary(node, ("append", "prepend", "insert"))
+            and isinstance(node.left, IrData)
+            and isinstance(node.right, IrScore)
+        ):
+            yield replace(node, right=IrLiteral(value=Int(0)))
+
+            if isinstance(node, IrInsert):
+                index = node.index
+            elif node.op == "prepend":
+                index = 0
+            else:
+                index = -1
+
+            element = replace(node.left, path=node.left.path[index])
+            yield IrBinary(op="set", left=element, right=node.right)
+        else:
+            yield node
+
 
 
 def convert_data_arithmetic(opt: Optimizer, nodes: Iterable[IrOperation]):
@@ -337,8 +359,6 @@ def commutative_set_collapsing(
     """
     for node in nodes:
         next_node: Union[IrOperation, None] = next(nodes, None)
-        # print("node", node)
-        # print("next_node", next_node)
 
         if (
             is_binary(node, ("add", "mul"))
@@ -396,6 +416,7 @@ def data_set_scaling(nodes: SmartGenerator[IrOperation]):
             is_binary(node, ("mul", "div"))
             and is_binary(next_node, "set")
             and isinstance(node.right, IrLiteral)
+            and isinstance(node.right.value, Numeric)
             and isinstance(next_node.left, IrData)
             and node.left == next_node.right
         ):
@@ -445,6 +466,7 @@ def data_get_scaling(nodes: SmartGenerator[IrOperation]):
             and is_binary(next_node, ("mul", "div"))
             and isinstance(node.right, IrData)
             and isinstance(next_node.right, IrLiteral)
+            and isinstance(next_node.right.value, Numeric)
             and node.left == next_node.left
         ):
             scale = float(next_node.right.value)
@@ -475,8 +497,8 @@ def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
             if is_binary(node, "div"):
                 value = 1 / value
 
-            numerator = IrLiteral(value=value.numerator)
-            denominator = IrLiteral(value=value.denominator)
+            numerator = IrLiteral(value=Int(value.numerator))
+            denominator = IrLiteral(value=Int(value.denominator))
 
             yield IrBinary(op="mul", left=node.left, right=numerator)
             yield IrBinary(op="div", left=node.left, right=denominator)
@@ -496,7 +518,7 @@ def output_score_replacement(nodes: Iterable[IrOperation]) -> Iterable[IrOperati
         last_node = all_nodes[-1]
 
         if not is_binary(last_node, "set"):
-            yield from nodes
+            yield from all_nodes
             return
 
         target_var = last_node.right
