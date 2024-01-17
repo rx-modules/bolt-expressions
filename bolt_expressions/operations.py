@@ -2,7 +2,15 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable, ClassVar, Iterable, List, Tuple, Union, cast
 
 
-from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrOperation, IrScore, IrSource
+from .optimizer import (
+    IrBinary,
+    IrData,
+    IrInsert,
+    IrLiteral,
+    IrOperation,
+    IrScore,
+    IrSource,
+)
 
 from .literals import Literal
 from .node import ExpressionNode

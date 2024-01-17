@@ -7,6 +7,7 @@ __all__ = [
     "identifier_generator",
 ]
 
+
 def type_name(obj: Any) -> str:
     return type(obj).__name__
 

@@ -15,7 +15,19 @@ from typing import (
 )
 from mecha import AbstractNode
 
-from nbtlib import Byte, Short, Int, Double, Float, String, List, Array, Compound, Numeric, Path  # type:ignore
+from nbtlib import (
+    Byte,
+    Short,
+    Int,
+    Double,
+    Float,
+    String,
+    List,
+    Array,
+    Compound,
+    Numeric,
+    Path,
+)  # type:ignore
 
 
 __all__ = [
@@ -71,6 +83,7 @@ class IrScore(IrSource):
 DataTargetType = Literal["storage", "entity", "block"]
 NbtType = Byte | Short | Int | Float | Double | String | List | Array | Compound
 
+
 @dataclass(frozen=True, kw_only=True)
 class IrData(IrSource):
     type: DataTargetType
@@ -103,6 +116,7 @@ class IrUnary(IrOperation):
 class IrBinary(IrOperation):
     left: IrSource
     right: IrSource | IrLiteral
+
 
 @dataclass(frozen=True, kw_only=True)
 class IrInsert(IrBinary):
@@ -262,10 +276,6 @@ class Optimizer:
         return IrScore(holder=holder, obj=obj)
 
 
-"""
-Insert score
-
-"""
 def data_insert_score(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     for node in nodes:
         if (
@@ -286,7 +296,6 @@ def data_insert_score(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
             yield IrBinary(op="set", left=element, right=node.right)
         else:
             yield node
-
 
 
 def convert_data_arithmetic(opt: Optimizer, nodes: Iterable[IrOperation]):

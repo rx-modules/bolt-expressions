@@ -1,10 +1,10 @@
-
 from typing import Any, Generator, Iterable
 from mecha import Visitor, rule
 
 from .utils import type_name
 
 from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrNode, IrScore, IrUnary
+
 
 class InvalidOperand(Exception):
     def __init__(self, op: str, *operands: Any):
@@ -13,7 +13,7 @@ class InvalidOperand(Exception):
 
 
 class IrSerializer(Visitor):
-    def __call__(self, nodes: Iterable[IrNode]) -> list[str]: # type: ignore
+    def __call__(self, nodes: Iterable[IrNode]) -> list[str]:  # type: ignore
         result: list[str] = []
 
         for node in nodes:
@@ -33,8 +33,8 @@ class IrSerializer(Visitor):
 
     @rule(IrLiteral)
     def literal(self, node: IrLiteral, _: list[str]) -> str:
-        return node.value.snbt() # type: ignore
-    
+        return node.value.snbt()  # type: ignore
+
     @rule(IrBinary, op="add")
     def add(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
         left = yield node.left
@@ -47,7 +47,7 @@ class IrSerializer(Visitor):
                 cmd = f"scoreboard players operation {left} += {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         result.append(cmd)
 
     @rule(IrBinary, op="sub")
@@ -62,15 +62,17 @@ class IrSerializer(Visitor):
                 cmd = f"scoreboard players operation {left} -= {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         result.append(cmd)
-    
+
     @rule(IrBinary, op="mul")
     @rule(IrBinary, op="div")
     @rule(IrBinary, op="mod")
     @rule(IrBinary, op="min")
     @rule(IrBinary, op="max")
-    def binary_score_only(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
+    def binary_score_only(
+        self, node: IrBinary, result: list[str]
+    ) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -101,11 +103,13 @@ class IrSerializer(Visitor):
                 cmd = f"data modify {left} append from {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         result.append(cmd)
 
     @rule(IrBinary, op="prepend")
-    def prepend(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
+    def prepend(
+        self, node: IrBinary, result: list[str]
+    ) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -116,7 +120,7 @@ class IrSerializer(Visitor):
                 cmd = f"data modify {left} prepend from {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         result.append(cmd)
 
     @rule(IrInsert)
@@ -132,7 +136,7 @@ class IrSerializer(Visitor):
                 cmd = f"data modify {left} insert {index} from {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         result.append(cmd)
 
     @rule(IrBinary, op="merge")
@@ -149,7 +153,7 @@ class IrSerializer(Visitor):
                 cmd = f"data modify {left} merge from {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         result.append(cmd)
 
     @rule(IrUnary, op="remove")
@@ -161,11 +165,13 @@ class IrSerializer(Visitor):
                 cmd = f"data remove {target}"
             case t:
                 raise InvalidOperand(node.op, t)
-        
+
         result.append(cmd)
 
     @rule(IrUnary, op="reset")
-    def reset_op(self, node: IrUnary, result: list[str]) -> Generator[IrNode, str, None]:
+    def reset_op(
+        self, node: IrUnary, result: list[str]
+    ) -> Generator[IrNode, str, None]:
         target = yield node.target
 
         match node.target:
@@ -173,7 +179,7 @@ class IrSerializer(Visitor):
                 cmd = f"scoreboard players reset {target}"
             case t:
                 raise InvalidOperand(node.op, t)
-        
+
         result.append(cmd)
 
     @rule(IrUnary, op="enable")
@@ -185,7 +191,7 @@ class IrSerializer(Visitor):
                 cmd = f"scoreboard players enable {target}"
             case t:
                 raise InvalidOperand(node.op, t)
-        
+
         result.append(cmd)
 
     def should_cast_data(self, op: IrBinary) -> bool:
@@ -194,12 +200,8 @@ class IrSerializer(Visitor):
         if not isinstance(op.right, IrData):
             return False
 
-        return (
-            op.left.scale != 1
-            or op.right.scale != 1
-            or op.left.nbt_type is not None
-        )
-    
+        return op.left.scale != 1 or op.right.scale != 1 or op.left.nbt_type is not None
+
     def serialize_cast(self, data: IrData) -> tuple[str, str]:
         cast_type = data.nbt_type if data.nbt_type is not None else "double"
         scale = data.scale if data.scale is not None else 1
@@ -232,5 +234,5 @@ class IrSerializer(Visitor):
                 cmd = f"execute store result score {left} run data get {right} {scale}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         result.append(cmd)
