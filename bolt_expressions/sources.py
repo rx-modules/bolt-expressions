@@ -1,23 +1,20 @@
 from dataclasses import dataclass, field, replace
 from functools import cache
 from itertools import count
-from typing import Callable, ClassVar, Union
+from typing import Any, Callable, ClassVar, Union
 
-from nbtlib import Compound, Path
+from nbtlib import Compound, Path # type: ignore
 
-
-from . import operations as op
 from .optimizer import IrData, IrScore, DataTargetType
-from .literals import convert_tag
-from .node import ExpressionNode
+from .literals import Literal, convert_tag
+from .node import Expression, ExpressionNode
+from .operations import Add, Append, Divide, Enable, InPlaceMerge, Insert, Merge, Modulus, Multiply, Prepend, Remove, Reset, Set, Subtract, binary_operator
 
 # from rich.pretty import pprint
 
 __all__ = [
     "Source",
     "ScoreSource",
-    "ConstantScoreSource",
-    "TempScoreSource",
     "DataSource",
     "parse_compound",
 ]
@@ -29,18 +26,31 @@ class Source(ExpressionNode):
     ...
 
 
+def rebind(left: ExpressionNode, right: Any):
+    right_node = right if isinstance(right, ExpressionNode) else Literal(value=right, ctx=left.ctx)
+    op = Set(former=left, latter=right_node, ctx=left.ctx)
+    left.expr.resolve(op)
+
+    return left
+
+
 @dataclass(unsafe_hash=True, order=False)
 class ScoreSource(Source):
     scoreholder: str
     objective: str
 
-    @classmethod
-    def on_rebind(cls, callback: Callable):
-        cls._rebind = callback
+    __rebind__ = rebind
+    __add__, __radd__ = binary_operator(Add, reverse=True)
+    __sub__, __rsub__ = binary_operator(Subtract, reverse=True)
+    __mul__, __rmul__ = binary_operator(Multiply, reverse=True)
+    __truediv__, __rtruediv__ = binary_operator(Divide, reverse=True)
+    __mod__, __rmod__ = binary_operator(Modulus, reverse=True)
 
-    def __rebind__(self, other: ExpressionNode):
-        self._rebind(self, other)
-        return self
+    def enable(self):
+        self.expr.resolve(Enable(target=self, ctx=self.ctx))
+
+    def reset(self):
+        self.expr.resolve(Reset(target=self, ctx=self.ctx))
 
     def __str__(self):
         return f"{self.scoreholder} {self.objective}"
@@ -48,7 +58,7 @@ class ScoreSource(Source):
     def __repr__(self):
         return f'"{str(self)}"'
 
-    def component(self, **tags):
+    def component(self, **tags: Any):
         return {
             "score": {"name": self.scoreholder, "objective": self.objective},
             **tags,
@@ -64,29 +74,6 @@ class ScoreSource(Source):
     @property
     def obj(self):
         return self.objective
-
-
-@dataclass(unsafe_hash=True, order=False)
-class ConstantScoreSource(ScoreSource):
-    objective: str = "const"
-    value: int = field(hash=False, kw_only=True)
-
-    @classmethod
-    def create(cls, value: int):
-        return super().create(f"${value}", cls.objective, value=value)
-
-
-class TempScoreSource(ScoreSource):
-    objective: str = "temp"
-    count: ClassVar[int] = -1
-
-    @classmethod
-    def create(cls):
-        cls.count += 1
-        return super().create(f"$i{cls.count}", cls.objective)
-
-    def unroll(self):
-        return (), IrScore(holder=self.scoreholder, obj=self.objective, temp=True)
 
 
 def parse_compound(value: Union[str, dict, Path, Compound]):
@@ -109,12 +96,34 @@ class DataSource(Source):
 
     _constructed: bool = field(hash=False, default=False, init=False)
 
-    def __post_init__(self):
-        self._constructed = True
+    __rebind__ = rebind
+    __add__, __radd__ = binary_operator(Add, reverse=True)
+    __sub__, __rsub__ = binary_operator(Subtract, reverse=True)
+    __mul__, __rmul__ = binary_operator(Multiply, reverse=True)
+    __truediv__, __rtruediv__ = binary_operator(Divide, reverse=True)
+    __mod__, __rmod__ = binary_operator(Modulus, reverse=True)
+    __or__, __ror__ = binary_operator(Merge, reverse=True)
 
-    @classmethod
-    def on_rebind(cls, callback: Callable):
-        cls._rebind = callback
+    def insert(self, index: int, value: Any) -> None:
+        self.expr.resolve(Insert(former=self, latter=value, index=index, ctx=self.ctx))
+
+    def append(self, value: Any) -> None:
+        self.expr.resolve(Append(former=self, latter=value, ctx=self.ctx))
+
+    def prepend(self, value: Any) -> None:
+        self.expr.resolve(Prepend(former=self, latter=value, ctx=self.ctx))
+
+    def merge(self, value: Any) -> None:
+        self.expr.resolve(InPlaceMerge(former=self, latter=value, ctx=self.ctx))
+
+    def remove(self, sub_path: Any = None) -> None:
+        target = self if sub_path is None else self[sub_path]
+        self.expr.resolve(Remove(target=target, ctx=self.ctx))
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self._constructed = True
 
     def unroll(self):
         node = IrData(
@@ -126,10 +135,6 @@ class DataSource(Source):
         )
         return (), node
 
-    def __rebind__(self, other):
-        self._rebind(self, other)
-        return self
-
     def __setattr__(self, key: str, value):
         if not self._constructed:
             super().__setattr__(key, value)
@@ -138,7 +143,7 @@ class DataSource(Source):
 
     def __setitem__(self, key: str, value):
         child = self.__getitem__(key)
-        child._rebind(child, value)
+        child.__rebind__(value)
 
     def __getitem__(self, key: Union[str, int, Path, Compound]) -> "DataSource":
         if key is SOLO_COLON:

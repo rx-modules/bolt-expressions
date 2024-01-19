@@ -1,8 +1,5 @@
 __version__ = "0.12.2"
 
-from .api import Data as _Data
-from .api import Expression as _Expression
-from .api import Scoreboard as _Scoreboard
 from .api import *
 from .ast import *
 from .literals import *
@@ -11,6 +8,7 @@ from .operations import *
 from .optimizer import *
 from .plugin import *
 from .resolver import *
+from .serializer import *
 from .sources import *
 from .utils import *
 

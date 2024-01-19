@@ -199,8 +199,16 @@ class IrSerializer(Visitor):
             return False
         if not isinstance(op.right, IrData):
             return False
+        
+        left_scale = op.left.scale
+        if left_scale is not None and left_scale != 1:
+            return True
 
-        return op.left.scale != 1 or op.right.scale != 1 or op.left.nbt_type is not None
+        right_scale = op.right.scale
+        if right_scale is not None and right_scale != 1:
+            return True
+
+        return op.left.nbt_type is not None
 
     def serialize_cast(self, data: IrData) -> tuple[str, str]:
         cast_type = data.nbt_type if data.nbt_type is not None else "double"

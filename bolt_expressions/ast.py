@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable
 from beet.core.utils import required_field
 from mecha import AstCommand, AstNode, AstObjective, AstPlayerName, Reducer, rule
 
-from .sources import ConstantScoreSource, Source
+from .sources import Source
 
 __all__ = [
     "ConstantScoreChecker",
@@ -18,7 +18,7 @@ __all__ = [
 @dataclass
 class ConstantScoreChecker(Reducer):
     objective: str = required_field()
-    callback: Callable = required_field()
+    callback: Callable[[int], None] = required_field()
     pattern: re.Pattern[str] = re.compile(r"^\$([-+]?\d+)\b")
 
     @cached_property
@@ -42,15 +42,13 @@ class ConstantScoreChecker(Reducer):
             return
 
         value = int(match.group(1))
-        source = ConstantScoreSource.create(value)
-
-        self.callback(source)
+        self.callback(value)
 
 
 @dataclass
 class ObjectiveChecker(Reducer):
     whitelist: Iterable[str] = required_field()
-    callback: Callable = required_field()
+    callback: Callable[[str], None] = required_field()
 
     @rule(AstObjective)
     def objective(self, node: AstObjective):
@@ -60,7 +58,6 @@ class ObjectiveChecker(Reducer):
             return
 
         self.callback(value)
-
 
 @dataclass
 class SourceJsonConverter:

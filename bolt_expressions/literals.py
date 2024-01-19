@@ -1,16 +1,19 @@
-from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable
+from dataclasses import dataclass, field
+from typing import Any
+from beet import Context
 
-from nbtlib import Base, Byte, Compound, Double, Float, Int, List, Long, Short, String
+from nbtlib import Array, Byte, Compound, Double, Float, Int, List, Long, Short, String  # type: ignore
+from beet.core.utils import required_field
 
-from .optimizer import IrLiteral
-
-from .node import ExpressionNode
+from .optimizer import IrLiteral, NbtType
+from .node import Expression, ExpressionNode
+from .utils import type_name
 
 __all__ = [
     "Literal",
     "literal_types",
     "convert_tag",
+    "convert_node",
 ]
 
 literal_types = {
@@ -26,14 +29,14 @@ literal_types = {
 }
 
 
-def convert_tag(value):
+def convert_tag(value: Any) -> NbtType | None:
     match value:
-        case Base():
+        case Byte() | Short() | Int() | Float() | Double() | String() | List() | Array() | Compound():
             return value
         case list():
-            return List([convert_tag(x) for x in value])
-        case dict():
-            return Compound({key: convert_tag(value) for key, value in value.items()})
+            return List([convert_tag(x) for x in value])  # type: ignore
+        case dict(dict_value):  # type: ignore
+            return Compound({key: convert_tag(value) for key, value in value.items()})  # type: ignore
         case bool():
             return Byte(value)
         case int():
@@ -43,25 +46,33 @@ def convert_tag(value):
         case str():
             return String(value)
         case _:
-            return value
+            return None
 
 
 @dataclass(unsafe_hash=True, order=False)
 class Literal(ExpressionNode):
-    value: Any
+    value: Any = required_field(repr=False)
+    nbt: NbtType = field(init=False)
 
-    @classmethod
-    def create(cls, value: Base):
-        tag = convert_tag(value)
-        if tag is None:
-            raise ValueError(f'Invalid expression node of type {type(value)} "{value}"')
-        return super().create(tag)
+    def __post_init__(self):
+        value = convert_tag(self.value)
+
+        if value is None:
+            raise ValueError(
+                f'Invalid literal of type {type_name(value)} "{value}".'
+            )
+
+        self.nbt = value
 
     def __str__(self):
-        return self.value.snbt()
-
-    def __repr__(self):
-        return self.value.snbt()
+        return self.nbt.snbt() # type: ignore
 
     def unroll(self):
-        return (), IrLiteral(value=self.value)
+        return (), IrLiteral(value=self.nbt)
+
+
+def convert_node(value: Any, ctx: Context | Expression) -> ExpressionNode:
+    if isinstance(value, ExpressionNode):
+        return value
+    
+    return Literal(value=value, ctx=ctx)

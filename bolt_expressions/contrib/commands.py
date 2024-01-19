@@ -20,6 +20,7 @@ from mecha.contrib.implicit_execute import ImplicitExecuteParser
 from tokenstream import set_location
 
 from bolt_expressions.sources import DataSource, ScoreSource, Source
+from bolt_expressions.node import Expression
 
 DEFAULT_PREFIX = "var"
 
@@ -36,7 +37,7 @@ def commands(ctx: Context):
         "source"
     )
 
-    runtime.helpers["interpolate_source"] = SourceConverter()
+    runtime.helpers["interpolate_source"] = SourceConverter(ctx=ctx)
 
     mc.transform.extend(SourceTransformer(mc=mc))
 
@@ -175,6 +176,8 @@ class AstSourceNode(AstNode):
 
 @dataclass
 class SourceConverter:
+    ctx: Context | Expression
+
     @internal
     def __call__(self, obj: Any, node: AstNode):
         if isinstance(obj, AstNode):
@@ -183,9 +186,9 @@ class SourceConverter:
         if isinstance(obj, Source):
             source = obj
         elif isinstance(obj, tuple) and len(obj) == 2:
-            source = ScoreSource.create(*obj)
+            source = ScoreSource(*obj, ctx=self.ctx)
         elif isinstance(obj, tuple) and len(obj) == 3:
-            source = DataSource.create(*obj)
+            source = DataSource(*obj, ctx=self.ctx)
         else:
             raise ValueError(
                 f"Cannot interpolate source of type {type(obj)!r} '{obj}'."

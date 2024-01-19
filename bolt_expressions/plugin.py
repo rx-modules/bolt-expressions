@@ -1,17 +1,36 @@
-from beet import Context, Function
+from functools import partial
+from beet import Context
+from bolt import Runtime
 
-import bolt_expressions as expr
+from .node import Expression
+from .operations import wrapped_min, wrapped_max
+from .api import Scoreboard, Data
 
 __all__ = [
     "beet_default",
 ]
 
 
-def beet_default(ctx: Context):
-    expr.Expression = ctx.inject(expr._Expression)  # type: ignore
-    expr.Scoreboard = ctx.inject(expr._Scoreboard)  # type: ignore
-    expr.Data = ctx.inject(expr._Data)  # type: ignore
+def bolt_expressions(ctx: Context):
+    expr = ctx.inject(Expression)
+    ctx.inject(Scoreboard)
+    ctx.inject(Data)
+
+    runtime = ctx.inject(Runtime)
+
+    runtime.expose(
+        "min", partial(wrapped_min, runtime.globals.get("min", min))
+    )
+    runtime.expose(
+        "max", partial(wrapped_max, runtime.globals.get("max", max))
+    )
+
+    if not expr.opts.disable_commands:
+        ctx.require("bolt_expressions.contrib.commands")
 
     yield
 
-    expr.Expression.generate_init()
+    expr.generate_init()
+
+
+beet_default = bolt_expressions
