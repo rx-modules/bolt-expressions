@@ -9,12 +9,7 @@ from .ast import ConstantScoreChecker, ObjectiveChecker
 from .literals import literal_types
 from .node import Expression, ExpressionNode
 from .operations import (
-    Append,
-    GenericValue,
-    Insert,
-    Merge,
     Operation,
-    Prepend,
 )
 from .sources import (
     DataSource,

@@ -7,7 +7,6 @@ from .node import *
 from .operations import *
 from .optimizer import *
 from .plugin import *
-from .resolver import *
 from .serializer import *
 from .sources import *
 from .utils import *
