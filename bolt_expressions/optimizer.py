@@ -8,6 +8,7 @@ from typing import (
     Iterable,
     Iterator,
     Literal,
+    NamedTuple,
     Protocol,
     TypeGuard,
     TypeVar,
@@ -217,13 +218,24 @@ def smart_generator(func: Rule[T]) -> Callable[[Iterable[T]], SmartGenerator[T]]
     return rule
 
 
+class ScoreTuple(NamedTuple):
+    holder: str
+    obj: str
+
+class DataTuple(NamedTuple):
+    type: DataTargetType
+    target: str
+    path: Path
+    nbt_type: Any = None
+
+
 class TempScoreProvider(Protocol):
-    def __call__(self) -> tuple[str, str]:
+    def __call__(self) -> ScoreTuple:
         ...
 
 
 class ConstScoreProvider(Protocol):
-    def __call__(self, value: int) -> tuple[str, str]:
+    def __call__(self, value: int) -> ScoreTuple:
         ...
 
 

@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, partial
 from typing import Generator, Iterable, Union
-import typing as t
 
 from beet import Context, Function
 from bolt import Runtime
@@ -12,10 +11,15 @@ from nbtlib import Path # type: ignore
 
 
 from .optimizer import (
+    DataTuple,
+    IrData,
     IrLiteral,
     IrOperation,
+    IrScore,
     IrSource,
+    NbtType,
     Optimizer,
+    ScoreTuple,
     add_subtract_by_zero_removal,
     commutative_set_collapsing,
     convert_data_arithmetic,
@@ -67,11 +71,11 @@ class TempScoreManager:
 
     counter: int = field(default=0, init=False)
 
-    def __call__(self) -> tuple[str, str]:
+    def __call__(self) -> ScoreTuple:
         name = f"$s{self.counter}"
         self.counter += 1
 
-        return (name, self.objective)
+        return ScoreTuple(name, self.objective)
 
     def reset(self):
         self.counter = 0
@@ -86,10 +90,10 @@ class ConstScoreManager:
     def format(self, value: int) -> str:
         return f"${value}"
 
-    def create(self, value: int) -> tuple[str, str]:
+    def create(self, value: int) -> ScoreTuple:
         self.constants.add(value)
 
-        return (self.format(value), self.objective)
+        return ScoreTuple(self.format(value), self.objective)
 
     __call__ = create
 
@@ -110,6 +114,8 @@ class ExpressionNode(ABC):
     def unroll(self) -> tuple[Iterable[IrOperation], IrSource | IrLiteral]:
         ...
 
+
+ResolveResult = ScoreTuple | DataTuple | NbtType | None
 
 @dataclass
 class Expression:
@@ -158,9 +164,9 @@ class Expression:
 
         self.identifiers = identifier_generator(self.ctx)
     
-    def temp_data(self) -> tuple[t.Literal["storage"], str, Path]:
+    def temp_data(self) -> DataTuple:
         name = next(self.identifiers)
-        return ("storage", self.opts.temp_storage, Path(name))
+        return DataTuple("storage", self.opts.temp_storage, Path(name))
 
     @cached_property
     def _runtime(self) -> Runtime:
@@ -174,12 +180,12 @@ class Expression:
         for cmd in cmds:
             self._runtime.commands.append(self._mc.parse(cmd, using="command"))
 
-    def resolve(self, node: ExpressionNode):
+    def resolve(self, node: ExpressionNode) -> ResolveResult:
         self.temp_score.reset()
 
         pprint(node)
 
-        unrolled_nodes, _ = node.unroll()
+        unrolled_nodes, output = node.unroll()
         pprint(unrolled_nodes)
 
         optimized_nodes = list(self.optimizer(unrolled_nodes))
@@ -189,6 +195,19 @@ class Expression:
         pprint(cmds, expand_all=True)
 
         self.inject_command(*cmds)
+
+        match output:
+            case IrScore() as s:
+                result = ScoreTuple(s.holder, s.obj)
+            case IrData() as d:
+                result = DataTuple(d.type, d.target, d.path, d.nbt_type)
+            case IrLiteral() as l:
+                result = l.value
+            case _:
+                result = None
+        
+        return result
+            
 
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""

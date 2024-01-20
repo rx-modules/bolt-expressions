@@ -1,14 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, ClassVar, Iterable, Type, TypeVar, overload
+from typing import Any, Callable, ClassVar, Iterable, Type, TypeVar, Union, overload
 import typing as t
 
-from beet import Context
-
 from bolt_expressions.optimizer import IrBinary, IrLiteral, IrSource
-
-from .utils import type_name
-
 
 from .optimizer import (
     IrBinary,
@@ -19,10 +14,9 @@ from .optimizer import (
     IrScore,
     IrSource,
     IrUnary,
-    NbtType,
 )
-from .node import Expression, ExpressionNode
-from .literals import Literal, convert_node
+from .node import ExpressionNode
+from .literals import convert_node
 
 
 __all__ = [
@@ -54,11 +48,13 @@ __all__ = [
     "Max",
 ]
 
-
-def wrapped_min(f, *args, **kwargs):
+T = TypeVar("T")
+def wrapped_min(f: Any, *args: T, **kwargs: Any) -> Union[T, "Min"]:
     values = args
 
     if len(args) == 1:
+        if isinstance(args[0], ExpressionNode):
+            return args[0]
         if not isinstance(args[0], Iterable):
             return args[0]
 
@@ -67,17 +63,24 @@ def wrapped_min(f, *args, **kwargs):
     for i, node in enumerate(values):
         if not isinstance(node, ExpressionNode):
             continue
-
+            
         remaining = values[:i] + values[i + 1 :]
-        return Min.create(wrapped_min(f, *remaining, **kwargs), node)
+        return Min(
+            former=wrapped_min(f, *remaining, **kwargs),
+            latter=node,
+            ctx=node.ctx,
+            proxied=get_proxied_type(node),
+        )
 
     return f(*args, **kwargs)
 
 
-def wrapped_max(f, *args, **kwargs):
+def wrapped_max(f: Any, *args: T, **kwargs: Any) -> Union[T, "Max"]:
     values = args
 
     if len(args) == 1:
+        if isinstance(args[0], ExpressionNode):
+            return args[0]
         if not isinstance(args[0], Iterable):
             return args[0]
 
@@ -88,7 +91,12 @@ def wrapped_max(f, *args, **kwargs):
             continue
 
         remaining = values[:i] + values[i + 1 :]
-        return Max.create(wrapped_max(f, *remaining, **kwargs), node)
+        return Max(
+            former=wrapped_max(f, *remaining, **kwargs),
+            latter=node,
+            ctx=node.ctx,
+            proxied=get_proxied_type(node),
+        )
 
     return f(*args, **kwargs)
 
@@ -114,13 +122,26 @@ class OperatorProxyDescriptor:
 
 @dataclass(kw_only=True)
 class OperatorProxy:
-    proxied: Any = None
+    proxied: Any = field(default=None, repr=False)
     proxied_attributes: ClassVar[list[str]] = []
 
     def __init_subclass__(cls) -> None:
         for operator in cls.proxied_attributes:
             setattr(cls, operator, OperatorProxyDescriptor("proxied", operator))
 
+
+def unwrap_proxy(obj: Any) -> Any:
+    if not isinstance(obj, OperatorProxy):
+        return obj
+    return unwrap_proxy(obj.proxied)
+
+def get_proxied_type(obj: Any) -> type:
+    unwrapped = unwrap_proxy(obj)
+
+    if isinstance(unwrapped, type):
+        return unwrapped
+
+    return type(unwrapped) 
 
 
 class ResultType(Enum):
@@ -169,7 +190,7 @@ class Operation(ExpressionNode, OperatorProxy):
 
     def _create_temporary(self):
         if self.result == ResultType.data:
-            type, target, path = self.expr.temp_data()
+            type, target, path, _ = self.expr.temp_data()
             return IrData(type=type, target=target, path=path, temp=True)
 
         holder, obj = self.expr.temp_score()
@@ -184,7 +205,8 @@ class UnaryOperation(Operation):
         return IrUnary(op=self.op, target=target)
 
     def unroll(self) -> tuple[Iterable[IrOperation], IrSource]:
-        target_nodes, target_value = self.target.unroll()
+        target = convert_node(self.target, self.ctx)
+        target_nodes, target_value = target.unroll()
 
         if not isinstance(target_value, IrSource):
             raise ValueError("Left operand must be a source node.")
@@ -206,11 +228,29 @@ class UnaryOperation(Operation):
 
 UnaryOp = TypeVar("UnaryOp", bound=UnaryOperation)
 
-UnaryOpFunction = Callable[[ExpressionNode], UnaryOp]
 
-def unary_operator(cls: Type[UnaryOp]) -> UnaryOpFunction[UnaryOp]:
+UnaryOpFunction = Callable[[ExpressionNode], T]
+
+@overload
+def unary_operator(
+    cls: Type[UnaryOp],
+) -> UnaryOpFunction[UnaryOp]:
+    ...
+
+@overload
+def unary_operator(
+    cls: Type[UnaryOp],
+    result: Callable[[UnaryOp], T],
+) -> UnaryOpFunction[T]:
+    ...
+
+def unary_operator(
+    cls: Type[UnaryOp],
+    result: Callable[[UnaryOp], T] | None = None,
+) -> UnaryOpFunction[UnaryOp | T | None]:
     def decorator(target: ExpressionNode):
-        return cls(target=target, ctx=target.ctx, proxied=type(target))
+        obj = cls(target=target, ctx=target.ctx, proxied=get_proxied_type(target))
+        return result(obj) if result else obj
 
     return decorator
 
@@ -224,17 +264,15 @@ class BinaryOperation(Operation):
         return IrBinary(op=self.op, left=left, right=right)
 
     def unroll(self) -> tuple[Iterable[IrOperation], IrSource]:
+        former = convert_node(self.former, self.ctx)
         latter = convert_node(self.latter, self.ctx)
 
-        former_nodes, former_value = self.former.unroll()
+        former_nodes, former_value = former.unroll()
         latter_nodes, latter_value = latter.unroll()
-
-        if not isinstance(former_value, IrSource):
-            raise ValueError("Left operand must be a source node.")
 
         operations: list[IrOperation] = [*former_nodes, *latter_nodes]
 
-        if self.in_place:
+        if self.in_place and isinstance(former_value, IrSource):
             temp_var = former_value
         else:
             temp_var = self._create_temporary()
@@ -248,12 +286,12 @@ class BinaryOperation(Operation):
 
 BinOp = TypeVar("BinOp", bound=BinaryOperation)
 
-BinaryOpFunction = Callable[[ExpressionNode, Any], BinOp | None]
+BinaryOpFunction = Callable[[ExpressionNode, Any], T]
 
-SanitizedBinaryOpFunction = Callable[[ExpressionNode, ExpressionNode], BinOp | None]
+SanitizedBinaryOpFunction = Callable[[ExpressionNode, ExpressionNode], T]
 
 
-def sanitized(f: SanitizedBinaryOpFunction[BinOp]) -> BinaryOpFunction[BinOp]:
+def sanitized(f: SanitizedBinaryOpFunction[T]) -> BinaryOpFunction[T]:
     def decorated(node: ExpressionNode, value: Any):        
         return f(node, convert_node(value, node.ctx))
 
@@ -261,43 +299,56 @@ def sanitized(f: SanitizedBinaryOpFunction[BinOp]) -> BinaryOpFunction[BinOp]:
 
 
 @overload
-def binary_operator(cls: Type[BinOp], *, immediate: bool = False) -> BinaryOpFunction[BinOp]:
+def binary_operator(
+    cls: Type[BinOp],
+    *,
+    result: None = None,
+) -> BinaryOpFunction[BinOp]:
     ...
 
 @overload
 def binary_operator(
-    cls: Type[BinOp], *, reverse: t.Literal[True], immediate: bool = False
+    cls: Type[BinOp],
+    *,
+    result: Callable[[BinOp], T],
+) -> BinaryOpFunction[T]:
+    ...
+
+@overload
+def binary_operator(
+    cls: Type[BinOp],
+    *,
+    reverse: t.Literal[True],
 ) -> tuple[BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]]:
+    ...
+
+@overload
+def binary_operator(
+    cls: Type[BinOp],
+    *,
+    reverse: t.Literal[True],
+    result: Callable[[BinOp], T],
+) -> tuple[BinaryOpFunction[T], BinaryOpFunction[T]]:
     ...
 
 def binary_operator(
     cls: Type[BinOp],
     *,
     reverse: bool = False,
-    immediate: bool = False,
-) -> BinaryOpFunction[BinOp] | tuple[BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]]:
+    result: Callable[[BinOp], T] | None = None
+) -> BinaryOpFunction[T | BinOp] | tuple[BinaryOpFunction[T | BinOp], BinaryOpFunction[T | BinOp]]:
     @sanitized
-    def decorator(left: ExpressionNode, right: ExpressionNode):
-        obj = cls(former=left, latter=right, ctx=left.ctx, proxied=type(left))
-
-        if immediate:
-            left.expr.resolve(obj)
-            return
-            
-        return obj
+    def decorator(left: ExpressionNode, right: ExpressionNode) -> T | BinOp:
+        obj = cls(former=left, latter=right, ctx=left.ctx, proxied=get_proxied_type(left))
+        return result(obj) if result else obj
 
     if not reverse:
         return decorator
 
     @sanitized
-    def reversed(right: ExpressionNode, left: ExpressionNode):
-        obj = cls(former=left, latter=right, ctx=right.ctx, proxied=type(right))
-
-        if immediate:
-            left.expr.resolve(obj)
-            return
-
-        return obj
+    def reversed(right: ExpressionNode, left: ExpressionNode) -> T | BinOp:
+        obj = cls(former=left, latter=right, ctx=right.ctx, proxied=get_proxied_type(right))
+        return result(obj) if result else obj
 
     return (decorator, reversed)
 

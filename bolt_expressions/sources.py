@@ -1,13 +1,11 @@
 from dataclasses import dataclass, field, replace
-from functools import cache
-from itertools import count
-from typing import Any, Callable, ClassVar, Union
+from typing import Any, ClassVar, Union
 
 from nbtlib import Compound, Path # type: ignore
 
 from .optimizer import IrData, IrScore, DataTargetType
 from .literals import Literal, convert_tag
-from .node import Expression, ExpressionNode
+from .node import ExpressionNode
 from .operations import Add, Append, Divide, Enable, InPlaceMerge, Insert, Merge, Modulus, Multiply, Prepend, Remove, Reset, Set, Subtract, binary_operator
 
 # from rich.pretty import pprint
