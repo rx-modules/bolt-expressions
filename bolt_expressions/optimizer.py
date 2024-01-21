@@ -13,22 +13,20 @@ from typing import (
     TypeGuard,
     TypeVar,
     Union,
+    Concatenate,
+    ParamSpec,
 )
 from mecha import AbstractNode
 
 from nbtlib import (
-    Byte,
-    Short,
     Int,
     Double,
     Float,
-    String,
-    List,
-    Array,
-    Compound,
     Numeric,
     Path,
 )  # type:ignore
+
+from .typing import NbtType, NbtValue
 
 
 __all__ = [
@@ -82,7 +80,6 @@ class IrScore(IrSource):
 
 
 DataTargetType = Literal["storage", "entity", "block"]
-NbtType = Byte | Short | Int | Float | Double | String | List | Array | Compound
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -90,13 +87,13 @@ class IrData(IrSource):
     type: DataTargetType
     target: str
     path: Path
-    nbt_type: Any = None
+    nbt_type: NbtType = Any
     scale: float | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class IrLiteral(IrNode):
-    value: NbtType
+    value: NbtValue
 
 
 StoreValue = tuple[Literal["result", "success"], IrSource]
@@ -194,26 +191,27 @@ class SmartGenerator(Generator[T, None, None]):
         ...
 
 
-Rule = Callable[[Iterable[T]], Iterable[T]]
+P = ParamSpec("P")
+Rule = Callable[Concatenate[Iterable[T], P], Iterable[T]]
 
-SmartRule = Callable[[SmartGenerator[T]], Iterable[T]]
+SmartRule = Callable[Concatenate[SmartGenerator[T], P], Iterable[T]]
 
 
-def use_smart_generator(func: SmartRule[T]) -> Rule[T]:
+def use_smart_generator(func: SmartRule[T, P]) -> Rule[T, P]:
     """
     Provides a `SmartGenerator` object as first argument to the decorated rule.
     Returned function still takes an `Iterable` object.
     """
 
-    def rule(arg: Iterable[T]) -> Iterable[T]:
-        return func(SmartGenerator(arg))
+    def rule(arg: Iterable[T], *args: P.args, **kwargs: P.kwargs) -> Iterable[T]:
+        return func(SmartGenerator(arg), *args, **kwargs)
 
     return rule
 
 
-def smart_generator(func: Rule[T]) -> Callable[[Iterable[T]], SmartGenerator[T]]:
-    def rule(arg: Iterable[T]):
-        return SmartGenerator(func(arg))
+def smart_generator(func: Rule[T, P]) -> Callable[[Iterable[T]], SmartGenerator[T]]:
+    def rule(arg: Iterable[T], *args: P.args, **kwargs: P.kwargs):
+        return SmartGenerator(func(arg, *args, **kwargs))
 
     return rule
 
@@ -226,7 +224,7 @@ class DataTuple(NamedTuple):
     type: DataTargetType
     target: str
     path: Path
-    nbt_type: Any = None
+    nbt_type: NbtType = Any
 
 
 class TempScoreProvider(Protocol):
@@ -255,10 +253,11 @@ class Optimizer:
 
     temp_score: TempScoreProvider
     const_score: ConstScoreProvider
+    default_floating_nbt_type: str
 
-    rules: list[Rule[IrOperation]] = field(default_factory=list)
+    rules: list[Rule[IrOperation, []]] = field(default_factory=list)
 
-    def add_rules(self, *funcs: Rule[IrOperation], index: int | None = None):
+    def add_rules(self, *funcs: Rule[IrOperation, []], index: int | None = None):
         """Registers new rules, also converts the decorated generator into a `SmartGenerator`"""
 
         if index is None:
@@ -396,7 +395,7 @@ def commutative_set_collapsing(
 
 
 @use_smart_generator
-def data_set_scaling(nodes: SmartGenerator[IrOperation]):
+def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer):
     """
     Turns a multiplication/division of a temp score followed by a
     data set operation into a single set operation with a scale argument.
@@ -451,7 +450,9 @@ def data_set_scaling(nodes: SmartGenerator[IrOperation]):
 
             if is_binary(node, "div"):
                 scale = 1 / scale
-                number_type = number_type or "double"
+
+                if number_type is Any:
+                    number_type = opt.default_floating_nbt_type
 
             new_source = replace(source, scale=scale, nbt_type=number_type)
             out = IrBinary(op="set", left=new_source, right=node.left)

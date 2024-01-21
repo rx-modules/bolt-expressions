@@ -6,7 +6,7 @@ from nbtlib import Path # type: ignore
 from beet import Context
 
 from .ast import ConstantScoreChecker, ObjectiveChecker
-from .literals import literal_types
+from .typing import literal_types
 from .node import Expression, ExpressionNode
 from .operations import (
     Operation,

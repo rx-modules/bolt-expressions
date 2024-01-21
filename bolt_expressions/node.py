@@ -7,8 +7,7 @@ from beet import Context, Function
 from bolt import Runtime
 from mecha import Mecha
 from pydantic import BaseModel
-from nbtlib import Path # type: ignore
-
+from nbtlib import Path
 
 from .optimizer import (
     DataTuple,
@@ -17,7 +16,7 @@ from .optimizer import (
     IrOperation,
     IrScore,
     IrSource,
-    NbtType,
+    NbtValue,
     Optimizer,
     ScoreTuple,
     add_subtract_by_zero_removal,
@@ -35,6 +34,7 @@ from .optimizer import (
     set_to_self_removal,
 )
 from .serializer import IrSerializer
+from .typing import NbtTypeString
 from .utils import identifier_generator
 
 from rich.pretty import pprint
@@ -57,6 +57,8 @@ class ExpressionOptions(BaseModel):
     temp_storage: str = "bolt.expr:temp"
     init_path: str = "init_expressions"
     objective_prefix: str = ""
+    default_nbt_type: NbtTypeString = "int"
+    default_floating_nbt_type: str = "double"
 
     disable_commands: bool = False
 
@@ -115,7 +117,7 @@ class ExpressionNode(ABC):
         ...
 
 
-ResolveResult = ScoreTuple | DataTuple | NbtType | None
+ResolveResult = ScoreTuple | DataTuple | NbtValue | None
 
 @dataclass
 class Expression:
@@ -140,12 +142,13 @@ class Expression:
         self.optimizer = Optimizer(
             temp_score=self.temp_score,
             const_score=self.const_score,
+            default_floating_nbt_type=self.opts.default_floating_nbt_type,
         )
         self.optimizer.add_rules(
             data_insert_score,
             partial(convert_data_arithmetic, self.optimizer),
             # features
-            data_set_scaling,
+            partial(data_set_scaling, opt=self.optimizer),
             data_get_scaling,
             multiply_divide_by_fraction,
             # optimize
@@ -160,7 +163,7 @@ class Expression:
             partial(literal_to_constant_replacement, self.optimizer),
         )
 
-        self.serializer = IrSerializer()
+        self.serializer = IrSerializer(default_nbt_type=self.opts.default_nbt_type)
 
         self.identifiers = identifier_generator(self.ctx)
     
@@ -186,7 +189,7 @@ class Expression:
         pprint(node)
 
         unrolled_nodes, output = node.unroll()
-        pprint(unrolled_nodes)
+        # pprint(unrolled_nodes)
 
         optimized_nodes = list(self.optimizer(unrolled_nodes))
         pprint(optimized_nodes)

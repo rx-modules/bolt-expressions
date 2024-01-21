@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field, replace
-from typing import Any, ClassVar, Union
+from typing import Any, Union
 
 from nbtlib import Compound, Path # type: ignore
 
 from .optimizer import IrData, IrScore, DataTargetType
-from .literals import Literal, convert_tag
+from .literals import Literal
 from .node import ExpressionNode
 from .operations import Add, Append, Divide, Enable, InPlaceMerge, Insert, Merge, Modulus, Multiply, Prepend, Remove, Reset, Set, Subtract, binary_operator
+from .typing import NbtType, convert_type, convert_tag, is_type, literal_types
 
 # from rich.pretty import pprint
 
@@ -84,15 +85,17 @@ def parse_compound(value: Union[str, dict, Path, Compound]):
 
 @dataclass(unsafe_hash=True, order=False)
 class DataSource(Source):
-    _default_nbt_type: ClassVar[str] = "int"
-    _default_floating_point_type: ClassVar[str] = "double"
     _type: DataTargetType
     _target: str
     _path: Path = field(default_factory=Path)
     _scale: float = 1
-    _nbt_type: str = None
+    writetype: NbtType = Any
 
     _constructed: bool = field(hash=False, default=False, init=False)
+
+    @property
+    def readtype(self) -> NbtType:
+        return self.writetype
 
     __rebind__ = rebind
     __add__, __radd__ = binary_operator(Add, reverse=True)
@@ -128,7 +131,7 @@ class DataSource(Source):
             type=self._type,
             target=self._target,
             path=self._path,
-            nbt_type=self._nbt_type,
+            nbt_type=self.writetype,
             scale=self._scale,
         )
         return (), node
@@ -143,10 +146,16 @@ class DataSource(Source):
         child = self.__getitem__(key)
         child.__rebind__(value)
 
-    def __getitem__(self, key: Union[str, int, Path, Compound]) -> "DataSource":
+    def __getitem__(
+        self, key: Union[slice, str, dict[str, Any], int, type, Path]
+    ) -> "DataSource":
         if key is SOLO_COLON:
             # self[:]
             return self.all()
+        
+        if is_type(key):
+            return replace(self, writetype=convert_type(key))
+
         if (
             isinstance(key, dict)
             or isinstance(key, str)
@@ -162,21 +171,23 @@ class DataSource(Source):
 
     def __call__(
         self,
-        matching: Union[str, Path, Compound] = None,
-        scale: float = None,
-        type: str = None,
+        matching: str | Path | Compound | None = None,
+        scale: float | None = None,
+        type: str | None = None,
     ) -> "DataSource":
         """Create a new DataSource with modified properties."""
         if matching is not None:
             path = self._path[parse_compound(matching)]
         else:
             path = self._path
+        
+        writetype = literal_types[type] if type else self.writetype
 
         return replace(
             self,
             _path=path,
             _scale=scale if scale is not None else self._scale,
-            _nbt_type=type if type is not None else self._nbt_type,
+            writetype=writetype,
         )
 
     def __str__(self):
@@ -184,9 +195,6 @@ class DataSource(Source):
 
     def __repr__(self):
         return f'"{str(self)}"'
-
-    def get_type(self):
-        return self._nbt_type if self._nbt_type else self._default_nbt_type
 
     def all(self) -> "DataSource":
         path = self._path + "[]"

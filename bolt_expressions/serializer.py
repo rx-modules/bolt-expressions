@@ -1,6 +1,9 @@
+from dataclasses import dataclass
 from typing import Any, Generator, Iterable
 from mecha import Visitor, rule
+from nbtlib import Byte, Short, Int, Long, Float, Double # type: ignore
 
+from .typing import NBT_TYPE_STRING, NbtTypeString
 from .utils import type_name
 
 from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrNode, IrScore, IrUnary
@@ -12,7 +15,10 @@ class InvalidOperand(Exception):
         super().__init__(f"Invalid operand(s) for '{op}' operation: {fmt}.")
 
 
+@dataclass(kw_only=True)
 class IrSerializer(Visitor):
+    default_nbt_type: NbtTypeString
+    
     def __call__(self, nodes: Iterable[IrNode]) -> list[str]:  # type: ignore
         result: list[str] = []
 
@@ -208,12 +214,43 @@ class IrSerializer(Visitor):
         if right_scale is not None and right_scale != 1:
             return True
 
-        return op.left.nbt_type is not None
+        if op.left.nbt_type is Any:
+            return False
+        
+        return op.left.nbt_type != op.right.nbt_type
+    
+    def serialize_nbt_type(self, value: Any) -> NbtTypeString | None:
+        if isinstance(value, str):
+            return value if value in NBT_TYPE_STRING else None
+        
+        if not isinstance(value, type):
+            return None
+        
+        if issubclass(value, Byte):
+            return "byte"
+        if issubclass(value, Short):
+            return "short"
+        if issubclass(value, Int):
+            return "int"
+        if issubclass(value, Long):
+            return "long"
+        if issubclass(value, Float):
+            return "float"
+        if issubclass(value, Double):
+            return "double"
+        
+        return None
 
     def serialize_cast(self, data: IrData) -> tuple[str, str]:
-        cast_type = data.nbt_type if data.nbt_type is not None else "double"
+        cast_type = data.nbt_type
         scale = data.scale if data.scale is not None else 1
 
+        if not isinstance(cast_type, str):
+            cast_type = self.serialize_nbt_type(cast_type)
+        
+        if cast_type is None:
+            cast_type = self.default_nbt_type
+        
         return (cast_type, str(scale))
 
     @rule(IrBinary, op="set")
