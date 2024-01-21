@@ -8,6 +8,10 @@ from .utils import type_name
 
 from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrNode, IrScore, IrUnary
 
+__all__ = [
+    "InvalidOperand",
+    "IrSerializer",
+]
 
 class InvalidOperand(Exception):
     def __init__(self, op: str, *operands: Any):

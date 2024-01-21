@@ -4,6 +4,7 @@ from beet import Context
 from bolt import Runtime
 
 __all__ = [
+    "type_name",
     "identifier_generator",
 ]
 
