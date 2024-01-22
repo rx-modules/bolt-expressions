@@ -6,7 +6,7 @@ from nbtlib import Byte, Short, Int, Long, Float, Double # type: ignore
 from .typing import NBT_TYPE_STRING, NbtTypeString
 from .utils import type_name
 
-from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrNode, IrScore, IrUnary
+from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrNode, IrScore, IrUnary, is_cast_op
 
 __all__ = [
     "InvalidOperand",
@@ -203,25 +203,6 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, t)
 
         result.append(cmd)
-
-    def should_cast_data(self, op: IrBinary) -> bool:
-        if not isinstance(op.left, IrData):
-            return False
-        if not isinstance(op.right, IrData):
-            return False
-        
-        left_scale = op.left.scale
-        if left_scale is not None and left_scale != 1:
-            return True
-
-        right_scale = op.right.scale
-        if right_scale is not None and right_scale != 1:
-            return True
-
-        if op.left.nbt_type is Any:
-            return False
-        
-        return op.left.nbt_type != op.right.nbt_type
     
     def serialize_nbt_type(self, value: Any) -> NbtTypeString | None:
         if isinstance(value, str):
@@ -269,9 +250,9 @@ class IrSerializer(Visitor):
                 cmd = f"scoreboard players operation {left} = {right}"
             case IrData(), IrLiteral():
                 cmd = f"data modify {left} set value {right}"
-            case IrData(), IrData() if not self.should_cast_data(node):
+            case IrData(), IrData() if not is_cast_op(node):
                 cmd = f"data modify {left} set from {right}"
-            case IrData() as l, IrData() as r if self.should_cast_data(node):
+            case IrData() as l, IrData() as r if is_cast_op(node):
                 nbt_type, scale = self.serialize_cast(l)
                 _, right_scale = self.serialize_cast(r)
                 cmd = f"execute store result {left} {nbt_type} {scale} run data get {right} {right_scale}"

@@ -41,7 +41,7 @@ __all__ = [
     "data_set_scaling",
     "data_get_scaling",
     "multiply_divide_by_fraction",
-    "output_score_replacement",
+    "apply_temp_source_reuse",
     "multiply_divide_by_one_removal",
     "add_subtract_by_zero_removal",
     "set_to_self_removal",
@@ -141,6 +141,29 @@ def is_unary(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrUna
 
 def is_binary(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrBinary]:
     return is_op(obj, op) and isinstance(obj, IrBinary)
+
+
+def is_cast_op(node: IrBinary) -> bool:
+    if node.op != "set":
+        return False
+
+    if not isinstance(node.left, IrData):
+        return False
+    if not isinstance(node.right, IrData):
+        return False
+    
+    left_scale = node.left.scale
+    if left_scale is not None and left_scale != 1:
+        return True
+
+    right_scale = node.right.scale
+    if right_scale is not None and right_scale != 1:
+        return True
+
+    if node.left.nbt_type is Any:
+        return False
+    
+    return node.left.nbt_type != node.right.nbt_type
 
 
 SCORE_OPERATIONS = ("set", "add", "sub", "mul", "div", "mod", "min", "max")
@@ -468,7 +491,7 @@ def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer):
 
 
 @use_smart_generator
-def data_get_scaling(nodes: SmartGenerator[IrOperation]):
+def data_get_scaling(nodes: SmartGenerator[IrOperation]) -> Iterable[IrOperation]:
     """
     ````
     execute store result score $i0 temp run data get storage demo value 1
@@ -528,55 +551,70 @@ def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
             yield node
 
 
-def output_score_replacement(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
-    """Replace the outermost temp score by the output score.
-    If expression tree uses the output score, this rule won't be applied.
-    """
+def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
+    map: dict[IrSource, list[int]] = {}
+
+    def add(source: IrSource, i: int):
+        indexes = map.setdefault(source, [])
+        indexes.append(i)
+
+    for i, node in enumerate(nodes):
+        for _, source in node.store:
+            add(source, i)
+
+        if is_binary(node):
+            add(node.left, i)
+            
+            if isinstance(node.right, IrSource):
+                add(node.right, i)
+
+        if is_unary(node):
+            add(node.target, i)
+    
+    return map
+
+
+def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     all_nodes = list(nodes)
 
-    if all_nodes:
-        # print("[bold]Applying output score replacement on tree:[/bold]")
-        # pprint(all_nodes)
-        last_node = all_nodes[-1]
+    usage_map = get_source_usage(all_nodes)
+    # print(usage_map)
 
-        if not is_binary(last_node, "set"):
-            yield from all_nodes
-            return
+    replace_map: dict[IrSource, IrSource] = {}
 
-        target_var = last_node.right
-        output_var = last_node.left
-        can_replace = False
-        # print(f"Last node is {last_node}")
-        if isinstance(output_var, IrScore) and len(all_nodes) > 1:
-            for node in all_nodes[1:]:  # Ignore the first Set operation
-                # print(f"Is {node.right} equal to {output_var}? {node.right == output_var}")
-                if not is_binary(node):
-                    continue
+    def replace_source(source: IrSource) -> IrSource:
+        if replaced := replace_map.get(source):
+            return replace_source(replaced)
+        
+        return source
 
-                if node.right == output_var:
-                    break
-            else:
-                can_replace = True
-        # print(f"Can replace output score? {can_replace}")
-        def replace_source(source: IrSource | IrLiteral):
-            if source == target_var:
-                return output_var
-            return source
+    for i, node in enumerate(all_nodes):
+        if (
+            is_binary(node, "set")
+            and isinstance(node.right, IrSource)
+            and node.right.temp
+            and type(node.left) is type(node.right)
+            and not is_cast_op(node)
+        ):
+            left_usage = usage_map[node.left]
+            right_usage = usage_map[node.right]
 
-        if can_replace:
-            for node in all_nodes:
-                if is_binary(node):
-                    yield replace(
-                        node,
-                        left=replace_source(node.left),
-                        right=replace_source(node.right),
-                    )
-                elif is_unary(node):
-                    yield replace(node, target=replace_source(node.target))
-                else:
-                    yield node
+            if left_usage[0] == right_usage[-1] == i:
+                replace_map[node.right] = node.left
+    
+    for node in all_nodes:
+        store = tuple((type, replace_source(source)) for type, source in node.store)
+
+        if is_unary(node):
+            yield replace(node, store=store, target=replace_source(node.target))
+        elif is_binary(node):
+            yield replace(
+                node, store=store,
+                left=replace_source(node.left),
+                right=replace_source(node.right) if isinstance(node.right, IrSource) else node.right
+            )
         else:
-            yield from all_nodes
+            yield node
 
 
 def multiply_divide_by_one_removal(nodes: Iterable[IrOperation]):

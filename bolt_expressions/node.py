@@ -29,7 +29,7 @@ from .optimizer import (
     multiply_divide_by_fraction,
     multiply_divide_by_one_removal,
     noncommutative_set_collapsing,
-    output_score_replacement,
+    apply_temp_source_reuse,
     set_and_get_cleanup,
     set_to_self_removal,
 )
@@ -154,7 +154,7 @@ class Expression:
             # optimize
             noncommutative_set_collapsing,
             commutative_set_collapsing,
-            output_score_replacement,
+            apply_temp_source_reuse,
             # cleanup
             multiply_divide_by_one_removal,
             add_subtract_by_zero_removal,
