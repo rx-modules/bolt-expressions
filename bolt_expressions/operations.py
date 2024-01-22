@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 from typing import Any, Callable, ClassVar, Iterable, Type, TypeVar, Union, overload
 import typing as t
@@ -10,6 +10,7 @@ from .optimizer import (
     IrData,
     IrInsert,
     IrLiteral,
+    IrNode,
     IrOperation,
     IrScore,
     IrSource,
@@ -151,6 +152,7 @@ class ResultType(Enum):
 @dataclass(unsafe_hash=False, order=False, kw_only=True)
 class Operation(ExpressionNode, OperatorProxy):
     in_place: ClassVar[bool] = False
+    commutative: ClassVar[bool] = False
     op: ClassVar[str] = ""
     result: ClassVar[ResultType] = ResultType.score
 
@@ -255,6 +257,18 @@ def unary_operator(
     return decorator
 
 
+def balance_priority(node: IrNode) -> int:
+    if isinstance(node, IrSource) and node.temp:
+        return 3
+
+    if isinstance(node, IrData):
+        return 2
+
+    if isinstance(node, IrScore):
+        return 1
+
+    return 0
+
 @dataclass(unsafe_hash=False, order=False)
 class BinaryOperation(Operation):
     former: ExpressionNode
@@ -269,6 +283,14 @@ class BinaryOperation(Operation):
 
         former_nodes, former_value = former.unroll()
         latter_nodes, latter_value = latter.unroll()
+
+        if self.commutative:
+            former_priority = balance_priority(former_value)
+            latter_priority = balance_priority(latter_value)
+            
+            if former_priority < latter_priority:
+                node = replace(self, former=latter, latter=former)
+                return node.unroll()
 
         operations: list[IrOperation] = [*former_nodes, *latter_nodes]
 
@@ -405,6 +427,7 @@ class Reset(UnaryOperation):
 
 class Add(BinaryOperation):
     op: ClassVar[str] = "add"
+    commutative: ClassVar[bool] = True
 
 
 class Subtract(BinaryOperation):
@@ -413,6 +436,7 @@ class Subtract(BinaryOperation):
 
 class Multiply(BinaryOperation):
     op: ClassVar[str] = "mul"
+    commutative: ClassVar[bool] = True
 
 
 class Divide(BinaryOperation):
@@ -425,8 +449,10 @@ class Modulus(BinaryOperation):
 
 class Min(BinaryOperation):
     op: ClassVar[str] = "min"
+    commutative: ClassVar[bool] = True
 
 
 class Max(BinaryOperation):
     op: ClassVar[str] = "max"
+    commutative: ClassVar[bool] = True
 
