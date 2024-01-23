@@ -30,7 +30,7 @@ class ExtendedDataSource(DataSource):
         self += 1
 
 
-storage = ExtendedDataSource("storage", example:main, _inverted=True)
+storage = ExtendedDataSource("storage", example:main, _inverted=True, ctx=ctx)
 
 storage.b.index[0].named["! 3  - b#2a"].a({x:1}).b[{y:2}].c[] = 3
 

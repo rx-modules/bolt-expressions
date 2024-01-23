@@ -22,19 +22,19 @@ data modify storage demo:temp inventory prepend value 1
 data modify storage demo:temp inventory prepend value 0
 execute store result storage demo:temp inventory[0] int 1 run scoreboard players get #val abc.main
 data modify storage demo:temp inventory prepend from storage demo:temp item
-execute store result score $i1 bolt.expr.temp run data get storage demo:temp item 1
-scoreboard players operation $i1 bolt.expr.temp += #val abc.main
+execute store result score $i0 bolt.expr.temp run data get storage demo:temp item 1
+scoreboard players operation $i0 bolt.expr.temp += #val abc.main
 data modify storage demo:temp inventory prepend value 0
-execute store result storage demo:temp inventory[0] int 1 run scoreboard players get $i1 bolt.expr.temp
+execute store result storage demo:temp inventory[0] int 1 run scoreboard players get $i0 bolt.expr.temp
 say -----
 data modify storage demo:temp inventory insert 2 value 1
 data modify storage demo:temp inventory insert 1 value 0
 execute store result storage demo:temp inventory[1] int 1 run scoreboard players get #val abc.main
 data modify storage demo:temp inventory insert 3 from storage demo:temp item
-execute store result score $i2 bolt.expr.temp run data get storage demo:temp item 1
-scoreboard players operation $i2 bolt.expr.temp += #val abc.main
+execute store result score $i0 bolt.expr.temp run data get storage demo:temp item 1
+scoreboard players operation $i0 bolt.expr.temp += #val abc.main
 data modify storage demo:temp inventory insert 5 value 0
-execute store result storage demo:temp inventory[5] int 1 run scoreboard players get $i2 bolt.expr.temp
+execute store result storage demo:temp inventory[5] int 1 run scoreboard players get $i0 bolt.expr.temp
 say -----
 data modify storage demo:temp inventory merge value {}
 data modify storage demo:temp item merge from storage demo:temp other
