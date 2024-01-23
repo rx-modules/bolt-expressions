@@ -149,7 +149,7 @@ def is_cast_op(node: IrBinary) -> bool:
         return False
     if not isinstance(node.right, IrData):
         return False
-    
+
     left_scale = node.left.scale
     if left_scale is not None and left_scale != 1:
         return True
@@ -160,7 +160,7 @@ def is_cast_op(node: IrBinary) -> bool:
 
     if node.left.nbt_type is Any:
         return False
-    
+
     return node.left.nbt_type != node.right.nbt_type
 
 
@@ -240,6 +240,7 @@ def smart_generator(func: Rule[T, P]) -> Callable[[Iterable[T]], SmartGenerator[
 class ScoreTuple(NamedTuple):
     holder: str
     obj: str
+
 
 class DataTuple(NamedTuple):
     type: DataTargetType
@@ -585,13 +586,13 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
 
         if is_binary(node):
             add(node.left, i)
-            
+
             if isinstance(node.right, IrSource):
                 add(node.right, i)
 
         if is_unary(node):
             add(node.target, i)
-    
+
     return map
 
 
@@ -606,7 +607,7 @@ def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperatio
     def replace_source(source: IrSource) -> IrSource:
         if replaced := replace_map.get(source):
             return replace_source(replaced)
-        
+
         return source
 
     for i, node in enumerate(all_nodes):
@@ -622,7 +623,7 @@ def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperatio
 
             if left_usage[0] == right_usage[-1] == i:
                 replace_map[node.right] = node.left
-    
+
     for node in all_nodes:
         store = tuple((type, replace_source(source)) for type, source in node.store)
 
@@ -630,9 +631,12 @@ def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperatio
             yield replace(node, store=store, target=replace_source(node.target))
         elif is_binary(node):
             yield replace(
-                node, store=store,
+                node,
+                store=store,
                 left=replace_source(node.left),
-                right=replace_source(node.right) if isinstance(node.right, IrSource) else node.right
+                right=replace_source(node.right)
+                if isinstance(node.right, IrSource)
+                else node.right,
             )
         else:
             yield node
@@ -732,7 +736,7 @@ def rename_temp_scores(
     def replace_source(node: IrNode) -> IrNode:
         if not isinstance(node, IrSource):
             return node
-        
+
         if not node.temp:
             return node
 
@@ -741,7 +745,7 @@ def rename_temp_scores(
                 source_map[node] = opt.generate_score()
             else:
                 source_map[node] = node
-        
+
         return source_map[node]
 
     for node in nodes:
@@ -754,6 +758,11 @@ def rename_temp_scores(
         if is_unary(node):
             yield replace(node, target=replace_source(node.target), store=store)
         elif is_binary(node):
-            yield replace(node, left=replace_source(node.left), right=replace_source(node.right), store=store)
+            yield replace(
+                node,
+                left=replace_source(node.left),
+                right=replace_source(node.right),
+                store=store,
+            )
         else:
             yield replace(node, store=store)

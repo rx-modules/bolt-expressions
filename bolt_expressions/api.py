@@ -48,11 +48,10 @@ class Scoreboard:
             self.expr = ctx
 
         opts = self.expr.opts
-        
+
         self.constants = set()
         self.objectives = {opts.const_objective, opts.temp_objective}
         self.added_objectives = set()
-
 
     def add_objective(self, name: str, criteria: str = "dummy"):
         if name not in self.added_objectives:
@@ -72,7 +71,7 @@ class Scoreboard:
             )
 
     def objective(
-        self, name: str, criteria: str | None = None, prefixed: bool=True
+        self, name: str, criteria: str | None = None, prefixed: bool = True
     ) -> "Objective":
         """
         Get an Objective instance and add objective to init function if provided criteria.
@@ -100,16 +99,19 @@ class Objective:
     @overload
     def __getitem__(self, scoreholder: str) -> ScoreSource:
         ...
+
     @overload
     def __getitem__(self, scoreholder: tuple[str, ...]) -> tuple[ScoreSource, ...]:
         ...
-    def __getitem__(self, scoreholder: str | tuple[str, ...]) -> ScoreSource | tuple[ScoreSource, ...]:
+
+    def __getitem__(
+        self, scoreholder: str | tuple[str, ...]
+    ) -> ScoreSource | tuple[ScoreSource, ...]:
         if isinstance(scoreholder, str):
             return ScoreSource(scoreholder, self.name, ctx=self.ctx)
 
         return tuple(
-            ScoreSource(holder, self.name, ctx=self.ctx)
-            for holder in scoreholder
+            ScoreSource(holder, self.name, ctx=self.ctx) for holder in scoreholder
         )
 
     def __setitem__(self, scoreholder: str | tuple[str, ...], value: Any):
@@ -157,7 +159,7 @@ class Data:
     def cast(self, value: Any, nbt_type: NbtType | str):
         if isinstance(nbt_type, str):
             nbt_type = literal_types[nbt_type]
-        
+
         source = self.dummy(nbt_type)
         source.__rebind__(value)
 

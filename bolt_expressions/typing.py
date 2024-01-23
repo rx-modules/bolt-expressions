@@ -4,11 +4,7 @@ from typing import Any, Literal, Union, _UnionGenericAlias, get_args  # type: ig
 from nbtlib import Base, Compound, Float, Int, List, String, Byte, Short, Long, Double, Array  # type: ignore
 
 
-__all__ = [
-    "is_type",
-    "convert_type",
-    "literal_types"
-]
+__all__ = ["is_type", "convert_type", "literal_types"]
 
 
 literal_types = {
@@ -28,6 +24,7 @@ NBT_TYPE_STRING = ("byte", "short", "int", "long", "float", "double")
 NbtTypeString = Literal["byte", "short", "int", "long", "float", "double"]
 
 NbtValue = Byte | Short | Int | Float | Double | String | List | Array | Compound
+
 
 def convert_tag(value: Any) -> NbtValue | None:
     match value:

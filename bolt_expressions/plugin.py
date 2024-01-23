@@ -48,12 +48,8 @@ def bolt_expressions(ctx: Context):
     runtime.helpers["get_attribute_handler"] = handler
     runtime.helpers["interpolate_json"] = json_converter
 
-    runtime.expose(
-        "min", partial(wrapped_min, runtime.globals.get("min", min))
-    )
-    runtime.expose(
-        "max", partial(wrapped_max, runtime.globals.get("max", max))
-    )
+    runtime.expose("min", partial(wrapped_min, runtime.globals.get("min", min)))
+    runtime.expose("max", partial(wrapped_max, runtime.globals.get("max", max)))
 
     if not expr.opts.disable_commands:
         ctx.require("bolt_expressions.contrib.commands")
@@ -66,13 +62,15 @@ def bolt_expressions(ctx: Context):
 beet_default = bolt_expressions
 
 
-def module_attribute_handler(ctx: Context, previus_handler: Any, attributes: dict[str, Any]):
+def module_attribute_handler(
+    ctx: Context, previus_handler: Any, attributes: dict[str, Any]
+):
     def handler(obj: Any):
         if obj is bolt_expressions_module:
             return ExtendedAttributeHandler(obj, previus_handler(obj), ctx, attributes)
-        
+
         return previus_handler(obj)
-    
+
     return handler
 
 

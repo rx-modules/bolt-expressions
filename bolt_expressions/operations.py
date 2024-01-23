@@ -50,6 +50,8 @@ __all__ = [
 ]
 
 T = TypeVar("T")
+
+
 def wrapped_min(f: Any, *args: T, **kwargs: Any) -> Union[T, "Min"]:
     values = args
 
@@ -64,7 +66,7 @@ def wrapped_min(f: Any, *args: T, **kwargs: Any) -> Union[T, "Min"]:
     for i, node in enumerate(values):
         if not isinstance(node, ExpressionNode):
             continue
-            
+
         remaining = values[:i] + values[i + 1 :]
         return Min(
             former=wrapped_min(f, *remaining, **kwargs),
@@ -106,7 +108,7 @@ def wrapped_max(f: Any, *args: T, **kwargs: Any) -> Union[T, "Max"]:
 class OperatorProxyDescriptor:
     target_name: str
     operator: str
-    
+
     def __get__(self, obj: Any, objtype: Any = None):
         if obj is None:
             attr = getattr(objtype, self.target_name, None)
@@ -120,6 +122,7 @@ class OperatorProxyDescriptor:
 
         f = getattr(attr_cls, self.operator)
         return f.__get__(obj, objtype)
+
 
 @dataclass(kw_only=True)
 class OperatorProxy:
@@ -136,18 +139,20 @@ def unwrap_proxy(obj: Any) -> Any:
         return obj
     return unwrap_proxy(obj.proxied)
 
+
 def get_proxied_type(obj: Any) -> type:
     unwrapped = unwrap_proxy(obj)
 
     if isinstance(unwrapped, type):
         return unwrapped
 
-    return type(unwrapped) 
+    return type(unwrapped)
 
 
 class ResultType(Enum):
     score = auto()
     data = auto()
+
 
 @dataclass(unsafe_hash=False, order=False, kw_only=True)
 class Operation(ExpressionNode, OperatorProxy):
@@ -233,11 +238,13 @@ UnaryOp = TypeVar("UnaryOp", bound=UnaryOperation)
 
 UnaryOpFunction = Callable[[ExpressionNode], T]
 
+
 @overload
 def unary_operator(
     cls: Type[UnaryOp],
 ) -> UnaryOpFunction[UnaryOp]:
     ...
+
 
 @overload
 def unary_operator(
@@ -245,6 +252,7 @@ def unary_operator(
     result: Callable[[UnaryOp], T],
 ) -> UnaryOpFunction[T]:
     ...
+
 
 def unary_operator(
     cls: Type[UnaryOp],
@@ -269,6 +277,7 @@ def balance_priority(node: IrNode) -> int:
 
     return 0
 
+
 @dataclass(unsafe_hash=False, order=False)
 class BinaryOperation(Operation):
     former: ExpressionNode
@@ -287,7 +296,7 @@ class BinaryOperation(Operation):
         if self.commutative:
             former_priority = balance_priority(former_value)
             latter_priority = balance_priority(latter_value)
-            
+
             if former_priority < latter_priority:
                 node = replace(self, former=latter, latter=former)
                 return node.unroll()
@@ -314,7 +323,7 @@ SanitizedBinaryOpFunction = Callable[[ExpressionNode, ExpressionNode], T]
 
 
 def sanitized(f: SanitizedBinaryOpFunction[T]) -> BinaryOpFunction[T]:
-    def decorated(node: ExpressionNode, value: Any):        
+    def decorated(node: ExpressionNode, value: Any):
         return f(node, convert_node(value, node.ctx))
 
     return decorated
@@ -328,6 +337,7 @@ def binary_operator(
 ) -> BinaryOpFunction[BinOp]:
     ...
 
+
 @overload
 def binary_operator(
     cls: Type[BinOp],
@@ -336,6 +346,7 @@ def binary_operator(
 ) -> BinaryOpFunction[T]:
     ...
 
+
 @overload
 def binary_operator(
     cls: Type[BinOp],
@@ -343,6 +354,7 @@ def binary_operator(
     reverse: t.Literal[True],
 ) -> tuple[BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]]:
     ...
+
 
 @overload
 def binary_operator(
@@ -353,15 +365,20 @@ def binary_operator(
 ) -> tuple[BinaryOpFunction[T], BinaryOpFunction[T]]:
     ...
 
+
 def binary_operator(
     cls: Type[BinOp],
     *,
     reverse: bool = False,
-    result: Callable[[BinOp], T] | None = None
-) -> BinaryOpFunction[T | BinOp] | tuple[BinaryOpFunction[T | BinOp], BinaryOpFunction[T | BinOp]]:
+    result: Callable[[BinOp], T] | None = None,
+) -> BinaryOpFunction[T | BinOp] | tuple[
+    BinaryOpFunction[T | BinOp], BinaryOpFunction[T | BinOp]
+]:
     @sanitized
     def decorator(left: ExpressionNode, right: ExpressionNode) -> T | BinOp:
-        obj = cls(former=left, latter=right, ctx=left.ctx, proxied=get_proxied_type(left))
+        obj = cls(
+            former=left, latter=right, ctx=left.ctx, proxied=get_proxied_type(left)
+        )
         return result(obj) if result else obj
 
     if not reverse:
@@ -369,7 +386,9 @@ def binary_operator(
 
     @sanitized
     def reversed(right: ExpressionNode, left: ExpressionNode) -> T | BinOp:
-        obj = cls(former=left, latter=right, ctx=right.ctx, proxied=get_proxied_type(right))
+        obj = cls(
+            former=left, latter=right, ctx=right.ctx, proxied=get_proxied_type(right)
+        )
         return result(obj) if result else obj
 
     return (decorator, reversed)
@@ -383,6 +402,7 @@ class Remove(UnaryOperation):
 class Merge(BinaryOperation):
     op: ClassVar[str] = "merge"
     result: ClassVar[ResultType] = ResultType.data
+
 
 class InPlaceMerge(BinaryOperation):
     op: ClassVar[str] = "merge"
@@ -455,4 +475,3 @@ class Min(BinaryOperation):
 class Max(BinaryOperation):
     op: ClassVar[str] = "max"
     commutative: ClassVar[bool] = True
-

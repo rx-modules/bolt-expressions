@@ -59,6 +59,7 @@ class ObjectiveChecker(Reducer):
 
         self.callback(value)
 
+
 @dataclass
 class SourceJsonConverter:
     converter: Callable[[Any, AstNode], AstNode]
@@ -66,11 +67,11 @@ class SourceJsonConverter:
     def convert(self, obj: Any) -> Any:
         if isinstance(obj, Source):
             return obj.component()
-            
+
         if isinstance(obj, (list, tuple)):
             list_value = cast(list[Any], obj)
             return [self.convert(value) for value in list_value]
-            
+
         if isinstance(obj, dict):
             dict_value = cast(dict[str, Any], obj)
             return {key: self.convert(value) for key, value in dict_value.items()}

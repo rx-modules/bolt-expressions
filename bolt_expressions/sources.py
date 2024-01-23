@@ -2,12 +2,28 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from typing import Any, Union
 
-from nbtlib import Compound, Path # type: ignore
+from nbtlib import Compound, Path  # type: ignore
 
 from .optimizer import IrData, IrScore, DataTargetType
 from .literals import Literal
 from .node import ExpressionNode
-from .operations import Add, Append, Divide, Enable, InPlaceMerge, Insert, Merge, Modulus, Multiply, Prepend, Remove, Reset, Set, Subtract, binary_operator
+from .operations import (
+    Add,
+    Append,
+    Divide,
+    Enable,
+    InPlaceMerge,
+    Insert,
+    Merge,
+    Modulus,
+    Multiply,
+    Prepend,
+    Remove,
+    Reset,
+    Set,
+    Subtract,
+    binary_operator,
+)
 from .typing import NbtType, convert_type, convert_tag, is_type, literal_types
 
 # from rich.pretty import pprint
@@ -29,7 +45,11 @@ class Source(ExpressionNode, ABC):
 
 
 def rebind(left: ExpressionNode, right: Any):
-    right_node = right if isinstance(right, ExpressionNode) else Literal(value=right, ctx=left.ctx)
+    right_node = (
+        right
+        if isinstance(right, ExpressionNode)
+        else Literal(value=right, ctx=left.ctx)
+    )
     op = Set(former=left, latter=right_node, ctx=left.ctx)
     left.expr.resolve(op)
 
@@ -155,7 +175,7 @@ class DataSource(Source):
         if key is SOLO_COLON:
             # self[:]
             return self.all()
-        
+
         if is_type(key):
             return replace(self, writetype=convert_type(key))
 
@@ -183,7 +203,7 @@ class DataSource(Source):
             path = self._path[parse_compound(matching)]
         else:
             path = self._path
-        
+
         writetype = literal_types[type] if type else self.writetype
 
         return replace(

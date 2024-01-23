@@ -8,7 +8,7 @@ from beet import Context, Function
 from bolt import Runtime
 from mecha import Mecha
 from pydantic import BaseModel
-from nbtlib import Path # type: ignore
+from nbtlib import Path  # type: ignore
 
 from .optimizer import (
     ConstScoreManager,
@@ -81,7 +81,6 @@ class ExpressionNode(ABC):
             self.expr = self.ctx
         else:
             self.expr = self.ctx.inject(Expression)
-        
 
     @abstractmethod
     def unroll(self) -> tuple[Iterable[IrOperation], IrSource | IrLiteral]:
@@ -89,6 +88,7 @@ class ExpressionNode(ABC):
 
 
 ResolveResult = ScoreTuple | DataTuple | NbtValue | None
+
 
 class Expression:
     ctx: Context | None
@@ -162,7 +162,6 @@ class Expression:
 
         self.serializer = IrSerializer(default_nbt_type=self.opts.default_nbt_type)
 
-    
     def temp_data(self) -> DataTuple:
         name = next(self.identifiers)
         return DataTuple("storage", self.opts.temp_storage, Path(name))
@@ -213,9 +212,8 @@ class Expression:
                 result = l.value
             case _:
                 result = None
-        
+
         return result
-            
 
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
@@ -237,6 +235,5 @@ class Expression:
 
         if self.ctx:
             self.ctx.generate(self.opts.init_path, function)
-        
-        return function
 
+        return function

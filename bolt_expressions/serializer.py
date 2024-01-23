@@ -1,17 +1,27 @@
 from dataclasses import dataclass
 from typing import Any, Generator, Iterable
 from mecha import Visitor, rule
-from nbtlib import Byte, Short, Int, Long, Float, Double # type: ignore
+from nbtlib import Byte, Short, Int, Long, Float, Double  # type: ignore
 
 from .typing import NBT_TYPE_STRING, NbtTypeString
 from .utils import type_name
 
-from .optimizer import IrBinary, IrData, IrInsert, IrLiteral, IrNode, IrScore, IrUnary, is_cast_op
+from .optimizer import (
+    IrBinary,
+    IrData,
+    IrInsert,
+    IrLiteral,
+    IrNode,
+    IrScore,
+    IrUnary,
+    is_cast_op,
+)
 
 __all__ = [
     "InvalidOperand",
     "IrSerializer",
 ]
+
 
 class InvalidOperand(Exception):
     def __init__(self, op: str, *operands: Any):
@@ -22,7 +32,7 @@ class InvalidOperand(Exception):
 @dataclass(kw_only=True)
 class IrSerializer(Visitor):
     default_nbt_type: NbtTypeString
-    
+
     def __call__(self, nodes: Iterable[IrNode]) -> list[str]:  # type: ignore
         result: list[str] = []
 
@@ -203,14 +213,14 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, t)
 
         result.append(cmd)
-    
+
     def serialize_nbt_type(self, value: Any) -> NbtTypeString | None:
         if isinstance(value, str):
             return value if value in NBT_TYPE_STRING else None
-        
+
         if not isinstance(value, type):
             return None
-        
+
         if issubclass(value, Byte):
             return "byte"
         if issubclass(value, Short):
@@ -223,7 +233,7 @@ class IrSerializer(Visitor):
             return "float"
         if issubclass(value, Double):
             return "double"
-        
+
         return None
 
     def serialize_cast(self, data: IrData) -> tuple[str, str]:
@@ -232,10 +242,10 @@ class IrSerializer(Visitor):
 
         if not isinstance(cast_type, str):
             cast_type = self.serialize_nbt_type(cast_type)
-        
+
         if cast_type is None:
             cast_type = self.default_nbt_type
-        
+
         return (cast_type, str(scale))
 
     @rule(IrBinary, op="set")

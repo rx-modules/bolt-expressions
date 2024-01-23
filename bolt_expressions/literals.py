@@ -24,14 +24,12 @@ class Literal(ExpressionNode):
         value = convert_tag(self.value)
 
         if value is None:
-            raise ValueError(
-                f'Invalid literal of type {type_name(value)} "{value}".'
-            )
+            raise ValueError(f'Invalid literal of type {type_name(value)} "{value}".')
 
         self.nbt = value
 
     def __str__(self):
-        return self.nbt.snbt() # type: ignore
+        return self.nbt.snbt()  # type: ignore
 
     def unroll(self):
         return (), IrLiteral(value=self.nbt)
@@ -40,5 +38,5 @@ class Literal(ExpressionNode):
 def convert_node(value: Any, ctx: Context | Expression) -> ExpressionNode:
     if isinstance(value, ExpressionNode):
         return value
-    
+
     return Literal(value=value, ctx=ctx)
