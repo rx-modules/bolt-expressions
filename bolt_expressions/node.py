@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import cached_property, partial
+from functools import partial
 from typing import Generator, Iterable, Union
 
 from beet import Context, Function
 from bolt import Runtime
 from mecha import Mecha
 from pydantic import BaseModel
-from nbtlib import Path
+from nbtlib import Path # type: ignore
 
 from .optimizer import (
     DataTuple,
@@ -119,22 +120,47 @@ class ExpressionNode(ABC):
 
 ResolveResult = ScoreTuple | DataTuple | NbtValue | None
 
-@dataclass
 class Expression:
-    ctx: Context = field(repr=False)
-    called_init: bool = False
-    init_commands: list[str] = field(default_factory=list)
+    ctx: Context | None
+    opts: ExpressionOptions
 
-    optimizer: Optimizer = field(init=False)
-    serializer: IrSerializer = field(init=False)
+    called_init: bool
+    init_commands: list[str]
+    commands: list[str] | None
 
-    temp_score: TempScoreManager = field(init=False)
-    const_score: ConstScoreManager = field(init=False)
+    optimizer: Optimizer
+    serializer: IrSerializer
 
-    identifiers: Generator[str, None, None] = field(init=False)
+    temp_score: TempScoreManager
+    const_score: ConstScoreManager
+    identifiers: Generator[str, None, None]
 
-    def __post_init__(self):
-        self.opts = self.ctx.inject(expression_options)
+    mecha: Mecha | None
+    runtime: Runtime | None
+
+    def __init__(
+        self,
+        ctx: Context | None = None,
+        opts: ExpressionOptions | None = None,
+        mc: Mecha | None = None,
+        runtime: Runtime | None = None,
+    ):
+        self.called_init = False
+        self.init_commands = []
+        self.commands = None
+
+        self.ctx = ctx
+
+        if self.ctx:
+            self.opts = self.ctx.inject(expression_options)
+            self.identifiers = identifier_generator(ctx)
+            self.mc = self.ctx.inject(Mecha)
+            self.runtime = self.ctx.inject(Runtime)
+        else:
+            self.opts = opts if opts is not None else ExpressionOptions()
+            self.identifiers = identifier_generator()
+            self.mc = mc
+            self.runtime = runtime
 
         self.temp_score = TempScoreManager(self.opts.temp_objective)
         self.const_score = ConstScoreManager(self.opts.const_objective)
@@ -165,37 +191,45 @@ class Expression:
 
         self.serializer = IrSerializer(default_nbt_type=self.opts.default_nbt_type)
 
-        self.identifiers = identifier_generator(self.ctx)
     
     def temp_data(self) -> DataTuple:
         name = next(self.identifiers)
         return DataTuple("storage", self.opts.temp_storage, Path(name))
 
-    @cached_property
-    def _runtime(self) -> Runtime:
-        return self.ctx.inject(Runtime)
-
-    @cached_property
-    def _mc(self) -> Mecha:
-        return self.ctx.inject(Mecha)
-
     def inject_command(self, *cmds: str):
-        for cmd in cmds:
-            self._runtime.commands.append(self._mc.parse(cmd, using="command"))
+        if self.commands is not None:
+            self.commands.extend(cmds)
+            return
+
+        if self.mc and self.runtime:
+            for cmd in cmds:
+                self.runtime.commands.append(self.mc.parse(cmd, using="command"))
+
+    @contextmanager
+    def scope(self, result: list[str] | None = None):
+        if result is None:
+            result = []
+
+        prev = self.commands
+        self.commands = result
+
+        yield self.commands
+
+        self.commands = prev
 
     def resolve(self, node: ExpressionNode) -> ResolveResult:
         self.temp_score.reset()
 
-        pprint(node)
+        # pprint(node)
 
         unrolled_nodes, output = node.unroll()
         # pprint(unrolled_nodes)
 
         optimized_nodes = list(self.optimizer(unrolled_nodes))
-        pprint(optimized_nodes)
+        # pprint(optimized_nodes)
 
         cmds = self.serializer(optimized_nodes)
-        pprint(cmds, expand_all=True)
+        # pprint(cmds, expand_all=True)
 
         self.inject_command(*cmds)
 
@@ -214,19 +248,24 @@ class Expression:
 
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
+        if not self.ctx:
+            return
+
         path = self.ctx.generate.path(self.opts.init_path)
         self.inject_command(f"function {path}")
         self.called_init = True
 
-    def generate_init(self):
-        if not self.init_commands:
-            return
-
-        self.ctx.generate(
-            self.opts.init_path,
-            Function(
-                self.init_commands,
-                prepend_tags=["minecraft:load"] if not self.called_init else None,
-            ),
+    def generate_init(self) -> Function:
+        function = Function(
+            self.init_commands,
+            prepend_tags=["minecraft:load"] if not self.called_init else None,
         )
+
+        if not self.init_commands:
+            return function
+
+        if self.ctx:
+            self.ctx.generate(self.opts.init_path, function)
+        
+        return function
 

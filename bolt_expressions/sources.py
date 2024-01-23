@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from typing import Any, Union
 
@@ -21,8 +22,10 @@ __all__ = [
 SOLO_COLON = slice(None, None, None)
 
 
-class Source(ExpressionNode):
-    ...
+class Source(ExpressionNode, ABC):
+    @abstractmethod
+    def component(self) -> Any:
+        ...
 
 
 def rebind(left: ExpressionNode, right: Any):
@@ -147,7 +150,7 @@ class DataSource(Source):
         child.__rebind__(value)
 
     def __getitem__(
-        self, key: Union[slice, str, dict[str, Any], int, type, Path]
+        self, key: Union[slice, str, dict[str, Any], int, NbtType, Path]
     ) -> "DataSource":
         if key is SOLO_COLON:
             # self[:]

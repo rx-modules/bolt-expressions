@@ -1,32 +1,23 @@
-from dataclasses import dataclass, field, replace
-from functools import cached_property, partial
-from typing import Any, List, Union
+from dataclasses import dataclass, field
+from typing import Any, overload
 
-from nbtlib import Path # type: ignore
 from beet import Context
 
-from .ast import ConstantScoreChecker, ObjectiveChecker
-from .typing import literal_types
-from .node import Expression, ExpressionNode
-from .operations import (
-    Operation,
-)
+from .typing import NbtType, literal_types
+from .node import Expression
 from .sources import (
     DataSource,
     ScoreSource,
-    Source,
 )
-from .utils import identifier_generator
 
 
 __all__ = [
     "Scoreboard",
-    "Score",
+    "Objective",
     "Data",
 ]
 
 
-@dataclass
 class Scoreboard:
     """API for manipulating scoreboards.
 
@@ -44,72 +35,80 @@ class Scoreboard:
     ```
     """
 
-    ctx: Context = field(repr=False)
-    objectives: set[str] = field(default_factory=set)
-    constants: set[int] = field(default_factory=set)
+    expr: Expression
 
-    added_objectives: set[str] = field(init=False, default_factory=set)
+    constants: set[int]
+    objectives: set[str]
+    added_objectives: set[str]
 
-    def __post_init__(self):
-        self._expr = self.ctx.inject(Expression)
+    def __init__(self, ctx: Context | Expression):
+        if isinstance(ctx, Context):
+            self.expr = ctx.inject(Expression)
+        else:
+            self.expr = ctx
 
-        opts = self._expr.opts
+        opts = self.expr.opts
+        
+        self.constants = set()
+        self.objectives = {opts.const_objective, opts.temp_objective}
+        self.added_objectives = set()
 
-        self.objectives.update((opts.const_objective, opts.temp_objective))
-
-        self._expr._mc.check.extend(
-            ConstantScoreChecker(
-                objective=opts.const_objective, callback=self.add_constant
-            ),
-            ObjectiveChecker(
-                whitelist=self.objectives,
-                callback=self.add_objective,
-            ),
-        )
 
     def add_objective(self, name: str, criteria: str = "dummy"):
         if name not in self.added_objectives:
             self.added_objectives.add(name)
 
-            self._expr.init_commands.insert(
+            self.expr.init_commands.insert(
                 0, f"scoreboard objectives add {name} {criteria}"
             )
 
     def add_constant(self, value: int):
-        const_score = self._expr.const_score
-        holder, obj = const_score(value)
+        holder, obj = self.expr.const_score(value)
 
         if not value in self.constants:
             self.constants.add(value)
-            self._expr.init_commands.append(
+            self.expr.init_commands.append(
                 f"scoreboard players set {holder} {obj} {value}"
             )
 
-    def objective(self, name: str, criteria: str = None, prefixed=True):
-        """Get a Score instance through the Scoreboard API"""
+    def objective(
+        self, name: str, criteria: str | None = None, prefixed: bool=True
+    ) -> "Objective":
+        """
+        Get an Objective instance and add objective to init function if provided criteria.
+        """
+
         if prefixed:
-            name = self._expr.opts.objective_prefix + name
+            name = self.expr.opts.objective_prefix + name
 
         if criteria:
             self.add_objective(name, criteria)
 
-        return Score(self, name)
+        return Objective(name, ctx=self.expr)
 
-    def __call__(self, objective: str, criteria: str = None, prefixed=True):
-        return self.objective(objective, criteria, prefixed)
+    __call__ = objective
+
+    def score(self, scoreholder: str, objective: str) -> ScoreSource:
+        return ScoreSource(scoreholder, objective, ctx=self.expr)
 
 
 @dataclass
-class Score:
-    ref: Scoreboard = field(repr=False)
-    objective: str
+class Objective:
+    name: str
+    ctx: Context | Expression = field(kw_only=True)
 
+    @overload
+    def __getitem__(self, scoreholder: str) -> ScoreSource:
+        ...
+    @overload
+    def __getitem__(self, scoreholder: tuple[str, ...]) -> tuple[ScoreSource, ...]:
+        ...
     def __getitem__(self, scoreholder: str | tuple[str, ...]) -> ScoreSource | tuple[ScoreSource, ...]:
         if isinstance(scoreholder, str):
-            return ScoreSource(scoreholder, self.objective, ctx=self.ref.ctx)
+            return ScoreSource(scoreholder, self.name, ctx=self.ctx)
 
         return tuple(
-            ScoreSource(holder, self.objective, ctx=self.ref.ctx)
+            ScoreSource(holder, self.name, ctx=self.ctx)
             for holder in scoreholder
         )
 
@@ -121,39 +120,45 @@ class Score:
             score.__rebind__(value)
 
     def __str__(self):
-        return self.objective
+        return self.name
 
 
-@dataclass
 class Data:
-    ctx: Context = field(repr=False)
+    expr: Expression
 
-    def __post_init__(self):
-        self._expr = self.ctx.inject(Expression)
-        self.identifiers = identifier_generator(self.ctx)
+    def __init__(self, ctx: Context | Expression):
+        if isinstance(ctx, Context):
+            self.expr = ctx.inject(Expression)
+        else:
+            self.expr = ctx
 
     def __call__(self, target: str):
         """Guess target type and return a data source."""
         ...
 
     def storage(self, resource_location: str):
-        return DataSource("storage", resource_location, ctx=self.ctx)
+        return DataSource("storage", resource_location, ctx=self.expr)
 
     def entity(self, entity: str):
-        return DataSource("entity", entity, ctx=self.ctx)
+        return DataSource("entity", entity, ctx=self.expr)
 
     def block(self, position: str):
-        return DataSource("block", position, ctx=self.ctx)
+        return DataSource("block", position, ctx=self.expr)
 
-    def dummy(self, scale: int = 1, type: str = "int"):
+    def dummy(self, type: NbtType | str = Any):
         "Create a dummy data source in a storage."
-        path = next(self.identifiers)
-        target = self._expr.opts.temp_storage
-        return DataSource("storage", target, Path(path), scale, type, ctx=self.ctx)
 
-    def cast(self, value: Union[Source, Operation], type: str):
-        source = self.dummy(type=type)
-        if not isinstance(value, ExpressionNode):
-            value = literal_types[type](value)
-        self._expr.set(source, value)
-        return replace(source, _nbt_type=None)
+        if isinstance(type, str):
+            type = literal_types[type]
+
+        target_type, target, path, _ = self.expr.temp_data()
+        return DataSource(target_type, target, path, ctx=self.expr)[type]
+
+    def cast(self, value: Any, nbt_type: NbtType | str):
+        if isinstance(nbt_type, str):
+            nbt_type = literal_types[nbt_type]
+        
+        source = self.dummy(nbt_type)
+        source.__rebind__(value)
+
+        return source

@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, cast
 
 from beet.core.utils import required_field
 from mecha import AstCommand, AstNode, AstObjective, AstPlayerName, Reducer, rule
@@ -63,13 +63,17 @@ class ObjectiveChecker(Reducer):
 class SourceJsonConverter:
     converter: Callable[[Any, AstNode], AstNode]
 
-    def convert(self, obj: Any):
+    def convert(self, obj: Any) -> Any:
         if isinstance(obj, Source):
             return obj.component()
-        if isinstance(obj, list):
-            return [self.convert(value) for value in obj]
+            
+        if isinstance(obj, (list, tuple)):
+            list_value = cast(list[Any], obj)
+            return [self.convert(value) for value in list_value]
+            
         if isinstance(obj, dict):
-            return {key: self.convert(value) for key, value in obj.items()}
+            dict_value = cast(dict[str, Any], obj)
+            return {key: self.convert(value) for key, value in dict_value.items()}
 
         return obj
 

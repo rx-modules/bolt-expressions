@@ -4,8 +4,10 @@ from typing import Any
 from beet import Context
 from bolt import Runtime
 from bolt.utils import internal
+from mecha import Mecha
 
 import bolt_expressions as bolt_expressions_module
+from .ast import ConstantScoreChecker, ObjectiveChecker, SourceJsonConverter
 from .node import Expression
 from .operations import wrapped_min, wrapped_max
 from .api import Scoreboard, Data
@@ -21,6 +23,17 @@ def bolt_expressions(ctx: Context):
     scoreboard = ctx.inject(Scoreboard)
     data = ctx.inject(Data)
 
+    mc = ctx.inject(Mecha)
+    mc.check.extend(
+        ConstantScoreChecker(
+            objective=expr.opts.const_objective, callback=scoreboard.add_constant
+        ),
+        ObjectiveChecker(
+            whitelist=scoreboard.objectives,
+            callback=scoreboard.add_objective,
+        ),
+    )
+
     runtime = ctx.inject(Runtime)
 
     api = {
@@ -31,7 +44,9 @@ def bolt_expressions(ctx: Context):
     handler = module_attribute_handler(
         ctx, runtime.helpers["get_attribute_handler"], api
     )
+    json_converter = SourceJsonConverter(runtime.helpers["interpolate_json"])
     runtime.helpers["get_attribute_handler"] = handler
+    runtime.helpers["interpolate_json"] = json_converter
 
     runtime.expose(
         "min", partial(wrapped_min, runtime.globals.get("min", min))
