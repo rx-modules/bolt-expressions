@@ -9,7 +9,6 @@ from typing import (
     Iterator,
     Literal,
     NamedTuple,
-    Protocol,
     TypeGuard,
     TypeVar,
     Union,
@@ -27,7 +26,6 @@ from nbtlib import (
 )  # type:ignore
 
 from .typing import NbtType, NbtValue
-
 
 __all__ = [
     "Rule",
@@ -250,14 +248,37 @@ class DataTuple(NamedTuple):
     nbt_type: NbtType = Any
 
 
-class TempScoreProvider(Protocol):
+@dataclass
+class TempScoreManager:
+    objective: str
+
+    counter: int = field(default=0, init=False)
+
     def __call__(self) -> ScoreTuple:
-        ...
+        name = f"$i{self.counter}"
+        self.counter += 1
+
+        return ScoreTuple(name, self.objective)
+
+    def reset(self):
+        self.counter = 0
 
 
-class ConstScoreProvider(Protocol):
-    def __call__(self, value: int) -> ScoreTuple:
-        ...
+@dataclass
+class ConstScoreManager:
+    objective: str
+
+    constants: set[int] = field(default_factory=set, init=False)
+
+    def format(self, value: int) -> str:
+        return f"${value}"
+
+    def create(self, value: int) -> ScoreTuple:
+        self.constants.add(value)
+
+        return ScoreTuple(self.format(value), self.objective)
+
+    __call__ = create
 
 
 @dataclass
@@ -274,8 +295,8 @@ class Optimizer:
     writing new rules.
     """
 
-    temp_score: TempScoreProvider
-    const_score: ConstScoreProvider
+    temp_score: TempScoreManager
+    const_score: ConstScoreManager
     default_floating_nbt_type: str
 
     rules: list[Rule[IrOperation, []]] = field(default_factory=list)
@@ -697,3 +718,42 @@ def literal_to_constant_replacement(
             yield replace(node, right=constant)
         else:
             yield node
+
+
+def rename_temp_scores(
+    opt: Optimizer,
+    nodes: Iterable[IrOperation],
+) -> Iterable[IrOperation]:
+    nodes = tuple(nodes)
+    opt.temp_score.reset()
+
+    source_map: dict[IrSource, IrSource] = {}
+
+    def replace_source(node: IrNode) -> IrNode:
+        if not isinstance(node, IrSource):
+            return node
+        
+        if not node.temp:
+            return node
+
+        if node not in source_map:
+            if isinstance(node, IrScore):
+                source_map[node] = opt.generate_score()
+            else:
+                source_map[node] = node
+        
+        return source_map[node]
+
+    for node in nodes:
+        if not is_op(node):
+            yield node
+            continue
+
+        store = tuple((type, replace_source(s)) for type, s in node.store)
+
+        if is_unary(node):
+            yield replace(node, target=replace_source(node.target), store=store)
+        elif is_binary(node):
+            yield replace(node, left=replace_source(node.left), right=replace_source(node.right), store=store)
+        else:
+            yield replace(node, store=store)

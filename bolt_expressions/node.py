@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from nbtlib import Path # type: ignore
 
 from .optimizer import (
+    ConstScoreManager,
     DataTuple,
     IrData,
     IrLiteral,
@@ -20,6 +21,7 @@ from .optimizer import (
     NbtValue,
     Optimizer,
     ScoreTuple,
+    TempScoreManager,
     add_subtract_by_zero_removal,
     commutative_set_collapsing,
     convert_data_arithmetic,
@@ -31,6 +33,7 @@ from .optimizer import (
     multiply_divide_by_one_removal,
     noncommutative_set_collapsing,
     apply_temp_source_reuse,
+    rename_temp_scores,
     set_and_get_cleanup,
     set_to_self_removal,
 )
@@ -66,39 +69,6 @@ class ExpressionOptions(BaseModel):
 
 def expression_options(ctx: Context) -> ExpressionOptions:
     return ctx.validate("bolt_expressions", ExpressionOptions)
-
-
-@dataclass
-class TempScoreManager:
-    objective: str
-
-    counter: int = field(default=0, init=False)
-
-    def __call__(self) -> ScoreTuple:
-        name = f"$s{self.counter}"
-        self.counter += 1
-
-        return ScoreTuple(name, self.objective)
-
-    def reset(self):
-        self.counter = 0
-
-
-@dataclass
-class ConstScoreManager:
-    objective: str
-
-    constants: set[int] = field(default_factory=set, init=False)
-
-    def format(self, value: int) -> str:
-        return f"${value}"
-
-    def create(self, value: int) -> ScoreTuple:
-        self.constants.add(value)
-
-        return ScoreTuple(self.format(value), self.objective)
-
-    __call__ = create
 
 
 @dataclass(order=False, eq=False, kw_only=True)
@@ -172,20 +142,21 @@ class Expression:
         )
         self.optimizer.add_rules(
             data_insert_score,
-            partial(convert_data_arithmetic, self.optimizer),
             # features
             partial(data_set_scaling, opt=self.optimizer),
             data_get_scaling,
-            multiply_divide_by_fraction,
             # optimize
             noncommutative_set_collapsing,
             commutative_set_collapsing,
+            partial(convert_data_arithmetic, self.optimizer),
             apply_temp_source_reuse,
             # cleanup
+            multiply_divide_by_fraction,
             multiply_divide_by_one_removal,
             add_subtract_by_zero_removal,
             set_to_self_removal,
             set_and_get_cleanup,
+            partial(rename_temp_scores, self.optimizer),
             partial(literal_to_constant_replacement, self.optimizer),
         )
 
