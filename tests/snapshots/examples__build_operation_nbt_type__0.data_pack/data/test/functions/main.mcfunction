@@ -35,3 +35,30 @@ execute store result storage demo bar double 0.1 run data get storage demo c 1
 say force temp.c to be truncated
 execute store result storage bolt.expr:temp 2384k242hd495_10 int 0.1 run data get storage demo c 1
 data modify storage demo bar set from storage bolt.expr:temp 2384k242hd495_10
+say score is casted to int
+execute store result storage demo value int 1 run scoreboard players get @s obj
+say score is casted to double
+execute store result storage demo value double 0.1 run scoreboard players get @s obj
+execute store result storage demo value byte 1 run scoreboard players get @s obj
+execute store result score $i0 bolt.expr.temp run data get storage demo x1 100
+execute store result score $i1 bolt.expr.temp run data get storage demo x2 100
+scoreboard players operation $i0 bolt.expr.temp += $i1 bolt.expr.temp
+execute store result storage demo value double 0.005 run scoreboard players get $i0 bolt.expr.temp
+say casting to byte before appending to list
+execute store result storage demo value byte 1 run scoreboard players get $value obj
+data modify storage demo list append from storage demo value
+say or use Data.cast
+execute store result storage bolt.expr:temp 2384k242hd495_11 byte 1 run scoreboard players get $value obj
+data modify storage demo list append from storage bolt.expr:temp 2384k242hd495_11
+say casts y to double
+execute store result storage demo x double 1 run data get storage demo y 1
+say only copies the value
+data modify storage demo x set from storage demo y
+say no cast
+data modify storage demo x set from storage demo z
+execute store result storage demo x double 1 run data get storage demo z 1
+say casts z to double
+say no cast (type of x is temporarely overwritten)
+data modify storage demo x set from storage demo arbitrary
+say casts to a double
+execute store result storage demo x double 1 run data get storage demo arbitrary 1
