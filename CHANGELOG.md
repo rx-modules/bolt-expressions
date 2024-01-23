@@ -2,6 +2,18 @@
 
 <!--next-version-placeholder-->
 
+## v0.13.0 (2024-01-23)
+
+### Feature
+
+* Specify data source types using square brackets ([`b7b96fb`](https://github.com/rx-modules/bolt-expressions/commit/b7b96fb9c01580bd9504274f8728d1eea4ff1c28))
+
+### Fix
+
+* Reuse temporary score names ([`0eb9556`](https://github.com/rx-modules/bolt-expressions/commit/0eb9556918d9b0b1c0dbafe68a872763347f58ec))
+* Make api not dependent of Context object ([`72afafe`](https://github.com/rx-modules/bolt-expressions/commit/72afafe6f317147918ae95641a586c8f70b2ca2a))
+* Reduce number of temporaries used for score and data operations ([`8756e50`](https://github.com/rx-modules/bolt-expressions/commit/8756e50002052b255bf6c2c1ccabb29271b93ef0))
+
 ## v0.12.2 (2023-01-08)
 ### Fix
 * Fix inheritance of expression nodes and dataclasses.replace ([`bd6ac3d`](https://github.com/rx-modules/bolt-expressions/commit/bd6ac3d478a255603f2d70670337dd158fbefeaf))
