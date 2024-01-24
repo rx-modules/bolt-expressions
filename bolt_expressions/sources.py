@@ -26,7 +26,6 @@ from .operations import (
 )
 from .typing import NbtType, convert_type, convert_tag, is_type, literal_types
 
-# from rich.pretty import pprint
 
 __all__ = [
     "Source",

@@ -41,7 +41,6 @@ from .serializer import IrSerializer
 from .typing import NbtTypeString
 from .utils import identifier_generator
 
-from rich.pretty import pprint
 
 __all__ = [
     "ExpressionOptions",
