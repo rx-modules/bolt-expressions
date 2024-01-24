@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.13.1 (2024-01-24)
+
+### Fix
+
+* Remove rich import ([`a07da7d`](https://github.com/rx-modules/bolt-expressions/commit/a07da7d539b1d0289d539d82493de8ed465d9e28))
+
 ## v0.13.0 (2024-01-23)
 
 ### Feature
