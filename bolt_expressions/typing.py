@@ -1,13 +1,61 @@
-from types import GenericAlias, UnionType
-from typing import Any, Literal, Union, _UnionGenericAlias, get_args  # type: ignore isort: skip
+from types import GenericAlias, NoneType, UnionType
+from typing import (
+    Any,
+    Iterable,
+    Literal,
+    TypeGuard,
+    TypedDict,
+    Union,
+    _UnionGenericAlias, # type: ignore
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+    is_typeddict,
+)
+from beet import Context
 
-from nbtlib import Base, Compound, Float, Int, List, String, Byte, Short, Long, Double, Array  # type: ignore
+from nbtlib import End, Compound, Float, Int, List, String, Byte, Short, Long, Double, Array, NamedKey, ListIndex, CompoundMatch  # type: ignore
+
+from .utils import get_globals, type_name  # type: ignore
 
 
 __all__ = ["is_type", "convert_type", "literal_types"]
 
 
-literal_types = {
+NBT_TYPE_STRING = ("byte", "short", "int", "long", "float", "double")
+NbtTypeString = Literal["byte", "short", "int", "long", "float", "double"]
+
+
+NumericNbtValue = Byte | Short | Int | Long | Float | Double
+NbtValue = NumericNbtValue | String | List | Array | Compound
+
+NbtType = Union[
+    # numeric
+    type[Byte],
+    type[Short],
+    type[int],
+    type[Long],
+    type[float],
+    type[Double],
+    # string
+    type[str],
+    # array
+    type[Array],
+    # lists
+    type[list["NbtType"]],
+    # compounds
+    type[TypedDict],
+    type[dict[str, "NbtType"]],
+    dict[str, "NbtType"],
+    # unions
+    UnionType,
+    # any
+    type[Any],
+]
+
+
+literal_types: dict[str, type[NbtValue]] = {
     "byte": Byte,
     "short": Short,
     "int": Int,
@@ -18,12 +66,6 @@ literal_types = {
     "list": List,
     "string": String,
 }
-
-
-NBT_TYPE_STRING = ("byte", "short", "int", "long", "float", "double")
-NbtTypeString = Literal["byte", "short", "int", "long", "float", "double"]
-
-NbtValue = Byte | Short | Int | Float | Double | String | List | Array | Compound
 
 
 def convert_tag(value: Any) -> NbtValue | None:
@@ -46,21 +88,106 @@ def convert_tag(value: Any) -> NbtValue | None:
             return None
 
 
-NbtType = Union[type, GenericAlias, UnionType, dict[str, "NbtType"]]
+def is_typeddict_guard(value: Any) -> TypeGuard[type[TypedDict]]:
+    return is_typeddict(value)
 
 
-def is_type(value: dict[str, Any] | type | Any) -> bool:
+def is_alias(value: Any, origin: type | tuple[type, ...] | None = None) -> bool:
+    if not isinstance(value, GenericAlias):
+        return False
+
+    if origin is not None:
+        value_origin = get_origin(value)
+
+        if not isinstance(value_origin, type):
+            return False
+
+        return issubclass(value_origin, origin)
+
+    return True
+
+
+def is_union(value: Any) -> bool:
+    return isinstance(value, (UnionType, _UnionGenericAlias))
+
+
+def is_optional(value: Any) -> bool:
+    if not is_union(value):
+        return False
+
+    return NoneType in get_args(value)
+
+
+def is_numeric_type(value: Any) -> TypeGuard[type[NumericNbtValue]]:
+    return isinstance(value, type) and issubclass(
+        value, (Byte, Short, int, Long, float, Long)
+    )
+
+
+def is_string_type(value: Any) -> TypeGuard[type[String]]:
+    return isinstance(value, type) and issubclass(value, str)
+
+
+def is_list_type(value: Any) -> TypeGuard[type[list[Any]]]:
+    if is_alias(value):
+        return is_alias(value, list)
+
+    if not isinstance(value, type):
+        return False
+
+    return issubclass(value, list)
+
+
+def is_array_type(value: Any) -> TypeGuard[type[Array]]:
+    return isinstance(value, type) and issubclass(value, Array)
+
+
+def is_compound_alias(value: Any) -> TypeGuard[type[dict[str, Any]]]:
+    if is_alias(value):
+        return is_alias(value, dict)
+
+    return isinstance(value, type) and issubclass(value, dict)
+
+
+def unwrap_optional_type(value: Any) -> Any:
+    if not is_union(value):
+        return value
+
+    args = get_args(value)
+
+    if NoneType not in args:
+        return value
+
+    return Union[tuple(v for v in args if v is not NoneType)]  # type: ignore
+
+
+def is_type(value: Any) -> TypeGuard[NbtType]:
     if isinstance(value, dict):
+        value = cast(dict[Any, Any], value)
         return any(is_type(v) for v in value.values())
 
-    return value is Any or isinstance(
+    return value in (Any, None) or isinstance(
         value, (type, UnionType, _UnionGenericAlias, GenericAlias)
     )
 
 
-def convert_type(value: type | dict[str, Any] | Any) -> NbtType:
+def convert_type(value: Any, is_origin: bool = False) -> NbtType | None:
+    if value is Any:
+        return Any
+
+    if value in (None, NoneType):
+        return None
+
     if isinstance(value, dict):
-        return {key: convert_type(v) for key, v in value.items()}
+        value = cast(dict[str, Any], value)
+        value = {key: convert_type(v) for key, v in value.items()}
+
+    if is_typeddict(value):
+        return value  # type: ignore
+
+    if is_alias(value, Compound):
+        args = get_args(value)
+        return convert_type(dict[str, args[0]])  # type: ignore
 
     if isinstance(value, (UnionType, _UnionGenericAlias)):
         args = get_args(value)
@@ -72,7 +199,10 @@ def convert_type(value: type | dict[str, Any] | Any) -> NbtType:
         args = get_args(value)
 
         converted = tuple(convert_type(arg) for arg in args)
-        origin = convert_type(value.__origin__)
+        origin = convert_type(value.__origin__, is_origin=True)
+
+        if isinstance(origin, type) and issubclass(origin, Compound):
+            converted = (converted[-1],)
 
         if len(converted) == 1:
             converted = converted[0]
@@ -80,17 +210,121 @@ def convert_type(value: type | dict[str, Any] | Any) -> NbtType:
         return origin[converted]  # type: ignore
 
     if isinstance(value, type):
-        if issubclass(value, Base):
+        if issubclass(value, (Byte, Short, Long, Double, Array)):
             return value
+        if issubclass(value, bool):
+            return Byte
+        if issubclass(value, (int, Int)):
+            return int
+        if issubclass(value, (float, Float)):
+            return float
         if issubclass(value, str):
-            return String
-        if issubclass(value, int):
-            return Int
-        if issubclass(value, float):
-            return Float
+            return str
         if issubclass(value, dict):
-            return Compound
+            return dict if is_origin else convert_type(dict[str, Any])  # type: ignore
+        if issubclass(value, List):
+            subtype = Any if value.subtype is End else value.subtype
+            return list[convert_type(subtype)]  # type: ignore
         if issubclass(value, list):
-            return List
+            return list if is_origin else list[Any]  # type: ignore
 
-    return value
+    raise TypeError(f"type {type_name(value)} cannot be converted to nbt type.")
+
+
+Accessor = Union[NamedKey, ListIndex, CompoundMatch]
+
+
+def access_type_by_path(
+    t: NbtType | None, path: Iterable[Accessor], ctx: Context | None = None
+) -> NbtType | None:
+    new_accessors: tuple[Accessor, ...] = tuple(path)
+
+    for accessor in new_accessors:
+        t = access_type(t, accessor, ctx)
+
+    return t
+
+
+def access_typeddict(
+    t: type[TypedDict], accessor: Accessor, ctx: Context | None = None
+) -> NbtType:
+    if isinstance(accessor, CompoundMatch):
+        return t
+
+    if isinstance(accessor, NamedKey):
+        key = accessor.key
+
+        fields = get_type_hints(t, get_globals(t, ctx))
+
+        if attr_type := fields.get(key):
+            result = convert_type(attr_type)
+            return result if result is not None else Any
+
+    return Any
+
+
+def access_compound_alias(t: type[dict[str, Any]], accessor: Accessor) -> NbtType:
+    if isinstance(accessor, CompoundMatch):
+        return t
+
+    if isinstance(accessor, NamedKey):
+        args = get_args(t)
+
+        if not args:
+            return Any
+
+        return args[-1]
+
+    return Any
+
+
+def access_list(t: type[list[Any]], accessor: Accessor) -> NbtType:
+    if isinstance(accessor, ListIndex):
+        if is_alias(t, list):
+            arg = get_args(t)
+            return arg[0] if arg else Any
+
+        if isinstance(t, type) and issubclass(t, List):
+            if t.subtype is End:
+                return Any
+            return t.subtype
+
+    return Any
+
+
+def access_array(t: type[Array], accessor: Accessor) -> NbtType:
+    if isinstance(accessor, ListIndex):
+        wrapper = t.wrapper
+        return wrapper if wrapper is not None else Any
+
+    return Any
+
+
+def access_type(
+    current_type: NbtType | None, accessor: Accessor, ctx: Context | None = None
+) -> NbtType | None:
+    if current_type in (Any, None):
+        return current_type
+
+    if is_numeric_type(current_type) or is_string_type(current_type):
+        return Any
+
+    if is_union(current_type):
+        args = get_args(current_type)
+        subtypes = tuple(access_type(arg, accessor) for arg in args)
+
+        return Union[subtypes]  # type: ignore
+
+    if is_typeddict_guard(current_type):
+        return access_typeddict(current_type, accessor, ctx)
+
+    if is_compound_alias(current_type):
+        return access_compound_alias(current_type, accessor)
+
+    if is_list_type(current_type):
+        return access_list(current_type, accessor)
+
+    if is_array_type(current_type):
+        return access_array(current_type, accessor)
+
+    return Any

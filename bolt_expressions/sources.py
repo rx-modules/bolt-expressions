@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
-from typing import Any, Union
+from typing import Any, Union, cast
 
-from nbtlib import Compound, Path  # type: ignore
+from nbtlib import Compound, Path
 
 from .optimizer import IrData, IrScore, DataTargetType
 from .literals import Literal
@@ -24,7 +24,7 @@ from .operations import (
     Subtract,
     binary_operator,
 )
-from .typing import NbtType, convert_type, convert_tag, is_type, literal_types
+from .typing import NbtType, Accessor, access_type, access_type_by_path, convert_type, convert_tag, is_type, literal_types
 
 
 __all__ = [
@@ -178,18 +178,29 @@ class DataSource(Source):
         if is_type(key):
             return replace(self, writetype=convert_type(key))
 
-        if (
+        if key is SOLO_COLON:
+            path = self._path + "[]"
+        elif (
             isinstance(key, dict)
             or isinstance(key, str)
             and (key[0], key[-1]) == ("{", "}")
         ):
-            # self[{abc:1b}]
-            return self.filtered(key)
-        # self[0] or self.foo
-        path = self._path[key]
-        return replace(self, _path=path)
+            compound = parse_compound(key)
+            path = self._path[:][compound]
+        else:
+            path = self._path[key]
+
+        writetype = self._get_property_type(self.writetype, path)
+        return replace(self, _path=path, writetype=writetype)
 
     __getattr__ = __getitem__
+
+    def _get_property_type(self, nbt_type: NbtType, child_path: Path) -> NbtType:
+        path = cast(tuple[Accessor, ...], tuple(child_path))
+        length = len(self._path)
+        relative_path = path[length:]
+
+        return access_type_by_path(nbt_type, relative_path, self.expr.ctx) or Any
 
     def __call__(
         self,

@@ -1,7 +1,7 @@
+import sys
 from typing import Any, Dict
-
-from beet import Context
 from bolt import Runtime
+from beet import Context
 
 __all__ = [
     "type_name",
@@ -27,3 +27,17 @@ def identifier_generator(ctx: Context | None = None):
         counter = 0
         while True:
             yield str(f"i{counter}")
+
+
+def get_globals(obj: Any, ctx: Context | Runtime | None = None) -> dict[str, Any]:
+    if isinstance(ctx, Context):
+        runtime = ctx.inject(Runtime)
+    else:
+        runtime = ctx
+
+    if runtime is not None:
+        module = runtime.modules.get(obj.__module__)
+        if module:
+            return module.namespace
+
+    return getattr(sys.modules.get(obj.__module__, None), '__dict__', {})

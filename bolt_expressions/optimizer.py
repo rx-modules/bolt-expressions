@@ -25,7 +25,7 @@ from nbtlib import (
     Path,
 )  # type:ignore
 
-from .typing import NbtType, NbtValue
+from .typing import NbtType, NbtValue, unwrap_optional_type, is_numeric_type
 
 __all__ = [
     "Rule",
@@ -158,13 +158,16 @@ def is_cast_op(node: IrBinary) -> bool:
     if right_scale is not None and right_scale != 1:
         return True
 
-    if node.left.nbt_type is Any:
+    left_type = unwrap_optional_type(node.left.nbt_type)
+    right_type = unwrap_optional_type(node.right.nbt_type)
+
+    if left_type is Any:
         return False
 
-    if not isinstance(node.left.nbt_type, Numeric):
+    if not is_numeric_type(left_type):
         return False
 
-    return node.left.nbt_type != node.right.nbt_type
+    return left_type != right_type
 
 
 SCORE_OPERATIONS = ("set", "add", "sub", "mul", "div", "mod", "min", "max")
