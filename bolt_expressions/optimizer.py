@@ -161,6 +161,9 @@ def is_cast_op(node: IrBinary) -> bool:
     if node.left.nbt_type is Any:
         return False
 
+    if not isinstance(node.left.nbt_type, Numeric):
+        return False
+
     return node.left.nbt_type != node.right.nbt_type
 
 
