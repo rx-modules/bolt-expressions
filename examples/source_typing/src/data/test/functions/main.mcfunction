@@ -134,3 +134,23 @@ with assert_exception(TypeError):
     item[0]
 with assert_exception(TypeError):
     item + 1
+
+
+value = storage.value[list[Double]]
+
+value = [0,1,3,1,127]
+value.append(3)
+value.prepend(0)
+value.insert(4, 13)
+
+item = {id:"bla",Count:15,tag:{CustomModelData:14.2,Items:[{id:"stone",Count:3}]}}
+
+storage.new_item[Item] = item | {Count:5} | storage.other_item | {tag:{Items:[{Count:23}]}}
+
+storage.name[str] = "george"
+
+storage.flag[Byte] = 127
+storage.flag[Byte] = 128
+
+storage.flags[ByteArray] = [1,2,3,127]
+storage.flags[ByteArray] = [1,2,3,128]

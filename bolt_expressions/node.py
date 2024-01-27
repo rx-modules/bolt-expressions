@@ -8,7 +8,8 @@ from beet import Context, Function
 from bolt import Runtime
 from mecha import Mecha
 from pydantic import BaseModel
-from nbtlib import Path  # type: ignore
+from nbtlib import Path # type: ignore
+
 
 from .optimizer import (
     ConstScoreManager,
@@ -37,8 +38,9 @@ from .optimizer import (
     set_and_get_cleanup,
     set_to_self_removal,
 )
-from .serializer import IrSerializer
 from .typing import NbtTypeString
+from .casting import TypeCaster
+from .serializer import IrSerializer
 from .utils import identifier_generator
 
 
@@ -97,6 +99,7 @@ class Expression:
     init_commands: list[str]
     commands: list[str] | None
 
+    type_caster: TypeCaster
     optimizer: Optimizer
     serializer: IrSerializer
 
@@ -134,6 +137,9 @@ class Expression:
         self.temp_score = TempScoreManager(self.opts.temp_objective)
         self.const_score = ConstScoreManager(self.opts.const_objective)
 
+
+        self.type_caster = TypeCaster(ctx=self.ctx)
+
         self.optimizer = Optimizer(
             temp_score=self.temp_score,
             const_score=self.const_score,
@@ -157,6 +163,8 @@ class Expression:
             set_and_get_cleanup,
             partial(rename_temp_scores, self.optimizer),
             partial(literal_to_constant_replacement, self.optimizer),
+            # typing
+            self.type_caster,
         )
 
         self.serializer = IrSerializer(default_nbt_type=self.opts.default_nbt_type)

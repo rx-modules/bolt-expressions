@@ -245,7 +245,7 @@ def access_type_by_path(
 
 def access_typeddict(
     t: type[TypedDict], accessor: Accessor, ctx: Context | None = None
-) -> NbtType:
+) -> NbtType | None:
     if isinstance(accessor, CompoundMatch):
         return t
 
@@ -258,10 +258,10 @@ def access_typeddict(
             result = convert_type(attr_type)
             return result if result is not None else Any
 
-    return Any
+    return None
 
 
-def access_compound_alias(t: type[dict[str, Any]], accessor: Accessor) -> NbtType:
+def access_compound_alias(t: type[dict[str, Any]], accessor: Accessor) -> NbtType | None:
     if isinstance(accessor, CompoundMatch):
         return t
 
@@ -273,10 +273,10 @@ def access_compound_alias(t: type[dict[str, Any]], accessor: Accessor) -> NbtTyp
 
         return args[-1]
 
-    return Any
+    return None
 
 
-def access_list(t: type[list[Any]], accessor: Accessor) -> NbtType:
+def access_list(t: type[list[Any]], accessor: Accessor) -> NbtType | None:
     if isinstance(accessor, ListIndex):
         if is_alias(t, list):
             arg = get_args(t)
@@ -287,15 +287,15 @@ def access_list(t: type[list[Any]], accessor: Accessor) -> NbtType:
                 return Any
             return t.subtype
 
-    return Any
+    return None
 
 
-def access_array(t: type[Array], accessor: Accessor) -> NbtType:
+def access_array(t: type[Array], accessor: Accessor) -> NbtType | None:
     if isinstance(accessor, ListIndex):
         wrapper = t.wrapper
         return wrapper if wrapper is not None else Any
 
-    return Any
+    return None
 
 
 def access_type(
@@ -305,7 +305,7 @@ def access_type(
         return current_type
 
     if is_numeric_type(current_type) or is_string_type(current_type):
-        return Any
+        return None
 
     if is_union(current_type):
         args = get_args(current_type)
@@ -325,4 +325,4 @@ def access_type(
     if is_array_type(current_type):
         return access_array(current_type, accessor)
 
-    return Any
+    return None

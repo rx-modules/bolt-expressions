@@ -51,3 +51,17 @@ say ("storage name:path item.Count", <class 'bolt_expressions.sources.NumericDat
 say ("storage name:path item.tag", <class 'bolt_expressions.sources.CompoundDataSource'>)
 say ("storage name:path item.tag.Items", <class 'bolt_expressions.sources.SequenceDataSource'>)
 say ("storage name:path item.tag.Items[0]", <class 'bolt_expressions.sources.CompoundDataSource'>)
+data modify storage name:path value set value [0.0d, 1.0d, 3.0d, 1.0d, 127.0d]
+data modify storage name:path value append value 3.0d
+data modify storage name:path value prepend value 0.0d
+data modify storage name:path value insert 4 value 13.0d
+data modify storage name:path item set value {id: "bla", Count: 15b, tag: {CustomModelData: 14, Items: [{id: "stone", Count: 3b}]}}
+data modify storage name:path new_item set from storage name:path item
+data modify storage name:path new_item merge value {Count: 5b}
+data modify storage name:path new_item merge from storage name:path other_item
+data modify storage name:path new_item merge value {tag: {Items: [{Count: 23b}]}}
+data modify storage name:path name set value "george"
+data modify storage name:path flag set value 127b
+data modify storage name:path flag set value 128
+data modify storage name:path flags set value [B; 1B, 2B, 3B, 127B]
+data modify storage name:path flags set value [1, 2, 3, 128]
