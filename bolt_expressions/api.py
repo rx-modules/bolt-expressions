@@ -139,13 +139,13 @@ class Data:
         ...
 
     def storage(self, resource_location: str):
-        return DataSource("storage", resource_location, ctx=self.expr)
+        return DataSource.create("storage", resource_location, ctx=self.expr)
 
     def entity(self, entity: str):
-        return DataSource("entity", entity, ctx=self.expr)
+        return DataSource.create("entity", entity, ctx=self.expr)
 
     def block(self, position: str):
-        return DataSource("block", position, ctx=self.expr)
+        return DataSource.create("block", position, ctx=self.expr)
 
     def dummy(self, type: NbtType | str = Any):
         "Create a dummy data source in a storage."
@@ -154,7 +154,7 @@ class Data:
             type = literal_types[type]
 
         target_type, target, path, _ = self.expr.temp_data()
-        return DataSource(target_type, target, path, ctx=self.expr)[type]
+        return DataSource.create(target_type, target, path, ctx=self.expr)[type]
 
     def cast(self, value: Any, nbt_type: NbtType | str):
         if isinstance(nbt_type, str):

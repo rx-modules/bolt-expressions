@@ -1,18 +1,19 @@
-from bolt_expressions import Scoreboard, Data, DataSource
+from bolt_expressions import
+    Scoreboard,
+    Data,
+    GenericDataSource,
+    NumericDataSource,
+    StringDataSource,
+    SequenceDataSource,
+    CompoundDataSource
 from dataclasses import dataclass, replace
 from contextlib import contextmanager
+from typing import TypedDict
+from nbtlib import Byte, Double
 
-
-temp = Scoreboard("obj.temp")
-
-strg = Data.storage(example:main)
-
-@dataclass(order=False)
-class ExtendedDataSource(DataSource):
-    __annotations__ = {
-        "_inverted": bool
-    }
-    _inverted = False
+@dataclass(order=False, repr=False)
+class ExtendedDataSource:
+    _inverted: bool = False
 
     @contextmanager
     def __branch__(self):
@@ -29,19 +30,66 @@ class ExtendedDataSource(DataSource):
     def increment(self):
         self += 1
 
+    @classmethod
+    def get_subclasses(cls):
+        return {
+            "generic": ExtendedGenericDataSource,
+            "numeric": ExtendedNumericDataSource,
+            "string": ExtendedStringDataSource,
+            "array": ExtendedSequenceDataSource,
+            "list": ExtendedSequenceDataSource,
+            "compound": ExtendedCompoundDataSource,
+        }
 
-storage = ExtendedDataSource("storage", example:main, _inverted=True, ctx=ctx)
+@dataclass(repr=False)
+class ExtendedGenericDataSource(ExtendedDataSource, GenericDataSource):
+    ...
 
-storage.b.index[0].named["! 3  - b#2a"].a({x:1}).b[{y:2}].c[] = 3
+@dataclass(repr=False)
+class ExtendedNumericDataSource(ExtendedDataSource, NumericDataSource):
+    ...
 
-storage.value.increment()
+@dataclass(repr=False)
+class ExtendedStringDataSource(ExtendedDataSource, StringDataSource):
+    ...
 
+@dataclass(repr=False)
+class ExtendedSequenceDataSource(ExtendedDataSource, SequenceDataSource):
+    ...
+
+@dataclass(repr=False)
+class ExtendedCompoundDataSource(ExtendedDataSource, CompoundDataSource):
+    ...
+
+
+storage = ExtendedGenericDataSource.create("storage", example:main, ctx=ctx)
+
+
+class ItemTag(TypedDict):
+    CustomModelData: int
+    Items: list["Item"]
+
+class Item(TypedDict):
+    id: str
+    Count: Byte
+    tag: ItemTag
+
+items = storage[list[Item]]
+
+say (items, items.writetype, type(items))
+say (items[0], items[0].writetype, type(items[0]))
+say (items[0].id, items[0].id.writetype, type(items[0].id))
+say (items[0].Count, items[0].Count.writetype, type(items[0].Count))
+say (items[0].tag, items[0].tag.writetype, type(items[0].tag))
+say (items[0].tag.Items, items[0].tag.Items.writetype, type(items[0].tag.Items))
+
+
+temp = Scoreboard("obj.temp")
 
 temp["$a"] = temp["$value"] - storage.a
-storage.a = temp["$a"]
 
-
-if storage({a: 0}):
+storage.a[Byte] = temp["$a"]
+if storage({a: Byte(0)}):
     say It's 0!
 else:
     say It's not 0...

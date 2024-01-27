@@ -188,7 +188,7 @@ class SourceConverter:
         elif isinstance(obj, tuple) and len(obj) == 2:
             source = ScoreSource(*obj, ctx=self.ctx)
         elif isinstance(obj, tuple) and len(obj) == 3:
-            source = DataSource(*obj, ctx=self.ctx)
+            source = DataSource.create(*obj, ctx=self.ctx)
         else:
             raise ValueError(
                 f"Cannot interpolate source of type {type(obj)!r} '{obj}'."

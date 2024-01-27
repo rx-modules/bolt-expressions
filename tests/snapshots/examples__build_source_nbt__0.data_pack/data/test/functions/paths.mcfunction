@@ -15,7 +15,6 @@ say storage demo:temp items[0].tag.Enchantments[{id: "minecraft:unbreaking"}]
 say storage demo:temp chest.Items[-1].tag.Enchantments[{id: "minecraft:unbreaking"}].lvl
 say storage demo:temp item.tag{Unbreakable: 0, Damage: 0s}
 say storage demo:temp value
-say storage demo:temp value.preserved.scale
 say storage demo:temp scale.set.until.set.again
 say storage demo:temp foo[{test: 1b}]
 say storage demo:temp foo."{test:1b"

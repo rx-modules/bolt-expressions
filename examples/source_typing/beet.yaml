@@ -1,0 +1,17 @@
+name: bolt-expressions-source-typing
+minecraft: "1.20"
+
+data_pack:
+  load: [src]
+
+require:
+  - bolt
+  - bolt_expressions
+
+pipeline:
+  - mecha
+
+output: dist
+
+meta:
+  generate_namespace: test

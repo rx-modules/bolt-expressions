@@ -1,5 +1,6 @@
 from nbtlib import Compound, Path, Byte, Short
 from bolt_expressions import Data
+from bolt_expressions.utils import assert_exception
 
 temp = Data.storage(demo:temp)
 
@@ -44,7 +45,8 @@ function ./paths:
 
     #> Specifying scale and number type
     say temp.value(scale=0.321)
-    say temp.value(scale=45.2, type="double").preserved.scale
+    with assert_exception(TypeError):
+        say temp.value(scale=45.2, type="double").preserved.scale
     say temp.scale.set(scale=0.5).until.set(scale=3).again
 
     #> Select all compound elements that match the specified compound
@@ -62,9 +64,9 @@ function ./paths:
     data modify storage val._target val[{id: 0}]._path set value 0
 
     #> Selecting all elements in an array
-    say temp.item.tag.Enchantments.all()
+    say temp.item.tag.Enchantments[]
     say temp.item.tag.Enchantments[:]
-    say temp.items.all().ids.all().literal["all"].key
+    say temp.items[].ids[].literal["all"].key
     say temp.items[:].ids[:].literal[":"].key
 
     #> Interpolating named tags

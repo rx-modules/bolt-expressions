@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import sys
 from typing import Any, Dict
 from bolt import Runtime
@@ -41,3 +42,13 @@ def get_globals(obj: Any, ctx: Context | Runtime | None = None) -> dict[str, Any
             return module.namespace
 
     return getattr(sys.modules.get(obj.__module__, None), '__dict__', {})
+
+
+@contextmanager
+def assert_exception(exc: type[Exception]):
+    try:
+        yield
+    except exc:
+        ...
+    else:
+        raise AssertionError(f"Expected {exc.__name__} to be raised.")

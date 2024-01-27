@@ -32,12 +32,7 @@ NbtValue = NumericNbtValue | String | List | Array | Compound
 
 NbtType = Union[
     # numeric
-    type[Byte],
-    type[Short],
-    type[int],
-    type[Long],
-    type[float],
-    type[Double],
+    type[NumericNbtValue],
     # string
     type[str],
     # array
@@ -51,7 +46,7 @@ NbtType = Union[
     # unions
     UnionType,
     # any
-    type[Any],
+    type,
 ]
 
 
@@ -78,10 +73,10 @@ def convert_tag(value: Any) -> NbtValue | None:
             return Compound({key: convert_tag(value) for key, value in value.items()})  # type: ignore
         case bool():
             return Byte(value)
-        case int():
-            return Int(value)
         case float():
             return Float(value)
+        case int():
+            return Int(value)
         case str():
             return String(value)
         case _:
@@ -120,7 +115,7 @@ def is_optional(value: Any) -> bool:
 
 def is_numeric_type(value: Any) -> TypeGuard[type[NumericNbtValue]]:
     return isinstance(value, type) and issubclass(
-        value, (Byte, Short, int, Long, float, Long)
+        value, (int, float)
     )
 
 
@@ -147,6 +142,9 @@ def is_compound_alias(value: Any) -> TypeGuard[type[dict[str, Any]]]:
         return is_alias(value, dict)
 
     return isinstance(value, type) and issubclass(value, dict)
+
+def is_compound_type(value: Any) -> TypeGuard[type[dict[str, Any]] | type[TypedDict]]:
+    return is_compound_alias(value) or is_typeddict(value)
 
 
 def unwrap_optional_type(value: Any) -> Any:
@@ -214,12 +212,12 @@ def convert_type(value: Any, is_origin: bool = False) -> NbtType | None:
             return value
         if issubclass(value, bool):
             return Byte
-        if issubclass(value, (int, Int)):
-            return int
         if issubclass(value, (float, Float)):
-            return float
+            return Float
+        if issubclass(value, (int, Int)):
+            return Int
         if issubclass(value, str):
-            return str
+            return String
         if issubclass(value, dict):
             return dict if is_origin else convert_type(dict[str, Any])  # type: ignore
         if issubclass(value, List):

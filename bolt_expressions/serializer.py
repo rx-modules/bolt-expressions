@@ -225,14 +225,14 @@ class IrSerializer(Visitor):
             return "byte"
         if issubclass(value, Short):
             return "short"
-        if issubclass(value, Int):
-            return "int"
         if issubclass(value, Long):
             return "long"
-        if issubclass(value, Float):
-            return "float"
         if issubclass(value, Double):
             return "double"
+        if issubclass(value, Float):
+            return "float"
+        if issubclass(value,Int):
+            return "int"
 
         return None
 
