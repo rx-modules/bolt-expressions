@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, overload
 
 from beet import Context
+from bolt.utils import internal
 
 from .typing import NbtType, literal_types
 from .node import Expression
@@ -114,6 +115,7 @@ class Objective:
             ScoreSource(holder, self.name, ctx=self.ctx) for holder in scoreholder
         )
 
+    @internal
     def __setitem__(self, scoreholder: str | tuple[str, ...], value: Any):
         target = self[scoreholder]
 

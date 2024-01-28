@@ -1,18 +1,69 @@
 from contextlib import contextmanager
 import sys
-from typing import Any, Dict
+from types import GenericAlias, NoneType, UnionType
+from typing import Any, Dict, _UnionGenericAlias, cast, get_args, get_origin, is_typeddict # type: ignore
 from bolt import Runtime
+from nbtlib import Base # type: ignore
 from beet import Context
 
 __all__ = [
     "type_name",
+    "format_type",
     "identifier_generator",
+    "get_globals",
+    "assert_exception",
 ]
 
 
 def type_name(obj: Any) -> str:
     return type(obj).__name__
 
+def format_name(t: Any) -> str:
+    if not isinstance(t, type):
+        return repr(t)
+        
+    if is_typeddict(t):
+        return f"{t.__module__}.{t.__name__}"
+
+    if issubclass(t, (bool, int, float, str, list, dict, NoneType, Base)):
+        return t.__name__
+
+    return f"{t.__module__}.{t.__name__}"
+
+def format_type(t: Any, *, __refs: list[Any] | None = None) -> str:
+    if __refs is None:
+        __refs = []
+
+    circular_ref = t in __refs
+    __refs.append(t)
+
+    if isinstance(t, (UnionType, _UnionGenericAlias)):
+        return " | ".join(format_type(x, __refs=__refs) for x in get_args(t))
+
+    if isinstance(t, GenericAlias):
+        origin = format_type(get_origin(t), __refs=__refs)
+        args = (format_type(x, __refs=__refs) for x in get_args(t))
+
+        if circular_ref:
+            return f"{origin}[...]"
+
+        return f"{origin}[{', '.join(args)}]"
+
+    if isinstance(t, dict):
+        t_dict = cast(dict[str, Any], t)
+        
+        if circular_ref:
+            return "{...}"
+
+        return (
+            "{"
+            + ", ".join(
+                f"{key}: {format_type(val, __refs=__refs)}" for key, val in t_dict.items()
+            )
+            + "}"
+        )
+
+    return format_name(t)
 
 def identifier_generator(ctx: Context | None = None):
     if ctx:

@@ -1,4 +1,5 @@
 from types import GenericAlias, NoneType, UnionType
+from frozendict import frozendict
 from typing import (
     Any,
     Iterable,
@@ -143,8 +144,11 @@ def is_compound_alias(value: Any) -> TypeGuard[type[dict[str, Any]]]:
 
     return isinstance(value, type) and issubclass(value, dict)
 
+def is_fixed_compound(value: Any) -> TypeGuard[dict[str, Any] | type[TypedDict]]:
+    return isinstance(value, dict) or is_typeddict(value)
+
 def is_compound_type(value: Any) -> TypeGuard[type[dict[str, Any]] | type[TypedDict]]:
-    return is_compound_alias(value) or is_typeddict(value)
+    return is_compound_alias(value) or is_fixed_compound(value)
 
 
 def unwrap_optional_type(value: Any) -> Any:
@@ -159,8 +163,23 @@ def unwrap_optional_type(value: Any) -> Any:
     return Union[tuple(v for v in args if v is not NoneType)]  # type: ignore
 
 
-def is_type(value: Any) -> TypeGuard[NbtType]:
-    if isinstance(value, dict):
+def get_dict_fields(t: type[TypedDict] | dict[str, Any], ctx: Context | None) -> dict[str, NbtType]:
+    if isinstance(t, dict):
+        fields = t
+    else:
+        fields = get_type_hints(t, get_globals(t, ctx))
+    
+    result: dict[str, NbtType] = {}
+
+    for key, value in fields.items():
+        value_type = convert_type(value)
+        result[key] = value_type if value_type is not None else Any
+    
+    return frozendict(result) # type: ignore
+
+
+def is_type(value: Any, allow_dict: bool = True) -> TypeGuard[NbtType]:
+    if allow_dict and isinstance(value, dict):
         value = cast(dict[Any, Any], value)
         return any(is_type(v) for v in value.values())
 
@@ -178,7 +197,13 @@ def convert_type(value: Any, is_origin: bool = False) -> NbtType | None:
 
     if isinstance(value, dict):
         value = cast(dict[str, Any], value)
-        value = {key: convert_type(v) for key, v in value.items()}
+
+        type_dict: dict[str, NbtType] = {}
+        for key, val in value.items():
+            val_type = convert_type(val)
+            type_dict[key] = val_type if val_type is not None else Any
+        
+        return frozendict(type_dict) # type: ignore
 
     if is_typeddict(value):
         return value  # type: ignore

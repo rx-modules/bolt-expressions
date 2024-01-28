@@ -3,10 +3,10 @@ from enum import Enum, auto
 from typing import Any, Callable, ClassVar, Iterable, Type, TypeVar, Union, overload
 import typing as t
 
-from bolt_expressions.optimizer import IrBinary, IrLiteral, IrSource
-
+from .typing import NbtType
 from .optimizer import (
     IrBinary,
+    IrCast,
     IrData,
     IrInsert,
     IrLiteral,
@@ -220,7 +220,6 @@ class UnaryOperation(Operation):
 
         operations: list[IrOperation] = [*target_nodes]
 
-        print(self, self.in_place)
         if self.in_place:
             temp_var = target_value
         else:
@@ -434,6 +433,15 @@ class Set(BinaryOperation):
     op: ClassVar[str] = "set"
     in_place: ClassVar[bool] = True
 
+@dataclass(eq=False, order=False)
+class Cast(BinaryOperation):
+    op: ClassVar[str] = "cast"
+    in_place: ClassVar[bool] = True
+
+    cast_type: NbtType = Any
+
+    def create_operation(self, left: IrSource, right: IrSource | IrLiteral) -> IrCast:
+        return IrCast(left=left, right=right, cast_type=self.cast_type)
 
 class Enable(UnaryOperation):
     op: ClassVar[str] = "enable"

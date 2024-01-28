@@ -6,9 +6,12 @@ from typing import Generator, Iterable, Union
 
 from beet import Context, Function
 from bolt import Runtime
+from bolt.utils import internal
 from mecha import Mecha
 from pydantic import BaseModel
-from nbtlib import Path # type: ignore
+from nbtlib import Path
+
+# from rich.pretty import pprint
 
 
 from .optimizer import (
@@ -26,9 +29,11 @@ from .optimizer import (
     add_subtract_by_zero_removal,
     commutative_set_collapsing,
     convert_data_arithmetic,
+    convert_cast,
     data_get_scaling,
     data_insert_score,
     data_set_scaling,
+    discard_casting,
     literal_to_constant_replacement,
     multiply_divide_by_fraction,
     multiply_divide_by_one_removal,
@@ -40,6 +45,7 @@ from .optimizer import (
 )
 from .typing import NbtTypeString
 from .casting import TypeCaster
+from .check import TypeChecker
 from .serializer import IrSerializer
 from .utils import identifier_generator
 
@@ -100,6 +106,7 @@ class Expression:
     commands: list[str] | None
 
     type_caster: TypeCaster
+    type_checker: TypeChecker
     optimizer: Optimizer
     serializer: IrSerializer
 
@@ -137,8 +144,8 @@ class Expression:
         self.temp_score = TempScoreManager(self.opts.temp_objective)
         self.const_score = ConstScoreManager(self.opts.const_objective)
 
-
         self.type_caster = TypeCaster(ctx=self.ctx)
+        self.type_checker = TypeChecker(ctx=self.ctx)
 
         self.optimizer = Optimizer(
             temp_score=self.temp_score,
@@ -147,6 +154,7 @@ class Expression:
         )
         self.optimizer.add_rules(
             data_insert_score,
+            convert_cast,
             # features
             partial(data_set_scaling, opt=self.optimizer),
             data_get_scaling,
@@ -161,10 +169,12 @@ class Expression:
             add_subtract_by_zero_removal,
             set_to_self_removal,
             set_and_get_cleanup,
+            discard_casting,
             partial(rename_temp_scores, self.optimizer),
             partial(literal_to_constant_replacement, self.optimizer),
             # typing
             self.type_caster,
+            self.type_checker,
         )
 
         self.serializer = IrSerializer(default_nbt_type=self.opts.default_nbt_type)
@@ -194,6 +204,7 @@ class Expression:
 
         self.commands = prev
 
+    @internal
     def resolve(self, node: ExpressionNode) -> ResolveResult:
         self.temp_score.reset()
 

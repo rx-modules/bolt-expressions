@@ -1,6 +1,7 @@
 __version__ = "0.13.1"
 
 from .api import *
+from .exceptions import *
 from .ast import *
 from .literals import *
 from .node import *

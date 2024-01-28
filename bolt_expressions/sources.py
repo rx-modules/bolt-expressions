@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from typing import Any, ClassVar, ParamSpec, Protocol, TypedDict, Union, cast, is_typeddict, overload
 from beet import Context
+from bolt.utils import internal
 
 from nbtlib import Compound, Path, ListIndex, CompoundMatch, NamedKey
 
@@ -15,6 +16,7 @@ from .node import Expression, ExpressionNode
 from .operations import (
     Add,
     Append,
+    Cast,
     Divide,
     Enable,
     InPlaceMerge,
@@ -54,13 +56,18 @@ class Source(ExpressionNode, ABC):
         ...
 
 
-def rebind(left: ExpressionNode, right: Any):
+@internal
+def rebind(left: ExpressionNode, right: Any, cast: NbtType | None = None):
     right_node = (
         right
         if isinstance(right, ExpressionNode)
         else Literal(value=right, ctx=left.ctx)
     )
-    op = Set(former=left, latter=right_node, ctx=left.ctx)
+    if cast is None:
+        op = Set(former=left, latter=right_node, ctx=left.ctx)
+    else:
+        op = Cast(former=left, latter=right_node, cast_type=cast, ctx=left.ctx)
+    
     left.expr.resolve(op)
 
     return left
@@ -205,19 +212,23 @@ class DataSource(Source, ABC):
             type=self._type,
             target=self._target,
             path=self._path,
-            nbt_type=self.writetype,
+            nbt_type=self.readtype,
             scale=self._scale,
         )
         return (), node
     
-    __rebind__ = rebind
+    @internal
+    def __rebind__(self, right: Any):
+        return rebind(self, right, self.writetype)
 
+    @internal
     def __setattr__(self, key: str, value):
         if not self._constructed:
             super().__setattr__(key, value)
         else:
             self.__setitem__(key, value)
 
+    @internal
     def __setitem__(self, key: str, value):
         child = self.__getitem__(key)
         child.__rebind__(value)
@@ -225,7 +236,7 @@ class DataSource(Source, ABC):
     def __getitem__(
         self, key: Union[slice, str, dict[str, Any], int, NbtType, Path]
     ) -> Any:
-        if is_type(key):
+        if is_type(key, allow_dict=False):
             return self.create(
                 self._type, self._target, self._path, self._scale, key, ctx=self.ctx
             )
@@ -336,19 +347,24 @@ class GenericDataSource(DataSource):
     __mod__, __rmod__ = binary_operator(Modulus, reverse=True)
     __or__, __ror__ = binary_operator(Merge, reverse=True)
 
+    @internal
     def insert(self, index: int, value: Any) -> None:
         self.expr.resolve(Insert(former=self, latter=value, index=index, ctx=self.ctx))
 
+    @internal
     def append(self, value: Any) -> None:
         self.expr.resolve(Append(former=self, latter=value, ctx=self.ctx))
 
+    @internal
     def prepend(self, value: Any) -> None:
         self.expr.resolve(Prepend(former=self, latter=value, ctx=self.ctx))
 
+    @internal
     def remove(self, sub_path: Any = None) -> None:
         target = self if sub_path is None else self[sub_path]
         self.expr.resolve(Remove(target=target, ctx=self.ctx))
 
+    @internal
     def merge(self, value: Any) -> None:
         self.expr.resolve(InPlaceMerge(former=self, latter=value, ctx=self.ctx))
 
@@ -365,15 +381,19 @@ class StringDataSource(DataSource):
 class SequenceDataSource(DataSource):
     _list_index: ClassVar[bool] = True
 
+    @internal
     def insert(self, index: int, value: Any) -> None:
         self.expr.resolve(Insert(former=self, latter=value, index=index, ctx=self.ctx))
 
+    @internal
     def append(self, value: Any) -> None:
         self.expr.resolve(Append(former=self, latter=value, ctx=self.ctx))
 
+    @internal
     def prepend(self, value: Any) -> None:
         self.expr.resolve(Prepend(former=self, latter=value, ctx=self.ctx))
 
+    @internal
     def remove(self, sub_path: Any = None) -> None:
         target = self if sub_path is None else self[sub_path]
         self.expr.resolve(Remove(target=target, ctx=self.ctx))
@@ -384,5 +404,6 @@ class CompoundDataSource(DataSource):
 
     __or__, __ror__ = binary_operator(Merge, reverse=True)
 
+    @internal
     def merge(self, value: Any) -> None:
         self.expr.resolve(InPlaceMerge(former=self, latter=value, ctx=self.ctx))

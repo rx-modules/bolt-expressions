@@ -16,6 +16,7 @@ from typing import (
     ParamSpec,
 )
 from mecha import AbstractNode
+from bolt.utils import internal
 
 from nbtlib import (
     Int,
@@ -25,7 +26,8 @@ from nbtlib import (
     Path,
 )  # type:ignore
 
-from .typing import NbtType, NbtValue, unwrap_optional_type, is_numeric_type
+from .typing import NbtType, NbtValue, NumericNbtValue, literal_types, unwrap_optional_type, is_numeric_type
+# from rich.pretty import pprint
 
 __all__ = [
     "Rule",
@@ -119,6 +121,12 @@ class IrInsert(IrBinary):
     op: str = field(default="insert", init=False)
     index: int
 
+@dataclass(frozen=True, kw_only=True)
+class IrCast(IrBinary):
+    op: str = field(default="cast", init=False)
+    cast_type: NbtType = Any
+    scale: float = 1
+
 
 def is_op(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrOperation]:
     if not isinstance(obj, IrOperation):
@@ -141,34 +149,31 @@ def is_binary(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrBi
     return is_op(obj, op) and isinstance(obj, IrBinary)
 
 
-def is_cast_op(node: IrBinary) -> bool:
-    if node.op != "set":
-        return False
-
-    if not isinstance(node.left, IrData):
-        return False
-    if not isinstance(node.right, IrData):
-        return False
-
-    left_scale = node.left.scale
-    if left_scale is not None and left_scale != 1:
+def is_copy_op(node: Any) -> TypeGuard[IrBinary]:
+    if is_binary(node, "set"):
         return True
+    
+    if isinstance(node, IrCast):
+        cast_type = unwrap_optional_type(node.cast_type)
 
-    right_scale = node.right.scale
-    if right_scale is not None and right_scale != 1:
-        return True
+        if node.scale != 1:
+            return False
+        
+        if isinstance(node.left, IrScore) and isinstance(node.right, IrScore):
+            return True
+        
+        if isinstance(node.left, IrData) and isinstance(node.right, IrData):
+            if cast_type == unwrap_optional_type(node.right.nbt_type):
+                return True
+            if cast_type is Any:
+                return True
 
-    left_type = unwrap_optional_type(node.left.nbt_type)
-    right_type = unwrap_optional_type(node.right.nbt_type)
+        if isinstance(node.right, IrLiteral) and cast_type is Any:
+            return True
 
-    if left_type is Any:
         return False
-
-    if not is_numeric_type(left_type):
-        return False
-
-    return left_type != right_type
-
+    
+    return False
 
 SCORE_OPERATIONS = ("set", "add", "sub", "mul", "div", "mod", "min", "max")
 
@@ -319,6 +324,7 @@ class Optimizer:
         for f in funcs[::-1]:
             self.rules.insert(index, f)
 
+    @internal
     def optimize(self, nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
         """Performs the optimization by sending all nodes through the rules."""
 
@@ -369,9 +375,21 @@ def convert_data_arithmetic(opt: Optimizer, nodes: Iterable[IrOperation]):
         ):
             temp_score = opt.generate_score()
 
-            yield IrBinary(op="set", left=temp_score, right=node.right)
+            yield IrCast(left=temp_score, right=node.right, cast_type=Int)
             yield replace(node, right=temp_score)
 
+            continue
+
+        yield node
+
+def convert_cast(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    for node in nodes:
+        if is_binary(node, "set") and (
+            isinstance(node.left, IrScore) and isinstance(node.right, IrData)
+            or isinstance(node.left, IrData) and isinstance(node.right, IrScore)
+        ):
+            cast_type = Int if isinstance(node.left, IrScore) else Any
+            yield IrCast(left=node.left, right=node.right, cast_type=cast_type)
             continue
 
         yield node
@@ -395,13 +413,14 @@ def noncommutative_set_collapsing(nodes: SmartGenerator[IrOperation]):
     >>> abc["#value"] -= (1 + abc["@s"])    # doctest: +SKIP
     >>> abc["@s"] *= abc["@s"]              # doctest: +SKIP
     """
+
     for node in nodes:
         next_node = next(nodes, None)
         further_node = next(nodes, None)
         if (
-            is_binary(node, "set")
+            is_copy_op(node)
             and is_binary(next_node, SCORE_OPERATIONS)
-            and is_binary(further_node, "set")
+            and is_copy_op(further_node)
             and isinstance(further_node.left, IrScore)
             and node.right == further_node.left
             and node.left == next_node.left
@@ -485,7 +504,7 @@ def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer):
             next_node = next(nodes, None)
         if (
             is_binary(node, ("mul", "div"))
-            and is_binary(next_node, "set")
+            and isinstance(next_node, IrCast)
             and isinstance(node.right, IrLiteral)
             and isinstance(node.right.value, Numeric)
             and isinstance(next_node.left, IrData)
@@ -496,17 +515,15 @@ def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer):
             if scale.is_integer():
                 scale = int(scale)
 
-            source = next_node.left
-            number_type = source.nbt_type
+            number_type = next_node.cast_type
 
             if is_binary(node, "div"):
                 scale = 1 / scale
 
                 if number_type is Any:
-                    number_type = opt.default_floating_nbt_type
+                    number_type = literal_types[opt.default_floating_nbt_type]
 
-            new_source = replace(source, scale=scale, nbt_type=number_type)
-            out = IrBinary(op="set", left=new_source, right=node.left)
+            out = IrCast(left=next_node.left, right=node.left, cast_type=number_type, scale=scale)
 
             if operation_node:
                 yield operation_node  # yield the data operation node back in
@@ -535,7 +552,7 @@ def data_get_scaling(nodes: SmartGenerator[IrOperation]) -> Iterable[IrOperation
     for node in nodes:
         next_node = next(nodes, None)
         if (
-            is_binary(node, "set")
+            isinstance(node, IrCast)
             and is_binary(next_node, ("mul", "div"))
             and isinstance(node.right, IrData)
             and isinstance(next_node.right, IrLiteral)
@@ -550,8 +567,8 @@ def data_get_scaling(nodes: SmartGenerator[IrOperation]) -> Iterable[IrOperation
             if is_binary(next_node, "div"):
                 scale = 1 / scale
 
-            yield IrBinary(
-                op="set", left=node.left, right=replace(node.right, scale=scale)
+            yield IrCast(
+                left=node.left, right=node.right, scale=node.scale * scale
             )
         else:
             nodes.push(next_node)
@@ -601,7 +618,6 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
 
     return map
 
-
 def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     all_nodes = list(nodes)
 
@@ -622,7 +638,6 @@ def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperatio
             and isinstance(node.right, IrSource)
             and node.right.temp
             and type(node.left) is type(node.right)
-            and not is_cast_op(node)
         ):
             left_usage = usage_map[node.left]
             right_usage = usage_map[node.right]
@@ -668,13 +683,20 @@ def add_subtract_by_zero_removal(nodes: Iterable[IrOperation]):
             yield node
 
 
+def discard_casting(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    for node in nodes:
+        if isinstance(node, IrCast) and is_copy_op(node):
+            yield IrBinary(op="set",left=node.left,right=node.right)
+        else:
+            yield node
+
 def set_to_self_removal(nodes: Iterable[IrOperation]):
     """Removes Set operations that have the same former and latter source.
     Should run after "output_score_replacement" is applied to clean up
     all the reduntant Sets created by the previous rule.
     """
     for node in nodes:
-        if is_binary(node, "set"):
+        if is_copy_op(node):
             if node.left != node.right:
                 yield node
         else:
@@ -701,15 +723,28 @@ def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]):
     for node in nodes:
         next_node = next(nodes, None)
         if (
-            is_binary(node, "set")
-            and is_binary(next_node, "set")
+            is_binary(node, ("set", "cast"))
+            and is_binary(next_node, ("set", "cast"))
             and node.left == next_node.right
         ):
-            out = IrBinary(op="set", left=next_node.left, right=node.right)
+            scale = 1
+            if isinstance(next_node, IrCast):
+                scale = next_node.scale
+
+            if isinstance(node, IrCast):
+                if node.cast_type is not Any:
+                    nodes.push(next_node)
+                    yield node
+                    continue
+
+                scale *= node.scale
+
+            out = replace(next_node, right=node.right, scale=scale)
             yield out
-        else:
-            nodes.push(next_node)
-            yield node
+            continue
+
+        nodes.push(next_node)
+        yield node
 
 
 def literal_to_constant_replacement(

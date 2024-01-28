@@ -10,7 +10,7 @@ from mecha import Visitor, rule
 from nbtlib import String, Compound, List, Array, List, NamedKey, ListIndex, OutOfRange # type: ignore
 
 from .typing import NbtType, NbtValue, NumericNbtValue, access_type, convert_tag, is_array_type, is_compound_type, is_list_type, is_numeric_type, is_string_type, is_union, unwrap_optional_type
-from .optimizer import IrBinary, IrData, IrLiteral, IrOperation
+from .optimizer import IrBinary, IrCast, IrData, IrLiteral, IrOperation
 
 
 __all__ = [
@@ -100,7 +100,7 @@ def cast_value(nbt_type: NbtType, value: NbtValue | Any, ctx: Context | None = N
     return convert_tag(value)
 
 
-@dataclass(kw_only=True)
+@dataclass(eq=False, kw_only=True)
 class TypeCaster(Visitor):
     ctx: Context | None
     
@@ -112,7 +112,20 @@ class TypeCaster(Visitor):
     def fallback(self, node: IrOperation) -> IrOperation:
         return node
     
-    @rule(IrBinary, op="set")
+    @rule(IrCast)
+    def cast(self, node: IrCast) -> IrBinary:
+        if not isinstance(node.left, IrData):
+            return node
+        if not isinstance(node.right, IrLiteral):
+            return node
+
+        casted_value = cast_value(node.cast_type, node.right.value, self.ctx)
+
+        if casted_value is None:
+            return node
+
+        return replace(node, right=IrLiteral(value=casted_value))
+    
     @rule(IrBinary, op="merge")
     def set(self, node: IrBinary) -> IrBinary:
         if not isinstance(node.left, IrData):

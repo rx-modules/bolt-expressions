@@ -3,18 +3,18 @@ from typing import Any, Generator, Iterable
 from mecha import Visitor, rule
 from nbtlib import Byte, Short, Int, Long, Float, Double  # type: ignore
 
-from .typing import NBT_TYPE_STRING, NbtTypeString
+from .typing import NBT_TYPE_STRING, NbtTypeString, is_numeric_type
 from .utils import type_name
 
 from .optimizer import (
     IrBinary,
+    IrCast,
     IrData,
     IrInsert,
     IrLiteral,
     IrNode,
     IrScore,
     IrUnary,
-    is_cast_op,
 )
 
 __all__ = [
@@ -214,12 +214,12 @@ class IrSerializer(Visitor):
 
         result.append(cmd)
 
-    def serialize_nbt_type(self, value: Any) -> NbtTypeString | None:
-        if isinstance(value, str):
-            return value if value in NBT_TYPE_STRING else None
+    def serialize_nbt_type(self, value: Any) -> NbtTypeString:
+        if isinstance(value, str) and value in NBT_TYPE_STRING:
+            return value
 
         if not isinstance(value, type):
-            return None
+            return self.default_nbt_type
 
         if issubclass(value, Byte):
             return "byte"
@@ -234,7 +234,7 @@ class IrSerializer(Visitor):
         if issubclass(value,Int):
             return "int"
 
-        return None
+        return self.default_nbt_type
 
     def serialize_cast(self, data: IrData) -> tuple[str, str]:
         cast_type = data.nbt_type
@@ -260,17 +260,31 @@ class IrSerializer(Visitor):
                 cmd = f"scoreboard players operation {left} = {right}"
             case IrData(), IrLiteral():
                 cmd = f"data modify {left} set value {right}"
-            case IrData(), IrData() if not is_cast_op(node):
+            case IrData(), IrData():
                 cmd = f"data modify {left} set from {right}"
-            case IrData() as l, IrData() as r if is_cast_op(node):
-                nbt_type, scale = self.serialize_cast(l)
-                _, right_scale = self.serialize_cast(r)
-                cmd = f"execute store result {left} {nbt_type} {scale} run data get {right} {right_scale}"
+            case l, r:
+                raise InvalidOperand(node.op, l, r)
+
+        result.append(cmd)
+
+    @rule(IrCast, op="cast")
+    def cast(self, node: IrCast, result: list[str]) -> Generator[IrNode, str, None]:
+        left = yield node.left
+        right = yield node.right
+
+        nbt_type = self.serialize_nbt_type(node.cast_type)
+        scale = node.scale
+
+        match node.left, node.right:
+            case IrData(), IrLiteral():
+                cmd = f"data modify {left} set value {right}"
+            case IrData() as l, IrData() as r:
+                cmd = f"execute store result {left} {nbt_type} {scale} run data get {right} 1"
             case IrData() as l, IrScore():
-                nbt_type, scale = self.serialize_cast(l)
                 cmd = f"execute store result {left} {nbt_type} {scale} run scoreboard players get {right}"
+            case IrScore(), IrLiteral():
+                cmd = f"scoreboard players set {left} {right}"
             case IrScore(), IrData() as r:
-                _, scale = self.serialize_cast(r)
                 cmd = f"execute store result score {left} run data get {right} {scale}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
