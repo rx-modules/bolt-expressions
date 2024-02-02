@@ -27,6 +27,7 @@ beet = ">=0.55.0"
 mecha = ">=0.59.2"
 nbtlib = "1.12.1"
 bolt = ">=0.17.7"
+frozendict = "^2.4.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.12.0"
