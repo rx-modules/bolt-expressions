@@ -1,3 +1,5 @@
+from abc import ABC
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from types import TracebackType
@@ -18,16 +20,16 @@ from typing import (
 from mecha import AbstractNode
 from bolt.utils import internal
 
-from nbtlib import (
+from nbtlib import ( # type:ignore
     Int,
     Double,
     Float,
     Numeric,
     Path,
-)  # type:ignore
+)
 
-from .typing import NbtType, NbtValue, NumericNbtValue, literal_types, unwrap_optional_type, is_numeric_type
-# from rich.pretty import pprint
+from .typing import NbtType, NbtValue, literal_types, unwrap_optional_type
+
 
 __all__ = [
     "Rule",
@@ -68,15 +70,18 @@ class IrNode(AbstractNode):
     ...
 
 
-@dataclass(frozen=True, kw_only=True)
-class IrSource(IrNode):
-    temp: bool = False
+class IrSource(IrNode, ABC):
+    def to_tuple(self) -> "SourceTuple":
+        ...
 
 
 @dataclass(frozen=True, kw_only=True)
 class IrScore(IrSource):
     holder: str
     obj: str
+
+    def to_tuple(self) -> "ScoreTuple":
+        return ScoreTuple(self.holder, self.obj)
 
 
 DataTargetType = Literal["storage", "entity", "block"]
@@ -90,6 +95,8 @@ class IrData(IrSource):
     nbt_type: NbtType = Any
     scale: float | None = None
 
+    def to_tuple(self) -> "DataTuple":
+        return DataTuple(self.type, self.target, self.path)
 
 @dataclass(frozen=True, kw_only=True)
 class IrLiteral(IrNode):
@@ -257,7 +264,9 @@ class DataTuple(NamedTuple):
     type: DataTargetType
     target: str
     path: Path
-    nbt_type: NbtType = Any
+
+
+SourceTuple = ScoreTuple | DataTuple
 
 
 @dataclass
@@ -265,15 +274,66 @@ class TempScoreManager:
     objective: str
 
     counter: int = field(default=0, init=False)
+    format: Callable[[int], str] = field(default=lambda n: f"$s{n}") # type: ignore
 
     def __call__(self) -> ScoreTuple:
-        name = f"$i{self.counter}"
+        name = self.format(self.counter)
         self.counter += 1
 
         return ScoreTuple(name, self.objective)
+    
+    @contextmanager
+    def override(
+        self,
+        format: Callable[[int], str] | None = None,
+        reset: bool = False
+    ):
+        counter = self.counter
+        if reset:
+            self.counter = 0
+        
+        prev_format = self.format
+        if format:
+            self.format = format
 
-    def reset(self):
-        self.counter = 0
+        yield
+
+        self.counter = counter
+        self.format = prev_format
+
+
+@dataclass
+class TempDataManager:
+    target_type: DataTargetType
+    target: str
+
+    counter: int = field(default=0, init=False)
+    format: Callable[[int], str] = field(default=lambda n: f"i{n}") # type: ignore
+
+    def __call__(self) -> DataTuple:
+        name = self.format(self.counter)
+        self.counter += 1
+
+        return DataTuple(self.target_type, self.target, Path(name))
+    
+    @contextmanager
+    def override(
+        self,
+        format: Callable[[int], str] | None = None,
+        reset: bool = False
+    ):
+        counter = self.counter
+        if reset:
+            self.counter = 0
+        
+        prev_format = self.format
+        if format:
+            self.format = format
+
+        yield
+
+        self.counter = counter
+        self.format = prev_format
 
 
 @dataclass
@@ -308,9 +368,11 @@ class Optimizer:
     """
 
     temp_score: TempScoreManager
+    temp_data: TempDataManager
     const_score: ConstScoreManager
     default_floating_nbt_type: str
 
+    temp_sources: set[SourceTuple] = field(default_factory=set)
     rules: list[Rule[IrOperation, []]] = field(default_factory=list)
 
     def add_rules(self, *funcs: Rule[IrOperation, []], index: int | None = None):
@@ -328,20 +390,55 @@ class Optimizer:
     def optimize(self, nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
         """Performs the optimization by sending all nodes through the rules."""
 
-        for rule in self.rules:
-            nodes = rule(nodes)
+        with self.temp():
+            for rule in self.rules:
+                nodes = rule(nodes)
 
-        yield from nodes
+            yield from nodes
 
     __call__ = optimize
 
+    def add_temp(self, *sources: IrSource | SourceTuple):
+        for source in sources:
+            if isinstance(source, IrSource):
+                source = source.to_tuple()
+        
+            self.temp_sources.add(source)
+
+    @contextmanager
+    def temp(self, *sources: IrSource | SourceTuple):
+        prev_temp = set(self.temp_sources)
+        self.add_temp(*sources)
+        
+        yield
+        
+        self.temp_sources = prev_temp
+    
+    def is_temp(self, source: IrSource | SourceTuple):
+        if isinstance(source, IrSource):
+            source = source.to_tuple()
+
+        return source in self.temp_sources
+
     def generate_score(self) -> IrScore:
-        holder, obj = self.temp_score()
-        return IrScore(holder=holder, obj=obj, temp=True)
+        source = self.temp_score()
+        self.add_temp(source)
+
+        return IrScore(holder=source.holder, obj=source.obj)
 
     def generate_const(self, value: int) -> IrScore:
         holder, obj = self.const_score(value)
         return IrScore(holder=holder, obj=obj)
+
+    def generate_data(self) -> IrData:
+        source = self.temp_data()
+        self.add_temp(source)
+
+        return IrData(
+            type=source.type,
+            target=source.target,
+            path=source.path
+        )
 
 
 def data_insert_score(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
@@ -459,13 +556,12 @@ def commutative_set_collapsing(
         ):
             yield replace(node, left=next_node.left, right=next_node.right)
         else:
-            # print("old", node)
             nodes.push(next_node)
             yield node
 
 
 @use_smart_generator
-def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer):
+def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
     """
     Turns a multiplication/division of a temp score followed by a
     data set operation into a single set operation with a scale argument.
@@ -608,7 +704,8 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
             add(source, i)
 
         if is_binary(node):
-            add(node.left, i)
+            if node.op not in ("set", "cast"):
+                add(node.left, i)
 
             if isinstance(node.right, IrSource):
                 add(node.right, i)
@@ -618,12 +715,13 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
 
     return map
 
-def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+def apply_temp_source_reuse(
+    opt: Optimizer,
+    nodes: Iterable[IrOperation]
+) -> Iterable[IrOperation]:
     all_nodes = list(nodes)
 
     usage_map = get_source_usage(all_nodes)
-    # print(usage_map)
-
     replace_map: dict[IrSource, IrSource] = {}
 
     def replace_source(source: IrSource) -> IrSource:
@@ -636,13 +734,19 @@ def apply_temp_source_reuse(nodes: Iterable[IrOperation]) -> Iterable[IrOperatio
         if (
             is_binary(node, "set")
             and isinstance(node.right, IrSource)
-            and node.right.temp
+            and opt.is_temp(node.right)
             and type(node.left) is type(node.right)
         ):
-            left_usage = usage_map[node.left]
-            right_usage = usage_map[node.right]
+            left_usage = usage_map.get(node.left)
+            right_usage = usage_map.get(node.right)
 
-            if left_usage[0] == right_usage[-1] == i:
+            if  right_usage is None:
+                continue
+
+            if (
+                left_usage is None
+                or left_usage[0] > i and right_usage[-1] == i
+            ):
                 replace_map[node.right] = node.left
 
     for node in all_nodes:
@@ -703,6 +807,24 @@ def set_to_self_removal(nodes: Iterable[IrOperation]):
             yield node
 
 
+def literal_to_constant_replacement(
+    opt: Optimizer,
+    nodes: Iterable[IrOperation],
+) -> Iterable[IrOperation]:
+    for node in nodes:
+        if (
+            is_binary(node, ("mul", "div", "min", "max", "mod"))
+            and isinstance(node.right, IrLiteral)
+            and isinstance(node.right.value, Numeric)
+        ):
+            value = int(node.right.value)
+            constant = opt.generate_const(value)
+
+            yield replace(node, right=constant)
+        else:
+            yield node
+
+
 @use_smart_generator
 def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]):
     """
@@ -732,14 +854,21 @@ def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]):
                 scale = next_node.scale
 
             if isinstance(node, IrCast):
-                if node.cast_type is not Any:
+                if (
+                    node.cast_type is not Any
+                    and not isinstance(node.left, IrScore)
+                ):
                     nodes.push(next_node)
                     yield node
                     continue
 
                 scale *= node.scale
 
-            out = replace(next_node, right=node.right, scale=scale)
+            if isinstance(next_node, IrCast):
+                out = replace(next_node, right=node.right, scale=scale)
+            else:
+                out = replace(next_node, right=node.right)
+
             yield out
             continue
 
@@ -747,63 +876,49 @@ def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]):
         yield node
 
 
-def literal_to_constant_replacement(
-    opt: Optimizer,
-    nodes: Iterable[IrOperation],
-) -> Iterable[IrOperation]:
-    for node in nodes:
-        if (
-            is_binary(node, ("mul", "div", "min", "max", "mod"))
-            and isinstance(node.right, IrLiteral)
-            and isinstance(node.right.value, Numeric)
-        ):
-            value = int(node.right.value)
-            constant = opt.generate_const(value)
-
-            yield replace(node, right=constant)
-        else:
-            yield node
-
-
 def rename_temp_scores(
     opt: Optimizer,
     nodes: Iterable[IrOperation],
 ) -> Iterable[IrOperation]:
     nodes = tuple(nodes)
-    opt.temp_score.reset()
+    with (
+        opt.temp_score.override(format=lambda n: f"$i{n}", reset=True),
+        opt.temp_data.override(format=lambda n: f"i{n}", reset=True)
+    ):
+        source_map: dict[IrSource, IrSource] = {}
 
-    source_map: dict[IrSource, IrSource] = {}
+        def replace_source(node: IrNode) -> IrNode:
+            if not isinstance(node, IrSource):
+                return node
 
-    def replace_source(node: IrNode) -> IrNode:
-        if not isinstance(node, IrSource):
-            return node
+            if not opt.is_temp(node):
+                return node
 
-        if not node.temp:
-            return node
+            if node not in source_map:
+                if isinstance(node, IrScore):
+                    source_map[node] = opt.generate_score()
+                elif isinstance(node, IrData):
+                    source_map[node] = opt.generate_data()
+                else:
+                    source_map[node] = node
 
-        if node not in source_map:
-            if isinstance(node, IrScore):
-                source_map[node] = opt.generate_score()
+            return source_map[node]
+
+        for node in nodes:
+            if not is_op(node):
+                yield node
+                continue
+
+            store = tuple((type, replace_source(s)) for type, s in node.store)
+
+            if is_unary(node):
+                yield replace(node, target=replace_source(node.target), store=store)
+            elif is_binary(node):
+                yield replace(
+                    node,
+                    left=replace_source(node.left),
+                    right=replace_source(node.right),
+                    store=store,
+                )
             else:
-                source_map[node] = node
-
-        return source_map[node]
-
-    for node in nodes:
-        if not is_op(node):
-            yield node
-            continue
-
-        store = tuple((type, replace_source(s)) for type, s in node.store)
-
-        if is_unary(node):
-            yield replace(node, target=replace_source(node.target), store=store)
-        elif is_binary(node):
-            yield replace(
-                node,
-                left=replace_source(node.left),
-                right=replace_source(node.right),
-                store=store,
-            )
-        else:
-            yield replace(node, store=store)
+                yield replace(node, store=store)

@@ -9,7 +9,7 @@ from mecha import Mecha
 import bolt_expressions as bolt_expressions_module
 from .ast import ConstantScoreChecker, ObjectiveChecker, SourceJsonConverter
 from .node import Expression
-from .operations import wrapped_min, wrapped_max
+from .expose import wrapped_min, wrapped_max
 from .api import Scoreboard, Data
 
 __all__ = [

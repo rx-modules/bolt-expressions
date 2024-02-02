@@ -6,7 +6,7 @@ from beet.core.utils import required_field
 
 from .optimizer import IrLiteral
 from .typing import NbtValue, convert_tag
-from .node import Expression, ExpressionNode
+from .node import Expression, ExpressionNode, UnrollHelper
 from .utils import type_name
 
 __all__ = [
@@ -31,7 +31,7 @@ class Literal(ExpressionNode):
     def __str__(self):
         return self.nbt.snbt()  # type: ignore
 
-    def unroll(self):
+    def unroll(self, helper: UnrollHelper):
         return (), IrLiteral(value=self.nbt)
 
 
