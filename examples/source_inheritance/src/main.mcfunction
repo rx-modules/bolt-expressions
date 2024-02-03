@@ -1,18 +1,11 @@
-from bolt_expressions import
-    Scoreboard,
-    Data,
-    GenericDataSource,
-    NumericDataSource,
-    StringDataSource,
-    SequenceDataSource,
-    CompoundDataSource
+from bolt_expressions import Scoreboard, Data, DataSource
 from dataclasses import dataclass, replace
 from contextlib import contextmanager
 from typing import TypedDict
 from nbtlib import Byte, Double
 
 @dataclass(order=False, repr=False)
-class ExtendedDataSource:
+class ExtendedDataSource(DataSource):
     _inverted: bool = False
 
     @contextmanager
@@ -30,39 +23,8 @@ class ExtendedDataSource:
     def increment(self):
         self += 1
 
-    @classmethod
-    def get_subclasses(cls):
-        return {
-            "generic": ExtendedGenericDataSource,
-            "numeric": ExtendedNumericDataSource,
-            "string": ExtendedStringDataSource,
-            "array": ExtendedSequenceDataSource,
-            "list": ExtendedSequenceDataSource,
-            "compound": ExtendedCompoundDataSource,
-        }
 
-@dataclass(repr=False)
-class ExtendedGenericDataSource(ExtendedDataSource, GenericDataSource):
-    ...
-
-@dataclass(repr=False)
-class ExtendedNumericDataSource(ExtendedDataSource, NumericDataSource):
-    ...
-
-@dataclass(repr=False)
-class ExtendedStringDataSource(ExtendedDataSource, StringDataSource):
-    ...
-
-@dataclass(repr=False)
-class ExtendedSequenceDataSource(ExtendedDataSource, SequenceDataSource):
-    ...
-
-@dataclass(repr=False)
-class ExtendedCompoundDataSource(ExtendedDataSource, CompoundDataSource):
-    ...
-
-
-storage = ExtendedGenericDataSource.create("storage", example:main, ctx=ctx)
+storage = ExtendedDataSource("storage", example:main, ctx=ctx)
 
 
 class ItemTag(TypedDict):

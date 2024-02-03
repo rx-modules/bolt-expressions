@@ -58,3 +58,9 @@ r.enable()
 # r is no longer set
 obj["$a1"] = r
 obj["$a2"] = r
+
+tellraw @a (obj["@s"] * 5)
+
+v = (obj["$v"] * 5) / obj["$w"]
+obj["$v"] = 0
+if score var v matches 1.. say Hello 

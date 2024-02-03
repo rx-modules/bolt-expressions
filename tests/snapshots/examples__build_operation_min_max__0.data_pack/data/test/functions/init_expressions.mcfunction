@@ -7,5 +7,5 @@ scoreboard players set $40 bolt.expr.const 40
 scoreboard players set $0 bolt.expr.const 0
 scoreboard players set $100 bolt.expr.const 100
 scoreboard players set $-1 bolt.expr.const -1
-scoreboard players set $4 bolt.expr.const 4
 scoreboard players set $3 bolt.expr.const 3
+scoreboard players set $4 bolt.expr.const 4

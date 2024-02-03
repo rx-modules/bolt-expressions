@@ -1,11 +1,15 @@
 say # scaled data to data
-execute store result storage demo out int 100 run data get storage demo value 1
+execute store result score $i0 bolt.expr.temp run data get storage demo value 1
+execute store result storage demo out int 100 run scoreboard players get $i0 bolt.expr.temp
 say # scaled score
-execute store result storage demo out double 0.01 run scoreboard players get $value obj
+scoreboard players operation $i0 bolt.expr.temp = $value obj
+execute store result storage demo out double 0.01 run scoreboard players get $i0 bolt.expr.temp
 say # scaled data
-execute store result storage demo out double 0.01 run data get storage demo value 1
+execute store result score $i0 bolt.expr.temp run data get storage demo value 1
+execute store result storage demo out double 0.01 run scoreboard players get $i0 bolt.expr.temp
 say # get and set scaled data
-execute store result storage demo out double 0.01 run data get storage demo value 100
+execute store result score $i0 bolt.expr.temp run data get storage demo value 100
+execute store result storage demo out double 0.01 run scoreboard players get $i0 bolt.expr.temp
 say # set scaled score
 scoreboard players operation $i0 bolt.expr.temp = $value obj
 scoreboard players add $i0 bolt.expr.temp 1
