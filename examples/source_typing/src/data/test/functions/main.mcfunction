@@ -1,6 +1,6 @@
 from nbtlib import Path, Byte, Short, Int, Long, Float, Double, ByteArray, IntArray, LongArray, List, Compound, String
 from typing import TypedDict, Any
-from bolt_expressions import Data
+from bolt_expressions import Data, TypeCheckDiagnostic
 from bolt_expressions.utils import assert_exception
 
 
@@ -143,14 +143,17 @@ value.append(3)
 value.prepend(0)
 value.insert(4, 13)
 
-item = {id:"bla",Count:15,tag:{CustomModelData:14.2,Items:[{id:"stone",Count:3}]}}
+with assert_exception(TypeCheckDiagnostic):
+    item = {id:"bla",Count:15,tag:{CustomModelData:14.2,Items:[{id:"stone",Count:3}]}}
 
 storage.new_item[Item] = item | {Count:5} | storage.other_item | {tag:{Items:[{Count:23}]}}
 
 storage.name[str] = "george"
 
 storage.flag[Byte] = 127
-storage.flag[Byte] = 128
+with assert_exception(TypeCheckDiagnostic):
+    storage.flag[Byte] = 128
 
 storage.flags[ByteArray] = [1,2,3,127]
-storage.flags[ByteArray] = [1,2,3,128]
+with assert_exception(TypeCheckDiagnostic):
+    storage.flags[ByteArray] = [1,2,3,128]

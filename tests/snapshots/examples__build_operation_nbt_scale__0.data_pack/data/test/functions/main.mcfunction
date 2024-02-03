@@ -5,7 +5,7 @@ execute store result storage demo out double 0.01 run scoreboard players get $va
 say # scaled data
 execute store result storage demo out double 0.01 run data get storage demo value 1
 say # get and set scaled data
-execute store result storage demo out double 0.01 run data get storage demo value 100
+execute store result storage demo out double 1.0 run data get storage demo value 1
 say # set scaled score
 scoreboard players operation $i0 bolt.expr.temp = $value obj
 scoreboard players add $i0 bolt.expr.temp 1
