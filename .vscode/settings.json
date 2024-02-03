@@ -10,13 +10,17 @@
   "python.linting.pycodestyleEnabled": false,
   "python.linting.pydocstyleEnabled": false,
   "python.linting.pylamaEnabled": false,
+  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportPrivateUsage": "none",
+  },
   "[python]": {
     "editor.tabSize": 4,
     "editor.formatOnSave": false,
     "editor.formatOnType": false,
     "editor.formatOnPaste": false,
     "editor.codeActionsOnSave": {
-      "source.organizeImports": false
+      "source.organizeImports": "never"
     }
   }
 }
