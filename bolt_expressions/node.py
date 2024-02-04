@@ -11,7 +11,7 @@ from bolt.utils import internal
 from bolt.contrib.defer import Defer
 from mecha import Mecha
 from pydantic import BaseModel
-from nbtlib import Path # type: ignore
+from nbtlib import Path  # type: ignore
 
 # from rich.pretty import pprint
 
@@ -83,6 +83,7 @@ class ResultType(Enum):
     score = auto()
     data = auto()
 
+
 @dataclass
 class UnrollHelper:
     ignored_sources: set[SourceTuple] = field(init=False, default_factory=set)
@@ -100,10 +101,10 @@ class UnrollHelper:
 
         if remove:
             self.ignored_sources.remove(source)
-    
+
     def add_temporary(self, source: SourceTuple):
         self.temporaries.add(source)
-    
+
     def create_temporary(self, result: ResultType) -> IrSource:
         if result == ResultType.data:
             source = self.data_manager()
@@ -113,8 +114,6 @@ class UnrollHelper:
         source = self.score_manager()
         self.add_temporary(source)
         return IrScore(holder=source.holder, obj=source.obj)
-
-
 
 
 @dataclass(order=False, eq=False, kw_only=True)
@@ -136,6 +135,7 @@ class ExpressionNode(ABC):
 
 
 ResolveResult = SourceTuple | NbtValue | None
+
 
 @dataclass(kw_only=True)
 class LazyEntry:
@@ -187,7 +187,7 @@ class Expression:
             self.identifiers = identifier_generator(ctx)
             self.mc = self.ctx.inject(Mecha)
             self.runtime = self.ctx.inject(Runtime)
-            self.defer= self.ctx.inject(Defer)
+            self.defer = self.ctx.inject(Defer)
         else:
             self.opts = opts if opts is not None else ExpressionOptions()
             self.identifiers = identifier_generator()
@@ -195,13 +195,10 @@ class Expression:
             self.runtime = runtime
 
         self.temp_score = TempScoreManager(
-            self.opts.temp_objective,
-            format=lambda _: "$" + next(self.identifiers)
+            self.opts.temp_objective, format=lambda _: "$" + next(self.identifiers)
         )
         self.temp_data = TempDataManager(
-            "storage",
-            self.opts.temp_storage,
-            format=lambda _: next(self.identifiers)
+            "storage", self.opts.temp_storage, format=lambda _: next(self.identifiers)
         )
         self.const_score = ConstScoreManager(self.opts.const_objective)
 
@@ -264,14 +261,16 @@ class Expression:
     def resolve(self, node: ExpressionNode, lazy: bool = False):
         # pprint(node)
 
-        helper = UnrollHelper(score_manager=self.temp_score, data_manager=self.temp_data)
+        helper = UnrollHelper(
+            score_manager=self.temp_score, data_manager=self.temp_data
+        )
         operations, result = node.unroll(helper)
 
         if not isinstance(result, IrSource):
             return
 
         source = result.to_tuple()
-        
+
         if source in self.lazy_values:
             del self.lazy_values[source]
 
@@ -280,7 +279,7 @@ class Expression:
 
         with self.optimizer.temp(*helper.temporaries):
             optimized_nodes = list(self.optimizer(operations))
-        
+
         # pprint(optimized_nodes)
         cmds = self.serializer(optimized_nodes)
         # pprint(cmds, expand_all=True)
@@ -288,30 +287,30 @@ class Expression:
         if not lazy or not self.defer:
             self.inject_command(*cmds)
             return
-        
+
         entry = LazyEntry(source=source, node=node, commands=cmds)
         self.lazy_values[source] = entry
         self.defer(partial(self.emit_lazy, entry=entry))
-    
+
     def unroll_lazy(
         self, source: SourceTuple, helper: UnrollHelper
     ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral] | None:
         if source in helper.ignored_sources:
             return None
-        
+
         if entry := self.lazy_values.get(source):
             helper.add_temporary(source)
 
             with helper.ignore_source(source):
                 return entry.node.unroll(helper)
-        
+
         return None
-    
+
     def evaluate_lazy(self, source: SourceTuple):
         if entry := self.lazy_values.get(source):
             entry.emit = True
             del self.lazy_values[source]
-    
+
     def emit_lazy(self, entry: LazyEntry):
         if entry.emit:
             self.inject_command(*entry.commands)

@@ -231,7 +231,7 @@ class IrSerializer(Visitor):
             return "double"
         if issubclass(value, Float):
             return "float"
-        if issubclass(value,Int):
+        if issubclass(value, Int):
             return "int"
 
         return self.default_nbt_type

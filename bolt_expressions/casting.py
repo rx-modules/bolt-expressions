@@ -1,5 +1,3 @@
-
-
 from contextlib import suppress
 from dataclasses import dataclass, replace
 from types import NoneType
@@ -7,9 +5,22 @@ from typing import Any, Iterable
 from beet import Context
 
 from mecha import Visitor, rule
-from nbtlib import String, Compound, List, Array, List, NamedKey, ListIndex, OutOfRange # type: ignore
+from nbtlib import String, Compound, List, Array, List, NamedKey, ListIndex, OutOfRange  # type: ignore
 
-from .typing import NbtType, NbtValue, NumericNbtValue, access_type, convert_tag, is_array_type, is_compound_type, is_list_type, is_numeric_type, is_string_type, is_union, unwrap_optional_type
+from .typing import (
+    NbtType,
+    NbtValue,
+    NumericNbtValue,
+    access_type,
+    convert_tag,
+    is_array_type,
+    is_compound_type,
+    is_list_type,
+    is_numeric_type,
+    is_string_type,
+    is_union,
+    unwrap_optional_type,
+)
 from .optimizer import IrBinary, IrCast, IrData, IrLiteral, IrOperation
 
 
@@ -18,7 +29,9 @@ __all__ = [
 ]
 
 
-def cast_dict(nbt_type: NbtType, value: dict[Any, Any], ctx: Context | None = None) -> Compound | None:
+def cast_dict(
+    nbt_type: NbtType, value: dict[Any, Any], ctx: Context | None = None
+) -> Compound | None:
     if not is_compound_type(nbt_type):
         return None
 
@@ -38,7 +51,9 @@ def cast_dict(nbt_type: NbtType, value: dict[Any, Any], ctx: Context | None = No
     return Compound(result)
 
 
-def cast_list(nbt_type: NbtType, value: list[Any] | Array, ctx: Context | None = None) -> List | Array | None:
+def cast_list(
+    nbt_type: NbtType, value: list[Any] | Array, ctx: Context | None = None
+) -> List | Array | None:
     if is_list_type(nbt_type):
         cast_type = List
     elif is_array_type(nbt_type):
@@ -79,7 +94,9 @@ def cast_string(nbt_type: NbtType, value: str) -> String | None:
     return None
 
 
-def cast_value(nbt_type: NbtType, value: NbtValue | Any, ctx: Context | None = None) -> NbtValue | None:
+def cast_value(
+    nbt_type: NbtType, value: NbtValue | Any, ctx: Context | None = None
+) -> NbtValue | None:
     nbt_type = unwrap_optional_type(nbt_type)
 
     if nbt_type in (Any, None, NoneType) or is_union(nbt_type):
@@ -103,15 +120,15 @@ def cast_value(nbt_type: NbtType, value: NbtValue | Any, ctx: Context | None = N
 @dataclass(eq=False, kw_only=True)
 class TypeCaster(Visitor):
     ctx: Context | None
-    
-    def __call__(self, nodes: Iterable[IrOperation]) -> Iterable[IrOperation]: # type: ignore
+
+    def __call__(self, nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:  # type: ignore
         for node in nodes:
             yield self.invoke(node)
-    
+
     @rule(IrOperation)
     def fallback(self, node: IrOperation) -> IrOperation:
         return node
-    
+
     @rule(IrCast)
     def cast(self, node: IrCast) -> IrBinary:
         if not isinstance(node.left, IrData):
@@ -125,7 +142,7 @@ class TypeCaster(Visitor):
             return node
 
         return replace(node, right=IrLiteral(value=casted_value))
-    
+
     @rule(IrBinary, op="merge")
     def set(self, node: IrBinary) -> IrBinary:
         if not isinstance(node.left, IrData):
@@ -139,7 +156,7 @@ class TypeCaster(Visitor):
             return node
 
         return replace(node, right=IrLiteral(value=casted_value))
-    
+
     @rule(IrBinary, op="insert")
     @rule(IrBinary, op="append")
     @rule(IrBinary, op="prepend")
@@ -148,7 +165,7 @@ class TypeCaster(Visitor):
             return node
         if not isinstance(node.right, IrLiteral):
             return node
-        
+
         nbt_type = access_type(node.left.nbt_type, ListIndex(None), self.ctx)
 
         if nbt_type is None:

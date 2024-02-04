@@ -2,17 +2,35 @@ from abc import ABC, abstractmethod
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from types import CodeType
-from typing import Any, Callable, ClassVar, Generic, ParamSpec, Self, TypeVar, Union, cast, overload
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Generic,
+    ParamSpec,
+    Self,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 import typing as t
 from bolt.utils import internal
 
-from nbtlib import Compound, Path, ListIndex, CompoundMatch, NamedKey # type: ignore
+from nbtlib import Compound, Path, ListIndex, CompoundMatch, NamedKey  # type: ignore
 
 from .node import Expression, UnrollHelper
 from .typing import NbtType, is_compound_type
 from .utils import format_type, type_name
 
-from .optimizer import DataTuple, IrData, IrScore, DataTargetType, ScoreTuple, SourceTuple
+from .optimizer import (
+    DataTuple,
+    IrData,
+    IrScore,
+    DataTargetType,
+    ScoreTuple,
+    SourceTuple,
+)
 from .literals import Literal, convert_node
 from .node import Expression, ExpressionNode
 from .operations import (
@@ -36,7 +54,19 @@ from .operations import (
     Subtract,
     UnaryOperation,
 )
-from .typing import NbtType, Accessor, access_type, convert_type, convert_tag, is_array_type, is_list_type, is_numeric_type, is_string_type, is_type, literal_types
+from .typing import (
+    NbtType,
+    Accessor,
+    access_type,
+    convert_type,
+    convert_tag,
+    is_array_type,
+    is_list_type,
+    is_numeric_type,
+    is_string_type,
+    is_type,
+    literal_types,
+)
 
 
 __all__ = [
@@ -59,12 +89,10 @@ def resolve(
     value: Any,
     result: Union["Source", None] = None,
     cast: NbtType | None = None,
-    lazy: bool = False
+    lazy: bool = False,
 ):
     value_node = (
-        value
-        if isinstance(value, ExpressionNode)
-        else Literal(value=value, ctx=expr)
+        value if isinstance(value, ExpressionNode) else Literal(value=value, ctx=expr)
     )
 
     result_type = ResultType.data
@@ -87,7 +115,7 @@ def resolve(
         op = Set(former=result, latter=value_node, ctx=expr)
     else:
         op = Cast(former=result, latter=value_node, cast_type=cast, ctx=expr)
-    
+
     expr.resolve(op, lazy=lazy)
 
     return result
@@ -97,11 +125,11 @@ def create_result(expr: Expression, result_type: ResultType) -> "Source":
     if result_type == ResultType.score:
         holder, obj = expr.temp_score()
         return ScoreSource(holder, obj, ctx=expr)
-    
+
     if result_type == ResultType.data:
         target_type, target, path = expr.temp_data()
         return DataSource(target_type, target, path, ctx=expr)
-    
+
     raise ValueError(f"Invalid operation result type {result_type}.")
 
 
@@ -117,17 +145,17 @@ class OperatorMethod(Generic[P, T]):
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
         if self.target and not self.lazy:
             self.target.evaluate()
-        
+
         value = self.func(*args, **kwargs)
 
-        if isinstance(value, (UnaryOperation , BinaryOperation)):
+        if isinstance(value, (UnaryOperation, BinaryOperation)):
             result = resolve(value.expr, value, lazy=self.lazy)
         else:
             result = value
-        
+
         if self.returns:
             return result
-    
+
     def __get__(self, obj: Any, objtype: Any = None):
         if isinstance(obj, OperatorHandler):
             target = obj.target
@@ -137,9 +165,9 @@ class OperatorMethod(Generic[P, T]):
             target = None
         else:
             raise TypeError(f"Operator method is bound on an invalid object.")
-        
+
         return replace(self, target=target, func=self.func.__get__(obj, objtype))
-    
+
     @property
     def __code__(self) -> CodeType:
         return self.func.__code__
@@ -147,27 +175,26 @@ class OperatorMethod(Generic[P, T]):
 
 @overload
 def operator_method(
-    *,
-    lazy: bool = False,
-    is_internal: bool = True,
-    returns: bool = True
+    *, lazy: bool = False, is_internal: bool = True, returns: bool = True
 ) -> Callable[[Callable[P, T]], OperatorMethod[P, T]]:
     ...
+
 
 @overload
 def operator_method(func: Callable[P, T]) -> OperatorMethod[P, T]:
     ...
+
 
 def operator_method(
     func: Callable[..., Any] | None = None,
     *,
     lazy: bool = False,
     is_internal: bool = True,
-    returns: bool = True
+    returns: bool = True,
 ) -> Any:
     def decorator(f: Callable[P, T]) -> OperatorMethod[P, T]:
         return OperatorMethod(f, lazy, returns)
-    
+
     if is_internal:
         internal(decorator)
 
@@ -189,7 +216,7 @@ class OperatorHandler:
         if attr := getattr(self, key, None):
             if isinstance(attr, OperatorMethod):
                 return cast(OperatorMethod[..., Any], attr)
-        
+
         return default
 
 
@@ -214,6 +241,7 @@ BinaryOpFunction = Callable[[Union[ExpressionNode, "OperatorHandler"], Any], T]
 
 SanitizedBinaryOpFunction = Callable[[ExpressionNode, ExpressionNode], T]
 
+
 def sanitized(f: SanitizedBinaryOpFunction[T]) -> BinaryOpFunction[T]:
     def decorated(node: Union[ExpressionNode, "OperatorHandler"], value: Any):
         if isinstance(node, OperatorHandler):
@@ -230,6 +258,7 @@ def binary_operator(
 ) -> BinaryOpFunction[BinOp]:
     ...
 
+
 @overload
 def binary_operator(
     cls: type[BinOp],
@@ -238,13 +267,12 @@ def binary_operator(
 ) -> tuple[BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]]:
     ...
 
+
 def binary_operator(
     cls: type[BinOp],
     *,
     reverse: bool = False,
-) -> BinaryOpFunction[BinOp] | tuple[
-    BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]
-]:
+) -> BinaryOpFunction[BinOp] | tuple[BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]]:
     @sanitized
     def decorator(left: ExpressionNode, right: ExpressionNode) -> Any:
         return cls(former=left, latter=right, ctx=left.ctx)
@@ -318,10 +346,9 @@ class ScoreSource(Source):
     def unroll(self, helper: UnrollHelper):
         if r := self.expr.unroll_lazy(self.to_tuple(), helper):
             return r[0], r[1]
-        
+
         result = IrScore(holder=self.scoreholder, obj=self.objective)
         return (), result
-        
 
     @property
     def holder(self):
@@ -354,7 +381,9 @@ class GenericOperatorHandler(OperatorHandler):
 
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
-        return Insert(former=self.target, latter=value, index=index, ctx=self.target.ctx)
+        return Insert(
+            former=self.target, latter=value, index=index, ctx=self.target.ctx
+        )
 
     @operator_method(returns=False)
     def append(self, value: Any):
@@ -373,6 +402,7 @@ class GenericOperatorHandler(OperatorHandler):
     def merge(self, value: Any):
         return InPlaceMerge(former=self.target, latter=value, ctx=self.target.ctx)
 
+
 class NumericOperatorHandler(OperatorHandler):
     __add__, __radd__ = binary_operator(Add, reverse=True)
     __sub__, __rsub__ = binary_operator(Subtract, reverse=True)
@@ -380,15 +410,19 @@ class NumericOperatorHandler(OperatorHandler):
     __truediv__, __rtruediv__ = binary_operator(Divide, reverse=True)
     __mod__, __rmod__ = binary_operator(Modulus, reverse=True)
 
+
 class StringOperatorHandler(OperatorHandler):
     ...
+
 
 class SequenceOperatorHandler(OperatorHandler):
     list_index: ClassVar[bool] = True
 
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
-        return Insert(former=self.target, latter=value, index=index, ctx=self.target.ctx)
+        return Insert(
+            former=self.target, latter=value, index=index, ctx=self.target.ctx
+        )
 
     @operator_method(returns=False)
     def append(self, value: Any):
@@ -402,6 +436,7 @@ class SequenceOperatorHandler(OperatorHandler):
     def remove(self, sub_path: Any = None):
         target = self.target if sub_path is None else self.target[sub_path]
         return Remove(target=target, ctx=self.target.ctx)
+
 
 class CompoundOperatorHandler(OperatorHandler):
     named_key: ClassVar[bool] = True
@@ -416,6 +451,7 @@ class CompoundOperatorHandler(OperatorHandler):
 
 def _not_implemented(*_: Any):
     return NotImplemented
+
 
 @dataclass
 class DataSourceOperator:
@@ -440,14 +476,14 @@ class DataSourceOperator:
 
         with suppress(AttributeError):
             return getattr(handler, self.operator)
-        
+
         if self.default is not None:
             return self.default.__get__(obj, objtype)
 
         raise AttributeError(
             f"'{type_name(obj)}' object has no attribute '{self.operator}'.",
             name=self.operator,
-            obj=obj
+            obj=obj,
         )
 
 
@@ -504,7 +540,7 @@ class DataSource(Source):
 
     def to_tuple(self) -> DataTuple:
         return DataTuple(self._type, self._target, self._path)
-    
+
     def unroll(self, helper: UnrollHelper):
         if r := self.expr.unroll_lazy(self.to_tuple(), helper):
             return r[0], r[1]
@@ -517,7 +553,7 @@ class DataSource(Source):
             scale=self._scale,
         )
         return (), result
-    
+
     @internal
     def __rebind__(self, right: Any):
         return resolve(self.expr, right, result=self, cast=self.writetype)
@@ -543,7 +579,7 @@ class DataSource(Source):
 
         if is_type(key, allow_dict=False):
             return replace(self, writetype=convert_type(key) or Any)
-        
+
         if isinstance(key, str):
             if method := self.operator_handler.get(key):
                 return method
@@ -569,29 +605,34 @@ class DataSource(Source):
             return self
 
         handler = self.operator_handler
-        
+
         accessor, *rest = cast(tuple[Accessor, ...], tuple(sub_path))
 
         if isinstance(accessor, ListIndex) and not handler.list_index:
-            raise TypeError(f"Data source of type '{format_type(self.readtype)}' object is not indexable")
+            raise TypeError(
+                f"Data source of type '{format_type(self.readtype)}' object is not indexable"
+            )
 
         if isinstance(accessor, CompoundMatch) and not handler.compound_match:
-            raise TypeError(f"Data source of type '{format_type(self.readtype)}' does not support compound matching")
+            raise TypeError(
+                f"Data source of type '{format_type(self.readtype)}' does not support compound matching"
+            )
 
         if isinstance(accessor, NamedKey) and not handler.named_key:
-            raise TypeError(f"Data source of type '{format_type(self.readtype)}' does not have named keys")
-        
+            raise TypeError(
+                f"Data source of type '{format_type(self.readtype)}' does not have named keys"
+            )
+
         writetype = access_type(self.writetype, accessor, self.expr.ctx) or Any
-        path = Path.from_accessors((*self._path, accessor)) # type: ignore
+        path = Path.from_accessors((*self._path, accessor))  # type: ignore
 
         source = replace(self, _path=path, writetype=writetype)
 
         if not len(rest):
             return source
-        
-        rest_path = Path.from_accessors(tuple(rest)) # type: ignore
+
+        rest_path = Path.from_accessors(tuple(rest))  # type: ignore
         return source._access(rest_path)
-        
 
     @overload
     def __call__(self, matching: str | Path | Compound, /) -> Any:

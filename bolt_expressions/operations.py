@@ -64,15 +64,13 @@ class UnaryOperation(Operation):
     def in_place_target(self) -> ExpressionNode | None:
         if not self.in_place:
             return None
-            
+
         return self.target
 
     def create_operation(self, target: IrSource) -> IrUnary:
         return IrUnary(op=self.op, target=target)
 
-    def unroll(
-        self, helper: UnrollHelper
-    ) -> tuple[Iterable[IrOperation], IrSource]:
+    def unroll(self, helper: UnrollHelper) -> tuple[Iterable[IrOperation], IrSource]:
         target = convert_node(self.target, self.ctx)
         target_nodes, target_value = target.unroll(helper)
 
@@ -190,6 +188,7 @@ class Set(BinaryOperation):
     op: ClassVar[str] = "set"
     in_place: ClassVar[bool] = True
 
+
 @dataclass(eq=False, order=False)
 class Cast(BinaryOperation):
     op: ClassVar[str] = "cast"
@@ -199,6 +198,7 @@ class Cast(BinaryOperation):
 
     def create_operation(self, left: IrSource, right: IrSource | IrLiteral) -> IrCast:
         return IrCast(left=left, right=right, cast_type=self.cast_type)
+
 
 class Enable(UnaryOperation):
     op: ClassVar[str] = "enable"

@@ -36,7 +36,15 @@ from .typing import (
     is_union,
     unwrap_optional_type,
 )
-from .optimizer import IrBinary, IrCast, IrData, IrLiteral, IrOperation, IrScore, IrSource
+from .optimizer import (
+    IrBinary,
+    IrCast,
+    IrData,
+    IrLiteral,
+    IrOperation,
+    IrScore,
+    IrSource,
+)
 from .exceptions import TypeCheckDiagnostic, TypeCheckError, get_exception_chain
 from .utils import format_type, get_globals
 
@@ -369,7 +377,12 @@ class TypeChecker(Visitor):
     def create_diagnostic(
         self,
         pattern: str,
-        *args: NbtType | tuple[IrSource | IrLiteral, NbtType] | tuple[Any, ...] | IrSource | IrLiteral | Any,
+        *args: NbtType
+        | tuple[IrSource | IrLiteral, NbtType]
+        | tuple[Any, ...]
+        | IrSource
+        | IrLiteral
+        | Any,
     ) -> TypeCheckDiagnostic:
         values: list[str] = []
 

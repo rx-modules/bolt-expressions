@@ -1,4 +1,3 @@
-
 from typing import Any, Iterable, TypeVar, Union
 
 from .sources import binary_operator
@@ -10,6 +9,7 @@ T = TypeVar("T")
 
 binary_min = binary_operator(Min)
 binary_max = binary_operator(Max)
+
 
 def wrapped_min(f: Any, *args: T, **kwargs: Any) -> Union[T, Any]:
     values = args

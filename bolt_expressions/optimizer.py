@@ -20,7 +20,7 @@ from typing import (
 from mecha import AbstractNode
 from bolt.utils import internal
 
-from nbtlib import ( # type:ignore
+from nbtlib import (  # type:ignore
     Int,
     Double,
     Float,
@@ -29,6 +29,7 @@ from nbtlib import ( # type:ignore
 )
 
 from .typing import NbtType, NbtValue, literal_types, unwrap_optional_type
+
 # from rich.pretty import pprint
 
 __all__ = [
@@ -97,6 +98,7 @@ class IrData(IrSource):
     def to_tuple(self) -> "DataTuple":
         return DataTuple(self.type, self.target, self.path)
 
+
 @dataclass(frozen=True, kw_only=True)
 class IrLiteral(IrNode):
     value: NbtValue
@@ -126,6 +128,7 @@ class IrBinary(IrOperation):
 class IrInsert(IrBinary):
     op: str = field(default="insert", init=False)
     index: int
+
 
 @dataclass(frozen=True, kw_only=True)
 class IrCast(IrBinary):
@@ -158,16 +161,16 @@ def is_binary(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrBi
 def is_copy_op(node: Any) -> TypeGuard[IrBinary]:
     if is_binary(node, "set"):
         return True
-    
+
     if isinstance(node, IrCast):
         cast_type = unwrap_optional_type(node.cast_type)
 
         if node.scale != 1:
             return False
-        
+
         if isinstance(node.left, IrScore) and isinstance(node.right, IrScore):
             return True
-        
+
         if isinstance(node.left, IrData) and isinstance(node.right, IrData):
             if cast_type == unwrap_optional_type(node.right.nbt_type):
                 return True
@@ -178,8 +181,9 @@ def is_copy_op(node: Any) -> TypeGuard[IrBinary]:
             return True
 
         return False
-    
+
     return False
+
 
 SCORE_OPERATIONS = ("set", "add", "sub", "mul", "div", "mod", "min", "max")
 
@@ -273,24 +277,20 @@ class TempScoreManager:
     objective: str
 
     counter: int = field(default=0, init=False)
-    format: Callable[[int], str] = field(default=lambda n: f"$s{n}") # type: ignore
+    format: Callable[[int], str] = field(default=lambda n: f"$s{n}")  # type: ignore
 
     def __call__(self) -> ScoreTuple:
         name = self.format(self.counter)
         self.counter += 1
 
         return ScoreTuple(name, self.objective)
-    
+
     @contextmanager
-    def override(
-        self,
-        format: Callable[[int], str] | None = None,
-        reset: bool = False
-    ):
+    def override(self, format: Callable[[int], str] | None = None, reset: bool = False):
         counter = self.counter
         if reset:
             self.counter = 0
-        
+
         prev_format = self.format
         if format:
             self.format = format
@@ -307,24 +307,20 @@ class TempDataManager:
     target: str
 
     counter: int = field(default=0, init=False)
-    format: Callable[[int], str] = field(default=lambda n: f"i{n}") # type: ignore
+    format: Callable[[int], str] = field(default=lambda n: f"i{n}")  # type: ignore
 
     def __call__(self) -> DataTuple:
         name = self.format(self.counter)
         self.counter += 1
 
         return DataTuple(self.target_type, self.target, Path(name))
-    
+
     @contextmanager
-    def override(
-        self,
-        format: Callable[[int], str] | None = None,
-        reset: bool = False
-    ):
+    def override(self, format: Callable[[int], str] | None = None, reset: bool = False):
         counter = self.counter
         if reset:
             self.counter = 0
-        
+
         prev_format = self.format
         if format:
             self.format = format
@@ -401,18 +397,18 @@ class Optimizer:
         for source in sources:
             if isinstance(source, IrSource):
                 source = source.to_tuple()
-        
+
             self.temp_sources.add(source)
 
     @contextmanager
     def temp(self, *sources: IrSource | SourceTuple):
         prev_temp = set(self.temp_sources)
         self.add_temp(*sources)
-        
+
         yield
-        
+
         self.temp_sources = prev_temp
-    
+
     def is_temp(self, source: IrSource | SourceTuple):
         if isinstance(source, IrSource):
             source = source.to_tuple()
@@ -433,11 +429,7 @@ class Optimizer:
         source = self.temp_data()
         self.add_temp(source)
 
-        return IrData(
-            type=source.type,
-            target=source.target,
-            path=source.path
-        )
+        return IrData(type=source.type, target=source.target, path=source.path)
 
 
 def data_insert_score(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
@@ -478,11 +470,14 @@ def convert_data_arithmetic(opt: Optimizer, nodes: Iterable[IrOperation]):
 
         yield node
 
+
 def convert_cast(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     for node in nodes:
         if is_binary(node, "set") and (
-            isinstance(node.left, IrScore) and isinstance(node.right, IrData)
-            or isinstance(node.left, IrData) and isinstance(node.right, IrScore)
+            isinstance(node.left, IrScore)
+            and isinstance(node.right, IrData)
+            or isinstance(node.left, IrData)
+            and isinstance(node.right, IrScore)
         ):
             cast_type = Int if isinstance(node.left, IrScore) else Any
             yield IrCast(left=node.left, right=node.right, cast_type=cast_type)
@@ -561,7 +556,9 @@ def commutative_set_collapsing(
 
 
 @use_smart_generator
-def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+def data_set_scaling(
+    nodes: SmartGenerator[IrOperation], opt: Optimizer
+) -> Iterable[IrOperation]:
     """
     Turns a multiplication/division of a temp score followed by a
     data set operation into a single set operation with a scale argument.
@@ -619,7 +616,9 @@ def data_set_scaling(nodes: SmartGenerator[IrOperation], opt: Optimizer) -> Iter
                 if number_type is Any:
                     number_type = literal_types[opt.default_floating_nbt_type]
 
-            out = IrCast(left=next_node.left, right=node.left, cast_type=number_type, scale=scale)
+            out = IrCast(
+                left=next_node.left, right=node.left, cast_type=number_type, scale=scale
+            )
 
             if operation_node:
                 yield operation_node  # yield the data operation node back in
@@ -663,9 +662,7 @@ def data_get_scaling(nodes: SmartGenerator[IrOperation]) -> Iterable[IrOperation
             if is_binary(next_node, "div"):
                 scale = 1 / scale
 
-            yield IrCast(
-                left=node.left, right=node.right, scale=node.scale * scale
-            )
+            yield IrCast(left=node.left, right=node.right, scale=node.scale * scale)
         else:
             nodes.push(next_node)
             yield node
@@ -714,9 +711,9 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
 
     return map
 
+
 def apply_temp_source_reuse(
-    opt: Optimizer,
-    nodes: Iterable[IrOperation]
+    opt: Optimizer, nodes: Iterable[IrOperation]
 ) -> Iterable[IrOperation]:
     all_nodes = list(nodes)
 
@@ -785,9 +782,10 @@ def add_subtract_by_zero_removal(nodes: Iterable[IrOperation]):
 def discard_casting(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     for node in nodes:
         if isinstance(node, IrCast) and is_copy_op(node):
-            yield IrBinary(op="set",left=node.left,right=node.right)
+            yield IrBinary(op="set", left=node.left, right=node.right)
         else:
             yield node
+
 
 def set_to_self_removal(nodes: Iterable[IrOperation]):
     """Removes Set operations that have the same former and latter source.
@@ -827,7 +825,7 @@ def rename_temp_scores(
     nodes = tuple(nodes)
     with (
         opt.temp_score.override(format=lambda n: f"$i{n}", reset=True),
-        opt.temp_data.override(format=lambda n: f"i{n}", reset=True)
+        opt.temp_data.override(format=lambda n: f"i{n}", reset=True),
     ):
         source_map: dict[IrSource, IrSource] = {}
 

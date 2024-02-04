@@ -7,7 +7,7 @@ from typing import (
     TypeGuard,
     TypedDict,
     Union,
-    _UnionGenericAlias, # type: ignore
+    _UnionGenericAlias,  # type: ignore
     cast,
     get_args,
     get_origin,
@@ -115,9 +115,7 @@ def is_optional(value: Any) -> bool:
 
 
 def is_numeric_type(value: Any) -> TypeGuard[type[NumericNbtValue]]:
-    return isinstance(value, type) and issubclass(
-        value, (int, float)
-    )
+    return isinstance(value, type) and issubclass(value, (int, float))
 
 
 def is_string_type(value: Any) -> TypeGuard[type[String]]:
@@ -144,8 +142,10 @@ def is_compound_alias(value: Any) -> TypeGuard[type[dict[str, Any]]]:
 
     return isinstance(value, type) and issubclass(value, dict)
 
+
 def is_fixed_compound(value: Any) -> TypeGuard[dict[str, Any] | type[TypedDict]]:
     return isinstance(value, dict) or is_typeddict(value)
+
 
 def is_compound_type(value: Any) -> TypeGuard[type[dict[str, Any]] | type[TypedDict]]:
     return is_compound_alias(value) or is_fixed_compound(value)
@@ -163,19 +163,21 @@ def unwrap_optional_type(value: Any) -> Any:
     return Union[tuple(v for v in args if v is not NoneType)]  # type: ignore
 
 
-def get_dict_fields(t: type[TypedDict] | dict[str, Any], ctx: Context | None) -> dict[str, NbtType]:
+def get_dict_fields(
+    t: type[TypedDict] | dict[str, Any], ctx: Context | None
+) -> dict[str, NbtType]:
     if isinstance(t, dict):
         fields = t
     else:
         fields = get_type_hints(t, get_globals(t, ctx))
-    
+
     result: dict[str, NbtType] = {}
 
     for key, value in fields.items():
         value_type = convert_type(value)
         result[key] = value_type if value_type is not None else Any
-    
-    return frozendict(result) # type: ignore
+
+    return frozendict(result)  # type: ignore
 
 
 def is_type(value: Any, allow_dict: bool = True) -> TypeGuard[NbtType]:
@@ -202,8 +204,8 @@ def convert_type(value: Any, is_origin: bool = False) -> NbtType | None:
         for key, val in value.items():
             val_type = convert_type(val)
             type_dict[key] = val_type if val_type is not None else Any
-        
-        return frozendict(type_dict) # type: ignore
+
+        return frozendict(type_dict)  # type: ignore
 
     if is_typeddict(value):
         return value  # type: ignore
@@ -286,7 +288,9 @@ def access_typeddict(
     return None
 
 
-def access_compound_alias(t: type[dict[str, Any]], accessor: Accessor) -> NbtType | None:
+def access_compound_alias(
+    t: type[dict[str, Any]], accessor: Accessor
+) -> NbtType | None:
     if isinstance(accessor, CompoundMatch):
         return t
 
