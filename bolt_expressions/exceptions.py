@@ -11,6 +11,7 @@ from typing import Any
 class TypeCheckError(Exception):
     """Type incompatibility during type checking"""
 
+
 class TypeCheckDiagnostic(Exception):
     """Diagnostic error raised by the type checker."""
 
