@@ -8,7 +8,6 @@ from typing import (
     ClassVar,
     Generic,
     ParamSpec,
-    Self,
     TypeVar,
     Union,
     cast,
@@ -292,7 +291,7 @@ class Source(ExpressionNode, ABC):
     def is_lazy(self) -> bool:
         return self.to_tuple() in self.expr.lazy_values
 
-    def evaluate(self) -> Self:
+    def evaluate(self):
         if self.is_lazy():
             self.expr.evaluate_lazy(self.to_tuple())
 
