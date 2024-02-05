@@ -20,6 +20,7 @@ from .typing import (
     NbtType,
     NumericNbtValue,
     NbtValue,
+    format_type,
     access_type,
     convert_type,
     get_dict_fields,
@@ -45,7 +46,7 @@ from .optimizer import (
     IrSource,
 )
 from .exceptions import TypeCheckDiagnostic, TypeCheckError, get_exception_chain
-from .utils import format_type, get_globals
+from .utils import get_globals
 
 
 __all__ = [
@@ -238,9 +239,7 @@ def check_list_type(
         raise exc from cause_exc
 
 
-def check_numeric_type(
-    write: type[NumericNbtValue], read: Any, **flags: Any
-) -> bool:
+def check_numeric_type(write: type[NumericNbtValue], read: Any, **flags: Any) -> bool:
     if not issubclass(read, Numeric):
         raise TypeCheckError(
             f'"{format_type(read)}" is not a numeric type and is not compatible with "{format_type(write)}".'

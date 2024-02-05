@@ -19,8 +19,8 @@ from bolt.utils import internal
 from nbtlib import Compound, Path, ListIndex, CompoundMatch, NamedKey  # type: ignore
 
 from .node import Expression, UnrollHelper
-from .typing import NbtType, is_compound_type
-from .utils import format_type, type_name
+from .typing import NbtType, is_compound_type, format_type
+from .utils import type_name
 
 from .optimizer import (
     DataTuple,
