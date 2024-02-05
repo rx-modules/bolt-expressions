@@ -2,6 +2,20 @@
 
 <!--next-version-placeholder-->
 
+## v0.14.0 (2024-02-05)
+
+### Feature
+
+* Source lazy values and data source operator handlers ([`6832b91`](https://github.com/rx-modules/bolt-expressions/commit/6832b9173d15ae6a88dd9d7d5b21929b459e41e6))
+* Type checking ([`b031303`](https://github.com/rx-modules/bolt-expressions/commit/b0313037e4428dd5e41cc7c608931cf613c6701f))
+* Literal casting ([`9874ca9`](https://github.com/rx-modules/bolt-expressions/commit/9874ca91f2c7045ffc8fbf17b06505984f2870c2))
+* Separate data source interfaces for each nbt type ([`dbe9a74`](https://github.com/rx-modules/bolt-expressions/commit/dbe9a74f31f3c58fb1b34a5069edada983535ec9))
+* Support dicts, lists, arrays and union types ([`1097f5f`](https://github.com/rx-modules/bolt-expressions/commit/1097f5fedf8a7211c5437deeeac50eadd256ae03))
+
+### Fix
+
+* Only cast numeric nbt types ([`86d49b1`](https://github.com/rx-modules/bolt-expressions/commit/86d49b1b257996ded2c5becef223c9e6806b3c6a))
+
 ## v0.13.1 (2024-01-24)
 
 ### Fix
