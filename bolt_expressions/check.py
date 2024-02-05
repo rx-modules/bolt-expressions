@@ -5,7 +5,6 @@ from typing import (
     Iterable,
     TypedDict,
     Union,
-    Unpack,
     get_args,
     get_type_hints,
     is_typeddict,
@@ -97,7 +96,7 @@ def check_union_type(
     write: NbtType,
     read: NbtType,
     ctx: Context | None = None,
-    **flags: Unpack[TypeCheckFlags],
+    **flags: Any,
 ) -> bool:
     if is_union(read):
         return all(check_type(write, r, ctx, **flags) for r in get_args(read))
@@ -119,7 +118,7 @@ def check_typeddict_type(
     write: type[TypedDict],
     read: NbtType,
     ctx: Context | None = None,
-    **flags: Unpack[TypeCheckFlags],
+    **flags: Any,
 ) -> bool:
     if not is_fixed_compound(read):
         raise TypeCheckError(
@@ -172,7 +171,7 @@ def check_expandable_compound_type(
     write: type[dict[str, Any]],
     read: NbtType,
     ctx: Context | None = None,
-    **flags: Unpack[TypeCheckFlags],
+    **flags: Any,
 ) -> bool:
     flags = {"numeric_match": True, **flags, "ignore_missing_keys": False}
 
@@ -218,7 +217,7 @@ def check_list_type(
     write: type[list[Any] | Array],
     read: NbtType,
     ctx: Context | None = None,
-    **flags: Unpack[TypeCheckFlags],
+    **flags: Any,
 ) -> bool:
     flags = {**flags, "numeric_match": True, "ignore_missing_keys": False}
 
@@ -240,7 +239,7 @@ def check_list_type(
 
 
 def check_numeric_type(
-    write: type[NumericNbtValue], read: Any, **flags: Unpack[TypeCheckFlags]
+    write: type[NumericNbtValue], read: Any, **flags: Any
 ) -> bool:
     if not issubclass(read, Numeric):
         raise TypeCheckError(
@@ -269,7 +268,7 @@ def check_type(
     write: NbtType | None,
     read: NbtType,
     ctx: Context | None = None,
-    **flags: Unpack[TypeCheckFlags],
+    **flags: Any,
 ) -> bool:
     """Checks if the type `read` is compatible with the type `write`."""
 
@@ -341,7 +340,7 @@ class TypeChecker(Visitor):
         latter: IrSource | IrLiteral,
         write: NbtType | None = None,
         read: NbtType | None = None,
-        **flags: Unpack[TypeCheckFlags],
+        **flags: Any,
     ) -> tuple[bool, tuple[BaseException, ...]]:
         if write is None:
             write = self.get_type(former)
