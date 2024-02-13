@@ -1,20 +1,27 @@
 from dataclasses import dataclass
-from typing import Any, Generator, Iterable
-from mecha import Visitor, rule
+from typing import Any, Generator, Iterable, cast
+from mecha import AstChildren, AstCommand, Mecha, Visitor, rule, AstRoot
 from nbtlib import Byte, Short, Int, Long, Float, Double  # type: ignore
 
-from .typing import NBT_TYPE_STRING, NbtTypeString, is_numeric_type
-from .utils import type_name
+from .typing import NBT_TYPE_STRING, NbtTypeString, NumericNbtValue
+from .utils import insert_nested_commands, type_name
 
 from .optimizer import (
     IrBinary,
+    IrBinaryCondition,
+    IrBoolScore,
+    IrBranch,
     IrCast,
+    IrCondition,
     IrData,
     IrInsert,
     IrLiteral,
     IrNode,
     IrScore,
+    IrSet,
+    IrSource,
     IrUnary,
+    IrUnaryCondition,
 )
 
 __all__ = [
@@ -29,17 +36,44 @@ class InvalidOperand(Exception):
         super().__init__(f"Invalid operand(s) for '{op}' operation: {fmt}.")
 
 
+@dataclass(frozen=True)
+class Command:
+    value: str
+
+    def to_ast(self, mc: Mecha) -> AstCommand:
+        return mc.parse(self.value, using="command")
+    
+    def __str__(self) -> str:
+        return self.value
+
+@dataclass(frozen=True)
+class BranchCommand(Command):
+    children: AstChildren[AstCommand] 
+
+    def to_ast(self, mc: Mecha) -> AstCommand:
+        command = super().to_ast(mc)
+        root = AstRoot(commands=self.children)
+        return insert_nested_commands(command, root)
+
+
 @dataclass(kw_only=True)
 class IrSerializer(Visitor):
     default_nbt_type: NbtTypeString
 
-    def __call__(self, nodes: Iterable[IrNode]) -> list[str]:  # type: ignore
-        result: list[str] = []
+    def __call__(self, nodes: Iterable[IrNode]) -> list[Command]:  # type: ignore
+        result: list[Any] = []
 
         for node in nodes:
             self.invoke(node, result)
 
-        return result
+        return [
+            Command(value) if not isinstance(value, Command) else value
+            for value in result
+        ]
+    
+    @rule(IrNode)
+    def fallback(self, node: IrNode, _: list[Any]):
+        raise TypeError(f"Could not serialize object '{node}'.")
 
     @rule(IrScore)
     def score(self, node: IrScore, _: list[str]) -> str:
@@ -54,6 +88,124 @@ class IrSerializer(Visitor):
     @rule(IrLiteral)
     def literal(self, node: IrLiteral, _: list[str]) -> str:
         return node.value.snbt()  # type: ignore
+    
+
+    @rule(IrBinaryCondition, op="less_than")
+    def less_than(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+        left = yield node.left
+        right = yield node.right
+        test = "unless" if node.negated else "if"
+
+        match node.left, node.right:
+            case IrScore(), IrScore():
+                return f"execute {test} score {left} < {right}"
+            case IrScore(), IrLiteral() as r:
+                value = cast(NumericNbtValue, r.value)
+                right = str(value - 1)
+                return f"execute {test} score {left} matches ..{right}"
+            case IrLiteral() as l, IrScore():
+                value = cast(NumericNbtValue, l.value)
+                right = str(value + 1)
+                return f"execute {test} score {right} matches {left}.."
+            case l, r:
+                raise InvalidOperand(node.op, l, r)
+
+    @rule(IrBinaryCondition, op="greater_than")
+    def greater_than(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+        left = yield node.left
+        right = yield node.right
+        test = "unless" if node.negated else "if"
+
+        match node.left, node.right:
+            case IrScore(), IrScore():
+                return f"execute {test} score {left} > {right}"
+            case IrScore(), IrLiteral() as r:
+                value = cast(NumericNbtValue, r.value)
+                right = str(value + 1)
+                return f"execute {test} score {left} matches {right}.."
+            case IrLiteral() as l, IrScore():
+                value = cast(NumericNbtValue, l.value)
+                right = str(value - 1)
+                return f"execute {test} score {right} matches ..{left}"
+            case l, r:
+                raise InvalidOperand(node.op, l, r)
+
+    @rule(IrBinaryCondition, op="greater_than_or_equal_to")
+    def greater_than_or_qual_to(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+        left = yield node.left
+        right = yield node.right
+        test = "unless" if node.negated else "if"
+
+        match node.left, node.right:
+            case IrScore(), IrScore():
+                return f"execute {test} score {left} >= {right}"
+            case IrScore(), IrLiteral():
+                return f"execute {test} score {left} matches {right}.."
+            case IrLiteral(), IrScore():
+                return f"execute {test} score {right} matches ..{left}"
+            case l, r:
+                raise InvalidOperand(node.op, l, r)
+
+    @rule(IrBinaryCondition, op="less_than_or_equal_to")
+    def less_than_or_qual_to(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+        left = yield node.left
+        right = yield node.right
+        test = "unless" if node.negated else "if"
+
+        match node.left, node.right:
+            case IrScore(), IrScore():
+                return f"execute {test} score {left} <= {right}"
+            case IrScore(), IrLiteral():
+                return f"execute {test} score {left} matches ..{right}"
+            case IrLiteral(), IrScore():
+                return f"execute {test} score {right} matches {left}.."
+            case l, r:
+                raise InvalidOperand(node.op, l, r)
+    
+    @rule(IrBinaryCondition, op="equal")
+    def equal(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+        left = yield node.left
+        right = yield node.right
+        test = "unless" if node.negated else "if"
+
+        match node.left, node.right:
+            case IrScore(), IrScore():
+                return f"execute {test} score {left} = {right}"
+            case IrScore(), IrLiteral():
+                return f"execute {test} score {left} matches {right}"
+            case IrLiteral(), IrScore():
+                return f"execute {test} score {right} matches {left}"
+            case l, r:
+                raise InvalidOperand(node.op, l, r)
+    
+    @rule(IrUnaryCondition, op="boolean")
+    def boolean(self, node: IrUnaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+        target = yield node.target
+        test = "unless" if node.negated else "if"
+
+        match node.target:
+            case IrBoolScore():
+                return f"execute {test} score {target} matches 1"
+            case IrScore() if node.negated:
+                return f"execute unless score {target} matches ..-1 unless score {target} matches 1.."
+            case IrScore() if not node.negated:
+                return f"execute if score {target} matches -2147483648.. unless score {target} matches 0"
+            case IrData():
+                return f"execute {test} data {target}"
+            case t:
+                raise InvalidOperand(node.op, t)
+    
+    @rule(IrBranch)
+    def branch(self, node: IrBranch, result: list[Any]) -> Generator[IrNode, str, None]:
+        target = yield node.target
+
+        match node.target:
+            case IrSource() as source:
+                cmd = yield IrUnaryCondition(op="boolean", target=source)
+            case IrCondition():
+                cmd = target
+        
+        result.append(BranchCommand(cmd, node.children))
 
     @rule(IrBinary, op="add")
     def add(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
@@ -248,7 +400,7 @@ class IrSerializer(Visitor):
 
         return (cast_type, str(scale))
 
-    @rule(IrBinary, op="set")
+    @rule(IrSet)
     def set(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
@@ -262,6 +414,10 @@ class IrSerializer(Visitor):
                 cmd = f"data modify {left} set value {right}"
             case IrData(), IrData():
                 cmd = f"data modify {left} set from {right}"
+            case IrScore(), IrCondition():
+                cmd = f"execute store success score {left} run {right}"
+            case IrData(), IrCondition():
+                cmd = f"execute store success {left} byte 1 run {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
@@ -282,10 +438,14 @@ class IrSerializer(Visitor):
                 cmd = f"execute store result {left} {nbt_type} {scale} run data get {right} 1"
             case IrData() as l, IrScore():
                 cmd = f"execute store result {left} {nbt_type} {scale} run scoreboard players get {right}"
+            case IrData(), IrCondition():
+                cmd = f"execute store success {left} {nbt_type} {scale} run {right}"
             case IrScore(), IrLiteral():
                 cmd = f"scoreboard players set {left} {right}"
             case IrScore(), IrData() as r:
                 cmd = f"execute store result score {left} run data get {right} {scale}"
+            case IrScore(), IrCondition():
+                cmd = f"execute store success score {left} run {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 

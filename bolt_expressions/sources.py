@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field, replace
 from types import CodeType
 from typing import (
@@ -36,14 +36,22 @@ from .operations import (
     Add,
     Append,
     BinaryOperation,
+    Boolean,
     Cast,
     Divide,
     Enable,
+    Equal,
+    GreaterThan,
+    GreaterThanOrEqualTo,
     InPlaceMerge,
     Insert,
+    LessThan,
+    LessThanOrEqualTo,
     Merge,
     Modulus,
     Multiply,
+    Not,
+    NotEqual,
     Operation,
     Prepend,
     Remove,
@@ -94,30 +102,34 @@ def resolve(
         value if isinstance(value, ExpressionNode) else Literal(value=value, ctx=expr)
     )
 
-    result_type = ResultType.data
+    result_type = None
     in_place = False
 
-    if isinstance(value_node, Operation):
-        result_type = value_node.result
+    if isinstance(value_node, ScoreSource):
+        result_type = ResultType.score
+    elif isinstance(value_node, DataSource):
+        result_type = ResultType.data
+    elif isinstance(value_node, Operation):
         in_place = value_node.in_place
 
-        if target := value_node.in_place_target:
-            if isinstance(target, Source):
-                result = target
-
-    if result is None:
+    if result_type and result is None:
         result = create_result(expr, result_type)
 
-    if in_place:
+    if in_place or not result:
         op = value_node
     elif cast is None:
         op = Set(former=result, latter=value_node, ctx=expr)
     else:
         op = Cast(former=result, latter=value_node, cast_type=cast, ctx=expr)
 
-    expr.resolve(op, lazy=lazy)
+    source = expr.resolve(op, lazy=lazy)
+    return get_source_from_tuple(expr, source)
 
-    return result
+def get_source_from_tuple(expr: Expression, t: SourceTuple) -> "Source":
+    if isinstance(t, DataTuple):
+        return DataSource(t.type, t.target, t.path, ctx=expr)
+
+    return ScoreSource(t.holder, t.obj, ctx=expr)
 
 
 def create_result(expr: Expression, result_type: ResultType) -> "Source":
@@ -131,6 +143,12 @@ def create_result(expr: Expression, result_type: ResultType) -> "Source":
 
     raise ValueError(f"Invalid operation result type {result_type}.")
 
+
+@contextmanager
+def branch(source: "Source"):
+    with source.expr.resolve_branch(source):
+        yield True
+    
 
 @dataclass
 class OperatorMethod(Generic[P, T]):
@@ -286,7 +304,7 @@ def binary_operator(
     return (OperatorMethod(decorator, lazy=True), OperatorMethod(reversed, lazy=True))
 
 
-@dataclass(order=False, kw_only=True)
+@dataclass(order=False, eq=False, kw_only=True)
 class Source(ExpressionNode, ABC):
     def is_lazy(self) -> bool:
         return self.to_tuple() in self.expr.lazy_values
@@ -307,7 +325,7 @@ class Source(ExpressionNode, ABC):
         ...
 
 
-@dataclass(unsafe_hash=True, order=False)
+@dataclass(unsafe_hash=True, order=False, eq=False)
 class ScoreSource(Source):
     scoreholder: str
     objective: str
@@ -317,6 +335,17 @@ class ScoreSource(Source):
     __mul__, __rmul__ = binary_operator(Multiply, reverse=True)
     __truediv__, __rtruediv__ = binary_operator(Divide, reverse=True)
     __mod__, __rmod__ = binary_operator(Modulus, reverse=True)
+    __lt__ = binary_operator(LessThan)
+    __le__ = binary_operator(LessThanOrEqualTo)
+    __gt__ = binary_operator(GreaterThan)
+    __ge__ = binary_operator(GreaterThanOrEqualTo)
+    __eq__ = binary_operator(Equal) # type: ignore
+    __ne__ = binary_operator(NotEqual) # type: ignore
+    __not__ = unary_operator(Not)
+    __branch__ = branch
+
+    def __dup__(self):
+        return resolve(self.expr, self)
 
     def __rebind__(self, value: Any):
         return resolve(self.expr, value, result=self)
@@ -377,6 +406,13 @@ class GenericOperatorHandler(OperatorHandler):
     __truediv__, __rtruediv__ = binary_operator(Divide, reverse=True)
     __mod__, __rmod__ = binary_operator(Modulus, reverse=True)
     __or__, __ror__ = binary_operator(Merge, reverse=True)
+    __lt__ = binary_operator(LessThan)
+    __le__ = binary_operator(LessThanOrEqualTo)
+    __gt__ = binary_operator(GreaterThan)
+    __ge__ = binary_operator(GreaterThanOrEqualTo)
+    __eq__ = binary_operator(Equal) # type: ignore
+    __ne__ = binary_operator(NotEqual) # type: ignore
+    __not__ = unary_operator(Not)
 
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
@@ -408,6 +444,13 @@ class NumericOperatorHandler(OperatorHandler):
     __mul__, __rmul__ = binary_operator(Multiply, reverse=True)
     __truediv__, __rtruediv__ = binary_operator(Divide, reverse=True)
     __mod__, __rmod__ = binary_operator(Modulus, reverse=True)
+    __lt__ = binary_operator(LessThan)
+    __le__ = binary_operator(LessThanOrEqualTo)
+    __gt__ = binary_operator(GreaterThan)
+    __ge__ = binary_operator(GreaterThanOrEqualTo)
+    __eq__ = binary_operator(Equal) # type: ignore
+    __ne__ = binary_operator(NotEqual) # type: ignore
+    __not__ = unary_operator(Not)
 
 
 class StringOperatorHandler(OperatorHandler):
@@ -461,6 +504,10 @@ class DataSourceOperator:
 
     def __set_name__(self, owner: Any, name: str):
         self.operator = name
+    
+    def __call__(self, obj: Any, *args: Any, **kwargs: Any) -> Any:
+        f = self.__get__(obj, type(obj))
+        return f(*args, **kwargs)
 
     def __get__(self, obj: Any, objtype: Any):
         if obj is None:
@@ -508,6 +555,13 @@ class DataSource(Source):
     __rmod__ = DataSourceOperator(_not_implemented)
     __or__ = DataSourceOperator(_not_implemented)
     __ror__ = DataSourceOperator(_not_implemented)
+    __lt__ = DataSourceOperator(_not_implemented)
+    __le__ = DataSourceOperator(_not_implemented)
+    __gt__ = DataSourceOperator(_not_implemented)
+    __ge__ = DataSourceOperator(_not_implemented)
+    __eq__ = DataSourceOperator(_not_implemented) # type: ignore
+    __ne__ = DataSourceOperator(_not_implemented) # type: ignore
+    __not__ = DataSourceOperator(_not_implemented)
 
     @property
     def operator_handler(self) -> OperatorHandler:
@@ -552,6 +606,8 @@ class DataSource(Source):
             scale=self._scale,
         )
         return (), result
+
+    __branch__ = branch
 
     @internal
     def __rebind__(self, right: Any):

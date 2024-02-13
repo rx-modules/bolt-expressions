@@ -9,17 +9,21 @@ from beet import Context, Function
 from bolt import Runtime
 from bolt.utils import internal
 from bolt.contrib.defer import Defer
-from mecha import Mecha
+from mecha import AstChildren, Mecha
 from pydantic import BaseModel
 from nbtlib import Path  # type: ignore
+
+from rich.pretty import pprint
 
 
 from .optimizer import (
     ConstScoreManager,
+    IrBranch,
     IrData,
     IrLiteral,
     IrOperation,
     IrScore,
+    IrSet,
     IrSource,
     NbtValue,
     Optimizer,
@@ -28,17 +32,22 @@ from .optimizer import (
     TempScoreManager,
     add_subtract_by_zero_removal,
     commutative_set_collapsing,
+    branch_condition_propagation,
     convert_data_arithmetic,
     convert_cast,
+    convert_data_order_operation,
     data_get_scaling,
     data_insert_score,
     data_set_scaling,
+    deadcode_elimination,
     discard_casting,
+    init_score_boolean_result,
     literal_to_constant_replacement,
     multiply_divide_by_fraction,
     multiply_divide_by_one_removal,
     noncommutative_set_collapsing,
     apply_temp_source_reuse,
+    boolean_condition_propagation,
     rename_temp_scores,
     set_and_get_cleanup,
     set_to_self_removal,
@@ -46,7 +55,7 @@ from .optimizer import (
 from .typing import NbtTypeString
 from .casting import TypeCaster
 from .check import TypeChecker
-from .serializer import IrSerializer
+from .serializer import Command, IrSerializer
 from .utils import identifier_generator
 
 
@@ -104,6 +113,9 @@ class UnrollHelper:
     def add_temporary(self, source: SourceTuple):
         self.temporaries.add(source)
 
+    def remove_temporary(self, source: SourceTuple):
+        self.temporaries.discard(source)
+
     def create_temporary(self, result: ResultType) -> IrSource:
         if result == ResultType.data:
             source = self.data_manager()
@@ -140,7 +152,7 @@ ResolveResult = SourceTuple | NbtValue | None
 class LazyEntry:
     source: SourceTuple
     node: ExpressionNode
-    commands: list[str]
+    commands: list[Command]
     emit: bool = False
 
 
@@ -150,7 +162,7 @@ class Expression:
 
     called_init: bool
     init_commands: list[str]
-    commands: list[str] | None
+    commands: list[Command] | None
     lazy_values: dict[SourceTuple, LazyEntry]
 
     type_caster: TypeCaster
@@ -211,43 +223,49 @@ class Expression:
             default_floating_nbt_type=self.opts.default_floating_nbt_type,
         )
         self.optimizer.add_rules(
-            data_insert_score,
-            convert_cast,
-            partial(convert_data_arithmetic, self.optimizer),
-            discard_casting,
-            partial(apply_temp_source_reuse, self.optimizer),
-            set_to_self_removal,
+            data_insert_score=data_insert_score,
+            convert_cast=convert_cast,
+            convert_data_arithmetic=partial(convert_data_arithmetic, self.optimizer),
+            convert_data_order_operation=partial(convert_data_order_operation, opt=self.optimizer),
+            discard_casting=discard_casting,
+            apply_temp_source_reuse=partial(apply_temp_source_reuse, self.optimizer),
+            set_to_self_removal=set_to_self_removal,
             # features
-            partial(data_set_scaling, opt=self.optimizer),
-            data_get_scaling,
+            data_set_scaling=partial(data_set_scaling, opt=self.optimizer),
+            data_get_scaling=data_get_scaling,
             # cleanup
-            multiply_divide_by_fraction,
-            multiply_divide_by_one_removal,
-            add_subtract_by_zero_removal,
-            set_to_self_removal,
-            set_and_get_cleanup,
-            noncommutative_set_collapsing,
-            commutative_set_collapsing,
-            partial(rename_temp_scores, self.optimizer),
-            partial(literal_to_constant_replacement, self.optimizer),
+            multiply_divide_by_fraction=multiply_divide_by_fraction,
+            multiply_divide_by_one_removal=multiply_divide_by_one_removal,
+            add_subtract_by_zero_removal=add_subtract_by_zero_removal,
+            set_to_self_removal_post=set_to_self_removal,
+            set_and_get_cleanup=set_and_get_cleanup,
+            noncommutative_set_collapsing=noncommutative_set_collapsing,
+            commutative_set_collapsing=commutative_set_collapsing,
+            rename_temp_scores=partial(rename_temp_scores, self.optimizer),
+            literal_to_constant_replacement=partial(literal_to_constant_replacement, self.optimizer),
+            boolean_condition_propagation=boolean_condition_propagation,
+            branch_condition_propagation=branch_condition_propagation,
+            init_score_boolean_result=init_score_boolean_result,
+            deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
             # typing
-            self.type_caster,
-            self.type_checker,
+            type_caster=self.type_caster,
+            type_checker=self.type_checker,
         )
 
         self.serializer = IrSerializer(default_nbt_type=self.opts.default_nbt_type)
 
-    def inject_command(self, *cmds: str):
+    def inject_command(self, *cmds: Command):
         if self.commands is not None:
             self.commands.extend(cmds)
             return
 
         if self.mc and self.runtime:
             for cmd in cmds:
-                self.runtime.commands.append(self.mc.parse(cmd, using="command"))
+                ast = cmd.to_ast(self.mc)
+                self.runtime.commands.append(ast)
 
     @contextmanager
-    def scope(self, result: list[str] | None = None):
+    def scope(self, result: list[Command] | None = None):
         if result is None:
             result = []
 
@@ -257,34 +275,81 @@ class Expression:
         yield self.commands
 
         self.commands = prev
-
-    @internal
-    def resolve(self, node: ExpressionNode, lazy: bool = False):
+    
+    def unroll(self, node: ExpressionNode) -> tuple[
+        Iterable[IrOperation], IrSource | IrLiteral, UnrollHelper
+    ]:
         helper = UnrollHelper(
             score_manager=self.temp_score, data_manager=self.temp_data
         )
         operations, result = node.unroll(helper)
 
-        if not isinstance(result, IrSource):
-            return
+        if isinstance(result, IrSource):
+            helper.remove_temporary(result.to_tuple())
 
+        return operations, result, helper
+
+    @internal
+    def resolve(self, node: ExpressionNode, lazy: bool = False) -> SourceTuple:
+        operations, result, helper = self.unroll(node)
+
+        if not isinstance(result, IrSource):
+            score = self.optimizer.generate_score()
+            operations = (IrSet(left=score, right=result),)
+            result = score
+        
         source = result.to_tuple()
 
-        if source in self.lazy_values:
-            del self.lazy_values[source]
-
         with self.optimizer.temp(*helper.temporaries):
-            optimized_nodes = list(self.optimizer(operations))
+            nodes = self.optimizer(operations)
 
-        cmds = self.serializer(optimized_nodes)
+        cmds = self.serializer(nodes)
 
         if not lazy or not self.defer:
             self.inject_command(*cmds)
-            return
+            return source
 
         entry = LazyEntry(source=source, node=node, commands=cmds)
         self.lazy_values[source] = entry
         self.defer(partial(self.emit_lazy, entry=entry))
+
+        return source
+
+    @contextmanager
+    @internal
+    def resolve_branch(self, node: ExpressionNode):
+        if not self.runtime:
+            raise ValueError("Branch only works when a runtime object is provided.")
+
+        operations, result, helper = self.unroll(node)
+
+        if not isinstance(result, IrSource):
+            return
+        
+        with self.optimizer.temp(*helper.temporaries):
+            nodes = self.optimizer(
+                operations,
+                rename_temp_scores=False,
+                deadcode_elimination=False,
+            )
+
+        with self.runtime.scope() as cmds:
+            yield
+        
+        branch = IrBranch(target=result, children=AstChildren(cmds))
+        helper.add_temporary(result.to_tuple())
+
+        with self.optimizer.temp(*helper.temporaries):
+            nodes = self.optimizer(
+                (*nodes, branch),
+                disable_all=True,
+                branch_condition_propagation=True,
+                rename_temp_scores=True,
+                deadcode_elimination=True,
+            )
+        
+        cmds = self.serializer(nodes)
+        self.inject_command(*cmds)
 
     def unroll_lazy(
         self, source: SourceTuple, helper: UnrollHelper
@@ -315,7 +380,7 @@ class Expression:
             return
 
         path = self.ctx.generate.path(self.opts.init_path)
-        self.inject_command(f"function {path}")
+        self.inject_command(Command(f"function {path}"))
         self.called_init = True
 
     def generate_init(self) -> Function:

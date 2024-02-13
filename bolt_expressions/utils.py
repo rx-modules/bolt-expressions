@@ -1,8 +1,10 @@
 from contextlib import contextmanager
+from dataclasses import replace
 import sys
 from types import NoneType
 from typing import Any, Dict, _UnionGenericAlias, is_typeddict  # type: ignore
 from bolt import Runtime
+from mecha import AstChildren, AstCommand, AstRoot
 from nbtlib import Base  # type: ignore
 from beet import Context
 
@@ -69,3 +71,22 @@ def assert_exception(exc: type[Exception]):
         ...
     else:
         raise AssertionError(f"Expected {exc.__name__} to be raised.")
+
+
+def insert_nested_commands(execute: AstCommand, root: AstRoot) -> AstCommand:
+    """Inserts nested commands to the end of an execute command."""
+
+    subcommand = None
+    
+    if len(execute.arguments):
+        subcommand = execute.arguments[-1]
+
+    if not isinstance(subcommand, AstCommand):
+        commands = AstCommand(identifier="execute:commands", arguments=AstChildren((root,)))
+        arguments = AstChildren((*execute.arguments, commands))
+        identifier = execute.identifier + ":subcommand"
+        return replace(execute, identifier=identifier, arguments=arguments)
+
+    inserted = insert_nested_commands(subcommand, root)
+    arguments = AstChildren((*execute.arguments[:-1], inserted))
+    return replace(execute, arguments=arguments)

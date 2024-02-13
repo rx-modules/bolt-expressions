@@ -1,4 +1,5 @@
 from abc import ABC
+from bisect import bisect_left
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
@@ -17,7 +18,7 @@ from typing import (
     Concatenate,
     ParamSpec,
 )
-from mecha import AbstractNode
+from mecha import AbstractNode, AstChildren, AstCommand
 from bolt.utils import internal
 
 from nbtlib import (  # type:ignore
@@ -83,6 +84,8 @@ class IrScore(IrSource):
     def to_tuple(self) -> "ScoreTuple":
         return ScoreTuple(self.holder, self.obj)
 
+class IrBoolScore(IrScore):
+    ...
 
 DataTargetType = Literal["storage", "entity", "block"]
 
@@ -104,6 +107,40 @@ class IrLiteral(IrNode):
     value: NbtValue
 
 
+@dataclass(frozen=True, kw_only=True)
+class IrCondition(IrNode):
+    op: str
+    negated: bool = False
+
+@dataclass(frozen=True, kw_only=True)
+class IrUnaryCondition(IrCondition):
+    target: IrSource
+
+@dataclass(frozen=True, kw_only=True)
+class IrBinaryCondition(IrCondition):
+    left: IrSource | IrLiteral
+    right: IrSource | IrLiteral
+
+
+def is_condition(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrCondition]:
+    if not isinstance(obj, IrCondition):
+        return False
+
+    if op is None:
+        return True
+
+    if isinstance(op, str):
+        op = (op,)
+
+    return obj.op in op
+
+def is_unary_condition(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrUnaryCondition]:
+    return is_condition(obj, op) and isinstance(obj, IrUnaryCondition)
+
+def is_binary_condition(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrBinaryCondition]:
+    return is_condition(obj, op) and isinstance(obj, IrBinaryCondition)
+
+
 StoreValue = tuple[Literal["result", "success"], IrSource]
 
 
@@ -112,29 +149,89 @@ class IrOperation(IrNode):
     op: str
     store: tuple[StoreValue, ...] = ()
 
+    destructive: bool = True
+
+    @property
+    def targets(self) -> tuple[IrSource, ...]:
+        return tuple(s[1] for s in self.store)
+
+    @property
+    def operands(self) -> tuple[IrSource | IrCondition | IrLiteral, ...]:
+        return ()
+
+
+
 
 @dataclass(frozen=True, kw_only=True)
 class IrUnary(IrOperation):
-    target: IrSource
+    target: IrSource | IrCondition
+
+    @property
+    def targets(self):
+        targets = super().targets
+
+        if self.destructive and isinstance(self.target, IrSource):
+            return targets + (self.target,)
+
+        return targets
+
+    @property
+    def operands(self) -> tuple[IrSource | IrCondition]:
+        return (self.target,)
 
 
 @dataclass(frozen=True, kw_only=True)
 class IrBinary(IrOperation):
     left: IrSource
-    right: IrSource | IrLiteral
+    right: IrSource | IrCondition | IrLiteral
+
+    uses_left: bool = True
+
+    @property
+    def targets(self):
+        targets = super().targets
+
+        if self.destructive:
+            return targets + (self.left,)
+
+        return targets
+
+    @property
+    def operands(self) -> tuple[IrSource | IrCondition | IrLiteral, ...]:
+        if not self.uses_left:
+            return (self.right,)
+
+        return (self.left, self.right)
+        
 
 
 @dataclass(frozen=True, kw_only=True)
 class IrInsert(IrBinary):
     op: str = field(default="insert", init=False)
+    destructive: bool = field(default=True, init=False)
     index: int
 
 
 @dataclass(frozen=True, kw_only=True)
+class IrSet(IrBinary):
+    op: str = field(default="set", init=False)
+    destructive: bool = field(default=True, init=False)
+    uses_left: bool = field(default=False, init=False)
+
+@dataclass(frozen=True, kw_only=True)
 class IrCast(IrBinary):
     op: str = field(default="cast", init=False)
+    destructive: bool = field(default=True, init=False)
+    uses_left: bool = field(default=False, init=False)
     cast_type: NbtType = Any
     scale: float = 1
+
+@dataclass(frozen=True, kw_only=True)
+class IrBranch(IrUnary):
+    op: str = field(default="branch", init=False)
+    destructive: bool = field(default=False, init=False)
+
+    children: AstChildren[AstCommand]
 
 
 def is_op(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrOperation]:
@@ -368,9 +465,14 @@ class Optimizer:
     default_floating_nbt_type: str
 
     temp_sources: set[SourceTuple] = field(default_factory=set)
-    rules: list[Rule[IrOperation, []]] = field(default_factory=list)
+    rules: list[tuple[str, Rule[IrOperation, []]]] = field(default_factory=list)
 
-    def add_rules(self, *funcs: Rule[IrOperation, []], index: int | None = None):
+    def add_rules(
+        self,
+        index: int | None = None,
+        /,
+        **funcs: Rule[IrOperation, []]
+    ):
         """Registers new rules, also converts the decorated generator into a `SmartGenerator`"""
 
         if index is None:
@@ -378,18 +480,27 @@ class Optimizer:
 
         index = min(len(self.rules), index)
 
-        for f in funcs[::-1]:
-            self.rules.insert(index, f)
+        for name, f in reversed(funcs.items()):
+            self.rules.insert(index, (name, f))
 
     @internal
-    def optimize(self, nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    def optimize(
+        self, nodes: Iterable[IrOperation],
+        disable_all: bool = False,
+        **rules: bool
+    ) -> Iterable[IrOperation]:
         """Performs the optimization by sending all nodes through the rules."""
 
+        active_rules = {name: not disable_all for name, _ in self.rules} | rules
+
         with self.temp():
-            for rule in self.rules:
+            for name, rule in self.rules:
+                if not active_rules.get(name):
+                    continue
+
                 nodes = rule(nodes)
 
-            yield from nodes
+            return tuple(nodes)
 
     __call__ = optimize
 
@@ -449,7 +560,7 @@ def data_insert_score(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
                 index = -1
 
             element = replace(node.left, path=node.left.path[index])
-            yield IrBinary(op="set", left=element, right=node.right)
+            yield IrSet(left=element, right=node.right)
         else:
             yield node
 
@@ -691,9 +802,15 @@ def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
 def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
     map: dict[IrSource, list[int]] = {}
 
-    def add(source: IrSource, i: int):
-        indexes = map.setdefault(source, [])
-        indexes.append(i)
+    def add(source: Any, i: int):
+        if isinstance(source, IrSource):
+            indexes = map.setdefault(source, [])
+            indexes.append(i)
+        elif isinstance(source, IrUnaryCondition):
+            add(source.target, i)
+        elif isinstance(source, IrBinaryCondition):
+            add(source.left, i)
+            add(source.right, i)
 
     for i, node in enumerate(nodes):
         for _, source in node.store:
@@ -702,9 +819,7 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
         if is_binary(node):
             if node.op not in ("set", "cast"):
                 add(node.left, i)
-
-            if isinstance(node.right, IrSource):
-                add(node.right, i)
+            add(node.right, i)
 
         if is_unary(node):
             add(node.target, i)
@@ -720,11 +835,21 @@ def apply_temp_source_reuse(
     usage_map = get_source_usage(all_nodes)
     replace_map: dict[IrSource, IrSource] = {}
 
-    def replace_source(source: IrSource) -> IrSource:
-        if replaced := replace_map.get(source):
-            return replace_source(replaced)
+    def replace_operand(value: Any) -> Any:
+        if isinstance(value, IrUnaryCondition):
+            return replace(value, target=replace_operand(value.target))
 
-        return source
+        if isinstance(value, IrBinaryCondition):
+            return replace(
+                value,
+                left=replace_operand(value.left),
+                right=replace_operand(value.right)
+            )
+
+        if replaced := replace_map.get(value):
+            return replace_operand(replaced)
+
+        return value
 
     for i, node in enumerate(all_nodes):
         if (
@@ -743,16 +868,16 @@ def apply_temp_source_reuse(
                 replace_map[node.right] = node.left
 
     for node in all_nodes:
-        store = tuple((type, replace_source(source)) for type, source in node.store)
+        store = tuple((type, replace_operand(source)) for type, source in node.store)
 
         if is_unary(node):
-            yield replace(node, store=store, target=replace_source(node.target))
+            yield replace(node, store=store, target=replace_operand(node.target))
         elif is_binary(node):
             yield replace(
                 node,
                 store=store,
-                left=replace_source(node.left),
-                right=replace_source(node.right)
+                left=replace_operand(node.left),
+                right=replace_operand(node.right)
                 if isinstance(node.right, IrSource)
                 else node.right,
             )
@@ -783,7 +908,7 @@ def add_subtract_by_zero_removal(nodes: Iterable[IrOperation]):
 def discard_casting(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     for node in nodes:
         if isinstance(node, IrCast) and is_copy_op(node):
-            yield IrBinary(op="set", left=node.left, right=node.right)
+            yield IrSet(left=node.left, right=node.right)
         else:
             yield node
 
@@ -820,7 +945,7 @@ def literal_to_constant_replacement(
 
 
 @use_smart_generator
-def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]):
+def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]) -> Iterable[IrOperation]:
     """
     Removes unnecessary temp vars possibly originated from previous
     optimizations.
@@ -872,13 +997,37 @@ def rename_temp_scores(
     nodes: Iterable[IrOperation],
 ) -> Iterable[IrOperation]:
     nodes = tuple(nodes)
+
+    ignored_sources: set[IrSource] = set()
+
+    defs = get_source_definitions(nodes)
+    for i, node in enumerate(nodes):
+        for source in get_node_dependencies(node):
+            source_defs = defs.get(source, [])
+
+            if not any(def_i < i for def_i in source_defs):
+                ignored_sources.add(source)
+
     with (
         opt.temp_score.override(format=lambda n: f"$i{n}", reset=True),
         opt.temp_data.override(format=lambda n: f"i{n}", reset=True),
     ):
         source_map: dict[IrSource, IrSource] = {}
 
-        def replace_source(node: IrNode) -> IrNode:
+        def replace_operand(node: IrNode) -> IrNode:
+            if node in ignored_sources:
+                return node
+
+            if isinstance(node, IrUnaryCondition):
+                return replace(node, target=replace_operand(node.target))
+                
+            if isinstance(node, IrBinaryCondition):
+                return replace(
+                    node,
+                    left=replace_operand(node.left),
+                    right=replace_operand(node.right)
+                )
+            
             if not isinstance(node, IrSource):
                 return node
 
@@ -900,16 +1049,181 @@ def rename_temp_scores(
                 yield node
                 continue
 
-            store = tuple((type, replace_source(s)) for type, s in node.store)
+            store = tuple((type, replace_operand(s)) for type, s in node.store)
 
             if is_unary(node):
-                yield replace(node, target=replace_source(node.target), store=store)
+                yield replace(node, target=replace_operand(node.target), store=store)
             elif is_binary(node):
                 yield replace(
                     node,
-                    left=replace_source(node.left),
-                    right=replace_source(node.right),
+                    left=replace_operand(node.left),
+                    right=replace_operand(node.right),
                     store=store,
                 )
             else:
                 yield replace(node, store=store)
+
+
+def get_source_definitions(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
+    definitions: dict[IrSource, list[int]] = {}
+
+    for i, node in enumerate(nodes):
+        for target in node.targets:
+            defs = definitions.setdefault(target, [])
+            defs.append(i)
+    
+    return definitions
+
+def get_reaching_definition(defs: dict[IrSource, list[int]], source: IrSource, i: int) -> int | None:
+    source_defs = defs.get(source)
+    if source_defs is None:
+        return None
+
+    value = bisect_left(source_defs, i) - 1
+    return source_defs[value] if value >= 0 else None
+ 
+def get_node_dependencies(node: IrNode) -> tuple[IrSource, ...]:
+    result: list[IrSource] = []
+
+    if is_op(node):
+        for operand in node.operands:
+            result.extend(get_node_dependencies(operand))
+    elif is_unary_condition(node):
+        result.extend(get_node_dependencies(node.target))
+    elif is_binary_condition(node):
+        result.extend(get_node_dependencies(node.left))
+        result.extend(get_node_dependencies(node.right))
+    elif isinstance(node, IrSource):
+        result.append(node)
+    
+    return tuple(result)
+
+def negate_condition(node: IrCondition):
+    if is_unary_condition(node, "not"):
+        return IrUnaryCondition(op="truthy", target=node.target)
+
+    return replace(node, negated=not node.negated)
+
+def boolean_condition_propagation(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    all_nodes = list(nodes)
+    defs = get_source_definitions(all_nodes)
+
+    for i, node in enumerate(all_nodes):
+        if (
+            is_binary(node, "set")
+            and is_unary_condition(node.right, "boolean")
+        ):
+            bool_cond = node.right
+
+            cond_def_i = get_reaching_definition(defs, bool_cond.target, i)
+            if cond_def_i is None:
+                continue
+            
+            cond_node = all_nodes[cond_def_i]
+
+            if is_binary(cond_node, "set") and is_condition(cond_node.right):
+                right = negate_condition(cond_node.right) if bool_cond.negated else cond_node.right
+                all_nodes[i] = replace(node, right=right)
+
+    yield from all_nodes
+
+def branch_condition_propagation(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    all_nodes = tuple(nodes)
+    defs = get_source_definitions(all_nodes)
+
+    for i, node in enumerate(all_nodes):
+        if not is_unary(node, "branch") or not isinstance(node.target, IrSource):
+            yield node
+            continue
+
+        cond_def_i = get_reaching_definition(defs, node.target, i)
+        if cond_def_i is None:
+            yield node
+            continue
+        
+        cond_def = all_nodes[cond_def_i]
+
+        if is_binary(cond_def, "set") and is_condition(cond_def.right):
+            yield replace(node, target=cond_def.right)
+            continue
+
+        yield node
+
+def deadcode_elimination(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    all_nodes = tuple(nodes)
+    usage = get_source_usage(all_nodes)
+
+    for node_i, node in enumerate(all_nodes):
+        if isinstance(node, IrBranch):
+            yield node
+            continue
+
+        for target in node.targets:
+            if not opt.is_temp(target):
+                yield node
+                continue
+
+            target_usage = usage.get(target, [])
+
+            if any(use_i > node_i for use_i in target_usage):
+                yield node
+                continue
+
+def convert_data_order_operation(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    result: list[IrOperation] = []
+
+    OPERATIONS = (
+        "less_than",
+        "less_than_or_equal_to",
+        "greater_than",
+        "greater_than_or_equal_to",
+        "equal",
+    )
+
+    def replace_operand(node: Any, in_condition: bool = False) -> Any:        
+        if is_binary_condition(node) and node.op in OPERATIONS:
+            return replace(
+                node,
+                left=replace_operand(node.left, in_condition=True),
+                right=replace_operand(node.right, in_condition=True)
+            )
+        
+        if is_unary_condition(node) and node.op in OPERATIONS:
+            return replace(node, target=replace_operand(node.target, in_condition=True))
+        
+        if isinstance(node, IrData) and in_condition:
+            score = opt.generate_score()
+            result.append(IrCast(left=score, right=node, cast_type=Int))
+            return score
+        
+        return node
+        
+    for node in nodes:
+        if is_unary(node):
+            node = replace(node, target=replace_operand(node.target))
+        elif is_binary(node):
+            node = replace(
+                node,
+                left=replace_operand(node.left),
+                right=replace_operand(node.right)
+            )
+
+        result.append(node)
+        
+    yield from result
+        
+
+def init_score_boolean_result(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    all_nodes = tuple(nodes)
+    defs = get_source_definitions(all_nodes)
+
+    for i, node in enumerate(all_nodes):
+        if (
+            is_binary(node, "set")
+            and is_unary_condition(node.right, "boolean")
+            and isinstance(node.right.target, IrScore)
+            and not any(x < i for x in defs.get(node.left, []))
+        ):
+            yield IrSet(left=node.left, right=IrLiteral(value=Int(0)))
+
+        yield node

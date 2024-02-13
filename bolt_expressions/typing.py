@@ -41,13 +41,13 @@ NbtType = Union[
     # lists
     type[list["NbtType"]],
     # compounds
-    type[TypedDict],
+    # type[TypedDict],
     type[dict[str, "NbtType"]],
     dict[str, "NbtType"],
     # unions
     UnionType,
     # any
-    type,
+    type[Any],
 ]
 
 
@@ -318,6 +318,11 @@ def access_type_by_path(
         t = access_type(t, accessor, ctx)
 
     return t
+
+
+class A(TypedDict):
+    a: str
+    b: int
 
 
 def access_typeddict(
