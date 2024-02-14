@@ -4,15 +4,25 @@ from functools import cached_property
 from typing import Any, Callable, Iterable, cast
 
 from beet.core.utils import required_field
-from mecha import AstCommand, AstNode, AstObjective, AstPlayerName, Reducer, rule
+from mecha import AstCommand, AstNode, AstObjective, AstPlayerName, MutatingReducer, Reducer, rule
 
 from .sources import Source
 
 __all__ = [
+    "RunExecuteTransformer",
     "ConstantScoreChecker",
     "ObjectiveChecker",
     "SourceJsonConverter",
 ]
+
+@dataclass
+class RunExecuteTransformer(MutatingReducer):
+    @rule(AstCommand, identifier="execute:run:subcommand")
+    def strip_run_execute(self, node: AstCommand):
+        if isinstance(command := node.arguments[0], AstCommand):
+            if command.identifier == "execute:subcommand":
+                return command.arguments[0]
+        return node
 
 
 @dataclass

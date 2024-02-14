@@ -7,7 +7,7 @@ from bolt.utils import internal
 from mecha import Mecha
 
 import bolt_expressions as bolt_expressions_module
-from .ast import ConstantScoreChecker, ObjectiveChecker, SourceJsonConverter
+from .ast import ConstantScoreChecker, ObjectiveChecker, RunExecuteTransformer, SourceJsonConverter
 from .node import Expression
 from .expose import wrapped_min, wrapped_max
 from .api import Scoreboard, Data
@@ -26,6 +26,7 @@ def bolt_expressions(ctx: Context):
     data = ctx.inject(Data)
 
     mc = ctx.inject(Mecha)
+    mc.transform.extend(RunExecuteTransformer())
     mc.check.extend(
         ConstantScoreChecker(
             objective=expr.opts.const_objective, callback=scoreboard.add_constant
