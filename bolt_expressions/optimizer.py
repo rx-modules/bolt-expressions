@@ -31,7 +31,6 @@ from nbtlib import (  # type:ignore
 
 from .typing import NbtType, NbtValue, literal_types, unwrap_optional_type
 
-
 __all__ = [
     "Rule",
     "SmartRule",
@@ -143,6 +142,7 @@ def is_binary_condition(obj: Any, op: str | Iterable[str] | None = None) -> Type
 
 StoreValue = tuple[Literal["result", "success"], IrSource]
 
+OperandType = IrLiteral | IrSource | IrCondition
 
 @dataclass(frozen=True, kw_only=True)
 class IrOperation(IrNode):
@@ -465,6 +465,8 @@ class Optimizer:
     default_floating_nbt_type: str
 
     temp_sources: set[SourceTuple] = field(default_factory=set)
+    defined_sources: set[SourceTuple] = field(default_factory=set)
+
     rules: list[tuple[str, Rule[IrOperation, []]]] = field(default_factory=list)
 
     def add_rules(
@@ -525,6 +527,28 @@ class Optimizer:
             source = source.to_tuple()
 
         return source in self.temp_sources
+
+    def mark_defined(self, *sources: IrSource | SourceTuple):
+        for source in sources:
+            if isinstance(source, IrSource):
+                source = source.to_tuple()
+
+            self.defined_sources.add(source)
+
+    @contextmanager
+    def defined(self, *sources: IrSource | SourceTuple):
+        prev_defined = set(self.defined_sources)
+        self.mark_defined(*sources)
+
+        yield
+
+        self.defined_sources = prev_defined
+
+    def is_defined(self, source: IrSource | SourceTuple):
+        if isinstance(source, IrSource):
+            source = source.to_tuple()
+
+        return source in self.defined_sources
 
     def generate_score(self) -> IrScore:
         source = self.temp_score()
@@ -1227,3 +1251,48 @@ def init_score_boolean_result(nodes: Iterable[IrOperation]) -> Iterable[IrOperat
             yield IrSet(left=node.left, right=IrLiteral(value=Int(0)))
 
         yield node
+
+
+Op = TypeVar("Op", bound=IrOperation)
+
+def replace_operation(
+    node: Op,
+    operands: tuple[OperandType, ...] | None = None,
+    **kwargs: Any
+) -> Op:
+    if operands is None:
+        operands = node.operands
+    
+    if is_unary(node):
+        return replace(node, target=operands[0], **kwargs)
+    
+    if is_binary(node):
+        if len(operands) == 1:
+            return replace(node, right=operands[0], **kwargs)
+
+        return replace(node, left=operands[0], right=operands[1], **kwargs)
+        
+    return replace(node, **kwargs)
+
+def convert_defined_boolean_condition(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    for node in nodes:
+        operands: list[OperandType] = []
+
+        for operand in node.operands:
+            if is_unary(node, "branch") and isinstance(operand, IrSource):
+                operand = IrUnaryCondition(op="boolean", target=operand)
+
+            if (
+                is_unary_condition(operand, "boolean")
+                and isinstance(operand.target, IrScore)
+                and opt.is_defined(operand.target)
+            ):
+                negated = not operand.negated
+                target = operand.target
+                zero = IrLiteral(value=Int(0))
+
+                operand = IrBinaryCondition(op="equal", left=target, right=zero, negated=negated)
+
+            operands.append(operand)
+        
+        yield replace_operation(node, operands=tuple(operands))

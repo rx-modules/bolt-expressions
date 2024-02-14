@@ -19,6 +19,8 @@ __all__ = [
 
 
 def bolt_expressions(ctx: Context):
+    ctx.require("bolt_control_flow")
+    
     expr = ctx.inject(Expression)
     scoreboard = ctx.inject(Scoreboard)
     data = ctx.inject(Data)

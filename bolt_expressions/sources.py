@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field, replace
+from functools import partial
 from types import CodeType
 from typing import (
     Any,
     Callable,
     ClassVar,
+    ContextManager,
+    Generator,
     Generic,
     ParamSpec,
     TypeVar,
@@ -14,13 +17,16 @@ from typing import (
     overload,
 )
 import typing as t
+from bolt import Runtime
 from bolt.utils import internal
+from mecha import AstChildren, AstRoot, Mecha
 
 from nbtlib import Compound, Path, ListIndex, CompoundMatch, NamedKey  # type: ignore
+from bolt_control_flow import BranchInfo, BranchType, Case, CaseResult, WrappedCases
 
 from .node import Expression, UnrollHelper
 from .typing import NbtType, is_compound_type, format_type
-from .utils import type_name
+from .utils import insert_nested_commands, type_name
 
 from .optimizer import (
     DataTuple,
@@ -132,6 +138,14 @@ def get_source_from_tuple(expr: Expression, t: SourceTuple) -> "Source":
     return ScoreSource(t.holder, t.obj, ctx=expr)
 
 
+@overload
+def create_result(expr: Expression, result_type: t.Literal[ResultType.data]) -> "DataSource":
+    ...
+
+@overload
+def create_result(expr: Expression, result_type: t.Literal[ResultType.score]) -> "ScoreSource":
+    ...
+
 def create_result(expr: Expression, result_type: ResultType) -> "Source":
     if result_type == ResultType.score:
         holder, obj = expr.temp_score()
@@ -145,10 +159,75 @@ def create_result(expr: Expression, result_type: ResultType) -> "Source":
 
 
 @contextmanager
-def branch(source: "Source"):
-    with source.expr.resolve_branch(source):
+def branch(self: "Source") -> Generator[bool, None, None]:
+    with self.expr.resolve_branch(self):
         yield True
+
+@contextmanager
+def multibranch(
+    source: "Source",
+    info: BranchInfo,
+    root_function: bool = False,
+    dup_exists: bool = False
+):
+    if info.branch_type != BranchType.IF_ELSE:
+        yield NotImplemented
+        return
+
+    runtime = source.expr.runtime
+    mecha = source.expr.mc
+
+    if not runtime or not mecha:
+        yield NotImplemented
+        return
+
+    if isinstance(info.parent_cases, WrappedCases):
+        yield MultiBranchCase(target=source, is_nested=True, runtime=runtime, mecha=mecha)
+        return
     
+    if root_function:
+        with source.expr.anonymous_function("if_else_{incr}"):
+            yield MultiBranchCase(target=source, is_nested=True, runtime=runtime, mecha=mecha)
+        return
+    
+    dup = source.__dup__()
+
+    if dup_exists:
+        with source.expr.optimizer.defined(dup.to_tuple()):
+            yield MultiBranchCase(target=dup, is_nested=False, runtime=runtime, mecha=mecha)
+    else:
+        yield MultiBranchCase(target=dup, is_nested=False, runtime=runtime, mecha=mecha)
+
+
+@dataclass(kw_only=True)
+class MultiBranchCase(WrappedCases):
+    target: "Source"
+    is_nested: bool = False
+    mecha: Mecha
+    runtime: Runtime
+
+    @contextmanager
+    def __case__(self, case: Case):
+        if not self.is_nested:
+            if case:
+                with self.target.__branch__():
+                    yield CaseResult.maybe()
+            else:
+                with self.target.__not__().__branch__():
+                    yield CaseResult.maybe()
+            return
+        
+        if case:
+            with self.target.__branch__():
+                with self.runtime.scope() as cmds:
+                    yield CaseResult.maybe()
+                
+                cmd = self.mecha.parse("return run execute:\n  ...", using="command")
+                root = AstRoot(commands=AstChildren(cmds))
+                self.runtime.commands.append(insert_nested_commands(cmd, root))
+        else:
+            yield CaseResult.maybe()
+
 
 @dataclass
 class OperatorMethod(Generic[P, T]):
@@ -316,6 +395,22 @@ class Source(ExpressionNode, ABC):
         return self
 
     @abstractmethod
+    def __rebind__(self, value: Any) -> "Source":
+        ...
+    
+    @abstractmethod
+    def __branch__(self) -> ContextManager[bool]:
+        ...
+    
+    @abstractmethod
+    def __dup__(self) -> "Source":
+        ...
+
+    @abstractmethod
+    def __not__(self, /) -> "Source":
+        ...
+
+    @abstractmethod
     @operator_method
     def component(self) -> Any:
         ...
@@ -343,6 +438,7 @@ class ScoreSource(Source):
     __ne__ = binary_operator(NotEqual) # type: ignore
     __not__ = unary_operator(Not)
     __branch__ = branch
+    __multibranch__ = partial(multibranch, dup_exists=True)
 
     def __dup__(self):
         return resolve(self.expr, self)
@@ -505,7 +601,7 @@ class DataSourceOperator:
     def __set_name__(self, owner: Any, name: str):
         self.operator = name
     
-    def __call__(self, obj: Any, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, obj: Any, /, *args: Any, **kwargs: Any) -> Any:
         f = self.__get__(obj, type(obj))
         return f(*args, **kwargs)
 
@@ -608,10 +704,18 @@ class DataSource(Source):
         return (), result
 
     __branch__ = branch
+    __multibranch__ = partial(multibranch, root_function=True)
 
     @internal
     def __rebind__(self, right: Any):
-        return resolve(self.expr, right, result=self, cast=self.writetype)
+        resolve(self.expr, right, result=self, cast=self.writetype)
+        return self
+
+    def __dup__(self):
+        result = create_result(self.expr, ResultType.data)
+
+        result.reset()
+        return resolve(self.expr, self, result=result)
 
     @internal
     def __setattr__(self, key: str, value):

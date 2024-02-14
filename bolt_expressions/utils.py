@@ -80,6 +80,9 @@ def insert_nested_commands(execute: AstCommand, root: AstRoot) -> AstCommand:
     
     if len(execute.arguments):
         subcommand = execute.arguments[-1]
+    
+    if isinstance(subcommand, AstRoot):
+        return replace(execute, arguments=AstChildren((*execute.arguments[:-1], root)))
 
     if not isinstance(subcommand, AstCommand):
         commands = AstCommand(identifier="execute:commands", arguments=AstChildren((root,)))

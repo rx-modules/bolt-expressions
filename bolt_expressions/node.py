@@ -3,13 +3,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial
-from typing import Generator, Iterable, Union
+from typing import Iterable, Union
+import typing as t
 
-from beet import Context, Function
+from beet import Context, Generator, Function
 from bolt import Runtime
 from bolt.utils import internal
 from bolt.contrib.defer import Defer
-from mecha import AstChildren, Mecha
+from mecha import AstChildren, AstRoot, Mecha
+from mecha.contrib.nested_location import NestedLocationResolver
 from pydantic import BaseModel
 from nbtlib import Path  # type: ignore
 
@@ -36,6 +38,7 @@ from .optimizer import (
     convert_data_arithmetic,
     convert_cast,
     convert_data_order_operation,
+    convert_defined_boolean_condition,
     data_get_scaling,
     data_insert_score,
     data_set_scaling,
@@ -56,7 +59,7 @@ from .typing import NbtTypeString
 from .casting import TypeCaster
 from .check import TypeChecker
 from .serializer import Command, IrSerializer
-from .utils import identifier_generator
+from .utils import identifier_generator, insert_nested_commands
 
 
 __all__ = [
@@ -173,11 +176,13 @@ class Expression:
     temp_score: TempScoreManager
     temp_data: TempDataManager
     const_score: ConstScoreManager
-    identifiers: Generator[str, None, None]
+    identifiers: t.Generator[str, None, None]
 
     mecha: Mecha | None
     runtime: Runtime | None
     defer: Defer | None
+    nested_location: NestedLocationResolver
+    generator: Generator
 
     def __init__(
         self,
@@ -199,6 +204,8 @@ class Expression:
             self.mc = self.ctx.inject(Mecha)
             self.runtime = self.ctx.inject(Runtime)
             self.defer = self.ctx.inject(Defer)
+            self.nested_location = self.ctx.inject(NestedLocationResolver)
+            self.generator = self.ctx.generate
         else:
             self.opts = opts if opts is not None else ExpressionOptions()
             self.identifiers = identifier_generator()
@@ -245,6 +252,7 @@ class Expression:
             literal_to_constant_replacement=partial(literal_to_constant_replacement, self.optimizer),
             boolean_condition_propagation=boolean_condition_propagation,
             branch_condition_propagation=branch_condition_propagation,
+            convert_defined_boolean_condition=partial(convert_defined_boolean_condition, opt=self.optimizer),
             init_score_boolean_result=init_score_boolean_result,
             deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
             # typing
@@ -275,6 +283,22 @@ class Expression:
         yield self.commands
 
         self.commands = prev
+    
+    @contextmanager
+    def anonymous_function(self, template: str = "anonymous_{incr}") -> t.Generator[str, None, None]:
+        if not self.runtime or not self.mc:
+            return
+
+        namespace, resolved = self.nested_location.resolve()
+        location = self.generator.format(f"{namespace}:{resolved}/{template}")
+
+        with self.runtime.scope() as cmds:
+            yield location
+        
+        cmd = self.mc.parse(f"execute function {location}:\n  ...", using="command")
+        root = AstRoot(commands=AstChildren(cmds))
+        self.runtime.commands.append(insert_nested_commands(cmd, root))
+
     
     def unroll(self, node: ExpressionNode) -> tuple[
         Iterable[IrOperation], IrSource | IrLiteral, UnrollHelper
@@ -344,6 +368,7 @@ class Expression:
                 (*nodes, branch),
                 disable_all=True,
                 branch_condition_propagation=True,
+                convert_defined_boolean_condition=True,
                 rename_temp_scores=True,
                 deadcode_elimination=True,
             )
