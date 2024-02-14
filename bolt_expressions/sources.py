@@ -410,6 +410,22 @@ class Source(ExpressionNode, ABC):
     def __not__(self, /) -> "Source":
         ...
 
+    def __logical_and__(self, other: Callable[[], Any]):
+        t = self.__dup__()
+        
+        with t.__branch__():
+            t.__rebind__(other())
+
+        return t
+
+    def __logical_or__(self, other: Callable[[], Any]):
+        t = self.__dup__()
+
+        with t.__not__().__branch__():
+            t.__rebind__(other())
+
+        return t
+    
     @abstractmethod
     @operator_method
     def component(self) -> Any:
