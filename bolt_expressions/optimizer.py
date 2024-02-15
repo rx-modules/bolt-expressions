@@ -2,12 +2,14 @@ from abc import ABC
 from bisect import bisect_left
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
+from enum import Enum
 from fractions import Fraction
 from types import TracebackType
 from typing import (
     Any,
     Callable,
     Generator,
+    Generic,
     Iterable,
     Iterator,
     Literal,
@@ -17,8 +19,9 @@ from typing import (
     Union,
     Concatenate,
     ParamSpec,
+    cast,
 )
-from mecha import AbstractNode, AstChildren, AstCommand
+from mecha import AbstractChildren, AbstractNode, AstNode
 from bolt.utils import internal
 
 from nbtlib import (  # type:ignore
@@ -26,10 +29,15 @@ from nbtlib import (  # type:ignore
     Double,
     Float,
     Numeric,
+    String,
+    Compound,
     Path,
+    NamedKey,
+    CompoundMatch,
+    ListIndex,
 )
 
-from .typing import NbtType, NbtValue, literal_types, unwrap_optional_type
+from .typing import Accessor, NbtType, NbtValue, convert_tag, literal_types, unwrap_optional_type
 
 __all__ = [
     "Rule",
@@ -49,7 +57,6 @@ __all__ = [
     "set_to_self_removal",
     "set_and_get_cleanup",
     "literal_to_constant_replacement",
-    "StoreValue",
     "DataTargetType",
     "IrNode",
     "IrSource",
@@ -68,6 +75,18 @@ T = TypeVar("T")
 
 class IrNode(AbstractNode):
     ...
+
+IrNodeType = TypeVar("IrNodeType", bound=IrNode, covariant=True)
+AstNodeType = TypeVar("AstNodeType", bound=AstNode, covariant=True)
+
+@dataclass(frozen=True, kw_only=True)
+class IrRaw(IrNode, Generic[AstNodeType]):
+    node: AstNodeType
+
+class IrChildren(AbstractChildren[IrNodeType]):
+    @classmethod
+    def from_ast(cls, children: Iterable[AstNodeType]) -> "IrChildren[IrRaw[AstNodeType]]":
+        return IrChildren(IrRaw(node=node) for node in children)
 
 
 class IrSource(IrNode, ABC):
@@ -140,20 +159,28 @@ def is_binary_condition(obj: Any, op: str | Iterable[str] | None = None) -> Type
     return is_condition(obj, op) and isinstance(obj, IrBinaryCondition)
 
 
-StoreValue = tuple[Literal["result", "success"], IrSource]
+class StoreType(Enum):
+    result = "result"
+    success = "success"
+
+@dataclass(frozen=True, kw_only=True)
+class IrStore(IrNode):
+    type: StoreType
+    value: IrSource
+
 
 OperandType = IrLiteral | IrSource | IrCondition
 
 @dataclass(frozen=True, kw_only=True)
 class IrOperation(IrNode):
     op: str
-    store: tuple[StoreValue, ...] = ()
+    store: IrChildren[IrStore] = field(default_factory=IrChildren)
 
     destructive: bool = True
 
     @property
     def targets(self) -> tuple[IrSource, ...]:
-        return tuple(s[1] for s in self.store)
+        return tuple(s.value for s in self.store)
 
     @property
     def operands(self) -> tuple[IrSource | IrCondition | IrLiteral, ...]:
@@ -231,7 +258,7 @@ class IrBranch(IrUnary):
     op: str = field(default="branch", init=False)
     destructive: bool = field(default=False, init=False)
 
-    children: AstChildren[AstCommand]
+    children: IrChildren[Any]
 
 
 def is_op(obj: Any, op: str | Iterable[str] | None = None) -> TypeGuard[IrOperation]:
@@ -837,8 +864,8 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
             add(source.right, i)
 
     for i, node in enumerate(nodes):
-        for _, source in node.store:
-            add(source, i)
+        for s in node.store:
+            add(s.value, i)
 
         if is_binary(node):
             if node.op not in ("set", "cast"):
@@ -892,7 +919,7 @@ def apply_temp_source_reuse(
                 replace_map[node.right] = node.left
 
     for node in all_nodes:
-        store = tuple((type, replace_operand(source)) for type, source in node.store)
+        store = IrChildren(replace(s, value=replace_operand(s.value)) for s in node.store)
 
         if is_unary(node):
             yield replace(node, store=store, target=replace_operand(node.target))
@@ -1073,7 +1100,7 @@ def rename_temp_scores(
                 yield node
                 continue
 
-            store = tuple((type, replace_operand(s)) for type, s in node.store)
+            store = IrChildren(replace(s, value=replace_operand(s.value)) for s in node.store)
 
             if is_unary(node):
                 yield replace(node, target=replace_operand(node.target), store=store)

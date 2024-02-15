@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Generator, Iterable, cast
 from mecha import AstChildren, AstCommand, Mecha, Visitor, rule, AstRoot
 from nbtlib import Byte, Short, Int, Long, Float, Double  # type: ignore
@@ -17,16 +17,20 @@ from .optimizer import (
     IrInsert,
     IrLiteral,
     IrNode,
+    IrRaw,
     IrScore,
     IrSet,
     IrSource,
+    IrOperation,
+    IrStore,
+    IrChildren,
     IrUnary,
     IrUnaryCondition,
 )
 
 __all__ = [
     "InvalidOperand",
-    "IrSerializer",
+    "AstConverter",
 ]
 
 
@@ -36,62 +40,79 @@ class InvalidOperand(Exception):
         super().__init__(f"Invalid operand(s) for '{op}' operation: {fmt}.")
 
 
-@dataclass(frozen=True)
-class Command:
-    value: str
-
-    def to_ast(self, mc: Mecha) -> AstCommand:
-        return mc.parse(self.value, using="command")
-    
-    def __str__(self) -> str:
-        return self.value
-
-@dataclass(frozen=True)
-class BranchCommand(Command):
-    children: AstChildren[AstCommand] 
-
-    def to_ast(self, mc: Mecha) -> AstCommand:
-        command = super().to_ast(mc)
-        root = AstRoot(commands=self.children)
-        return insert_nested_commands(command, root)
-
-
 @dataclass(kw_only=True)
-class IrSerializer(Visitor):
+class AstConverter(Visitor):
     default_nbt_type: NbtTypeString
 
-    def __call__(self, nodes: Iterable[IrNode]) -> list[Command]:  # type: ignore
-        result: list[Any] = []
+    mc: Mecha
+    result: list[AstCommand] = field(default_factory=list)
+
+    def __call__(self, nodes: Iterable[IrOperation]) -> AstChildren[AstCommand]:  # type: ignore
+        prev_result = self.result
+        self.result = []
 
         for node in nodes:
-            self.invoke(node, result)
+            self.invoke(node)
 
-        return [
-            Command(value) if not isinstance(value, Command) else value
-            for value in result
-        ]
+        result = AstChildren(self.result)
+        self.result = prev_result
+        return result
+    
+    def add_result(
+        self,
+        cmd: str,
+        store: IrChildren[IrStore] | None = None,
+        children: AstChildren[AstCommand] | None = None
+    ) -> None:
+        if store:
+            prefix = tuple(self.invoke(s) for s in store)
+            cmd = " ".join((*prefix, cmd))
+
+        node = self.mc.parse(cmd, using="command")
+
+        if children:        
+            node = insert_nested_commands(node, AstRoot(commands=children))
+
+        self.result.append(node)
     
     @rule(IrNode)
-    def fallback(self, node: IrNode, _: list[Any]):
-        raise TypeError(f"Could not serialize object '{node}'.")
+    def fallback(self, node: IrNode):
+        raise TypeError(f"Could not convert object '{node}' to AST.")
+
+    @rule(IrRaw)
+    def raw(self, node: IrRaw[AstCommand]):
+        self.result.append(node.node)
 
     @rule(IrScore)
-    def score(self, node: IrScore, _: list[str]) -> str:
+    def score(self, node: IrScore) -> str:
         return f"{node.holder} {node.obj}"
 
     @rule(IrData)
-    def data(self, node: IrData, _: list[str]) -> str:
+    def data(self, node: IrData) -> str:
         if not len(node.path):
             return f"{node.type} {node.target}"
         return f"{node.type} {node.target} {node.path}"
 
     @rule(IrLiteral)
-    def literal(self, node: IrLiteral, _: list[str]) -> str:
+    def literal(self, node: IrLiteral) -> str:
         return node.value.snbt()  # type: ignore
     
+    @rule(IrStore)
+    def store(self, node: IrStore) -> Generator[IrNode, str, str]:
+        value = yield node.value
+        type = node.type.value
 
+        match node.value:
+            case IrScore():
+                return f"execute store {type} score {value} run"
+            case IrData() as d:
+                nbt_type = self.serialize_nbt_type(d.nbt_type)
+                return f"execute store {type} {value} {nbt_type} 1 run"
+            case _:
+                raise ValueError(f"Invalid store source '{node.value}'.")
+    
     @rule(IrBinaryCondition, op="less_than")
-    def less_than(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+    def less_than(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
         left = yield node.left
         right = yield node.right
         test = "unless" if node.negated else "if"
@@ -111,7 +132,7 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, l, r)
 
     @rule(IrBinaryCondition, op="greater_than")
-    def greater_than(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+    def greater_than(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
         left = yield node.left
         right = yield node.right
         test = "unless" if node.negated else "if"
@@ -131,7 +152,7 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, l, r)
 
     @rule(IrBinaryCondition, op="greater_than_or_equal_to")
-    def greater_than_or_qual_to(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+    def greater_than_or_qual_to(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
         left = yield node.left
         right = yield node.right
         test = "unless" if node.negated else "if"
@@ -147,7 +168,7 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, l, r)
 
     @rule(IrBinaryCondition, op="less_than_or_equal_to")
-    def less_than_or_qual_to(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+    def less_than_or_qual_to(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
         left = yield node.left
         right = yield node.right
         test = "unless" if node.negated else "if"
@@ -163,7 +184,7 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, l, r)
     
     @rule(IrBinaryCondition, op="equal")
-    def equal(self, node: IrBinaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+    def equal(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
         left = yield node.left
         right = yield node.right
         test = "unless" if node.negated else "if"
@@ -179,7 +200,7 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, l, r)
     
     @rule(IrUnaryCondition, op="boolean")
-    def boolean(self, node: IrUnaryCondition, _: list[str]) -> Generator[IrNode, str, str]:
+    def boolean(self, node: IrUnaryCondition) -> Generator[IrNode, str, str]:
         target = yield node.target
         test = "unless" if node.negated else "if"
 
@@ -196,7 +217,7 @@ class IrSerializer(Visitor):
                 raise InvalidOperand(node.op, t)
     
     @rule(IrBranch)
-    def branch(self, node: IrBranch, result: list[Any]) -> Generator[IrNode, str, None]:
+    def branch(self, node: IrBranch) -> Generator[IrNode, str, None]:
         target = yield node.target
 
         match node.target:
@@ -205,10 +226,11 @@ class IrSerializer(Visitor):
             case IrCondition():
                 cmd = target
         
-        result.append(BranchCommand(cmd, node.children))
+        children = self(node.children)
+        self.add_result(cmd, node.store, children)
 
     @rule(IrBinary, op="add")
-    def add(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
+    def add(self, node: IrBinary) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -220,10 +242,10 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrBinary, op="sub")
-    def sub(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
+    def sub(self, node: IrBinary) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -235,7 +257,7 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrBinary, op="mul")
     @rule(IrBinary, op="div")
@@ -243,7 +265,7 @@ class IrSerializer(Visitor):
     @rule(IrBinary, op="min")
     @rule(IrBinary, op="max")
     def binary_score_only(
-        self, node: IrBinary, result: list[str]
+        self, node: IrBinary
     ) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
@@ -261,10 +283,10 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrBinary, op="append")
-    def append(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
+    def append(self, node: IrBinary) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -276,11 +298,11 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrBinary, op="prepend")
     def prepend(
-        self, node: IrBinary, result: list[str]
+        self, node: IrBinary
     ) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
@@ -292,11 +314,11 @@ class IrSerializer(Visitor):
                 cmd = f"data modify {left} prepend from {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-
-        result.append(cmd)
+        
+        self.add_result(cmd, node.store)
 
     @rule(IrInsert)
-    def insert(self, node: IrInsert, result: list[str]) -> Generator[IrNode, str, None]:
+    def insert(self, node: IrInsert) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
         index = node.index
@@ -309,10 +331,10 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrBinary, op="merge")
-    def merge(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
+    def merge(self, node: IrBinary) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -326,10 +348,10 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrUnary, op="remove")
-    def remove(self, node: IrUnary, result: list[str]) -> Generator[IrNode, str, None]:
+    def remove(self, node: IrUnary) -> Generator[IrNode, str, None]:
         target = yield node.target
 
         match node.target:
@@ -338,11 +360,11 @@ class IrSerializer(Visitor):
             case t:
                 raise InvalidOperand(node.op, t)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrUnary, op="reset")
     def reset_op(
-        self, node: IrUnary, result: list[str]
+        self, node: IrUnary
     ) -> Generator[IrNode, str, None]:
         target = yield node.target
 
@@ -352,10 +374,10 @@ class IrSerializer(Visitor):
             case t:
                 raise InvalidOperand(node.op, t)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrUnary, op="enable")
-    def enable(self, node: IrUnary, result: list[str]) -> Generator[IrNode, str, None]:
+    def enable(self, node: IrUnary) -> Generator[IrNode, str, None]:
         target = yield node.target
 
         match node.target:
@@ -364,7 +386,7 @@ class IrSerializer(Visitor):
             case t:
                 raise InvalidOperand(node.op, t)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     def serialize_nbt_type(self, value: Any) -> NbtTypeString:
         if isinstance(value, str) and value in NBT_TYPE_STRING:
@@ -401,7 +423,7 @@ class IrSerializer(Visitor):
         return (cast_type, str(scale))
 
     @rule(IrSet)
-    def set(self, node: IrBinary, result: list[str]) -> Generator[IrNode, str, None]:
+    def set(self, node: IrBinary) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -421,10 +443,10 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)
 
     @rule(IrCast, op="cast")
-    def cast(self, node: IrCast, result: list[str]) -> Generator[IrNode, str, None]:
+    def cast(self, node: IrCast) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -449,4 +471,4 @@ class IrSerializer(Visitor):
             case l, r:
                 raise InvalidOperand(node.op, l, r)
 
-        result.append(cmd)
+        self.add_result(cmd, node.store)

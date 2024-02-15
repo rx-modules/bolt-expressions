@@ -10,17 +10,18 @@ from beet import Context, Generator, Function
 from bolt import Runtime
 from bolt.utils import internal
 from bolt.contrib.defer import Defer
-from mecha import AstChildren, AstRoot, Mecha
+from mecha import AstChildren, AstCommand, AstRoot, Mecha
 from mecha.contrib.nested_location import NestedLocationResolver
 from pydantic import BaseModel
 from nbtlib import Path  # type: ignore
 
-from rich.pretty import pprint
+# from rich.pretty import pprint
 
 
 from .optimizer import (
     ConstScoreManager,
     IrBranch,
+    IrChildren,
     IrData,
     IrLiteral,
     IrOperation,
@@ -58,7 +59,7 @@ from .optimizer import (
 from .typing import NbtTypeString
 from .casting import TypeCaster
 from .check import TypeChecker
-from .serializer import Command, IrSerializer
+from .ast_converter import AstConverter
 from .utils import identifier_generator, insert_nested_commands
 
 
@@ -155,42 +156,36 @@ ResolveResult = SourceTuple | NbtValue | None
 class LazyEntry:
     source: SourceTuple
     node: ExpressionNode
-    commands: list[Command]
+    commands: AstChildren[AstCommand]
     emit: bool = False
 
 
 class Expression:
-    ctx: Context | None
+    ctx: Context
     opts: ExpressionOptions
 
     called_init: bool
     init_commands: list[str]
-    commands: list[Command] | None
+    commands: list[AstCommand] | None
     lazy_values: dict[SourceTuple, LazyEntry]
 
     type_caster: TypeCaster
     type_checker: TypeChecker
     optimizer: Optimizer
-    serializer: IrSerializer
+    ast_converter: AstConverter
 
     temp_score: TempScoreManager
     temp_data: TempDataManager
     const_score: ConstScoreManager
     identifiers: t.Generator[str, None, None]
 
-    mecha: Mecha | None
-    runtime: Runtime | None
-    defer: Defer | None
+    mecha: Mecha
+    runtime: Runtime
+    defer: Defer
     nested_location: NestedLocationResolver
     generator: Generator
 
-    def __init__(
-        self,
-        ctx: Context | None = None,
-        opts: ExpressionOptions | None = None,
-        mc: Mecha | None = None,
-        runtime: Runtime | None = None,
-    ):
+    def __init__(self, ctx: Context):
         self.called_init = False
         self.init_commands = []
         self.commands = None
@@ -198,19 +193,13 @@ class Expression:
 
         self.ctx = ctx
 
-        if self.ctx:
-            self.opts = self.ctx.inject(expression_options)
-            self.identifiers = identifier_generator(ctx)
-            self.mc = self.ctx.inject(Mecha)
-            self.runtime = self.ctx.inject(Runtime)
-            self.defer = self.ctx.inject(Defer)
-            self.nested_location = self.ctx.inject(NestedLocationResolver)
-            self.generator = self.ctx.generate
-        else:
-            self.opts = opts if opts is not None else ExpressionOptions()
-            self.identifiers = identifier_generator()
-            self.mc = mc
-            self.runtime = runtime
+        self.opts = self.ctx.inject(expression_options)
+        self.identifiers = identifier_generator(ctx)
+        self.mc = self.ctx.inject(Mecha)
+        self.runtime = self.ctx.inject(Runtime)
+        self.defer = self.ctx.inject(Defer)
+        self.nested_location = self.ctx.inject(NestedLocationResolver)
+        self.generator = self.ctx.generate
 
         self.temp_score = TempScoreManager(
             self.opts.temp_objective, format=lambda _: "$" + next(self.identifiers)
@@ -260,20 +249,21 @@ class Expression:
             type_checker=self.type_checker,
         )
 
-        self.serializer = IrSerializer(default_nbt_type=self.opts.default_nbt_type)
+        self.ast_converter = AstConverter(default_nbt_type=self.opts.default_nbt_type, mc=self.mc)
 
-    def inject_command(self, *cmds: Command):
-        if self.commands is not None:
-            self.commands.extend(cmds)
-            return
+    def inject_command(self, *cmds: str | AstCommand):
+        commands = self.commands
+        if commands is None:
+            commands = self.runtime.commands
 
-        if self.mc and self.runtime:
-            for cmd in cmds:
-                ast = cmd.to_ast(self.mc)
-                self.runtime.commands.append(ast)
+        for cmd in cmds:
+            if isinstance(cmd, str):
+                cmd = self.mc.parse(cmd, using="command")
+
+            commands.append(cmd)
 
     @contextmanager
-    def scope(self, result: list[Command] | None = None):
+    def scope(self, result: list[AstCommand] | None = None):
         if result is None:
             result = []
 
@@ -286,9 +276,6 @@ class Expression:
     
     @contextmanager
     def anonymous_function(self, template: str = "anonymous_{incr}") -> t.Generator[str, None, None]:
-        if not self.runtime or not self.mc:
-            return
-
         namespace, resolved = self.nested_location.resolve()
         location = self.generator.format(f"{namespace}:{resolved}/{template}")
 
@@ -327,9 +314,9 @@ class Expression:
         with self.optimizer.temp(*helper.temporaries):
             nodes = self.optimizer(operations)
 
-        cmds = self.serializer(nodes)
+        cmds = self.ast_converter(nodes)
 
-        if not lazy or not self.defer:
+        if not lazy:
             self.inject_command(*cmds)
             return source
 
@@ -342,9 +329,6 @@ class Expression:
     @contextmanager
     @internal
     def resolve_branch(self, node: ExpressionNode):
-        if not self.runtime:
-            raise ValueError("Branch only works when a runtime object is provided.")
-
         operations, result, helper = self.unroll(node)
 
         if not isinstance(result, IrSource):
@@ -360,7 +344,7 @@ class Expression:
         with self.runtime.scope() as cmds:
             yield
         
-        branch = IrBranch(target=result, children=AstChildren(cmds))
+        branch = IrBranch(target=result, children=IrChildren.from_ast(cmds))
         helper.add_temporary(result.to_tuple())
 
         with self.optimizer.temp(*helper.temporaries):
@@ -373,7 +357,7 @@ class Expression:
                 deadcode_elimination=True,
             )
         
-        cmds = self.serializer(nodes)
+        cmds = self.ast_converter(nodes)
         self.inject_command(*cmds)
 
     def unroll_lazy(
@@ -401,11 +385,8 @@ class Expression:
 
     def init(self):
         """Injects a function which creates `ConstantSource` fakeplayers"""
-        if not self.ctx:
-            return
-
         path = self.ctx.generate.path(self.opts.init_path)
-        self.inject_command(Command(f"function {path}"))
+        self.inject_command(f"function {path}")
         self.called_init = True
 
     def generate_init(self) -> Function:
@@ -417,7 +398,6 @@ class Expression:
         if not self.init_commands:
             return function
 
-        if self.ctx:
-            self.ctx.generate(self.opts.init_path, function)
+        self.ctx.generate(self.opts.init_path, function)
 
         return function

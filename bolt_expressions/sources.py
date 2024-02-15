@@ -177,10 +177,6 @@ def multibranch(
     runtime = source.expr.runtime
     mecha = source.expr.mc
 
-    if not runtime or not mecha:
-        yield NotImplemented
-        return
-
     if isinstance(info.parent_cases, WrappedCases):
         yield MultiBranchCase(target=source, is_nested=True, runtime=runtime, mecha=mecha)
         return
