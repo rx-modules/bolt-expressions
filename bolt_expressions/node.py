@@ -221,10 +221,14 @@ class Expression:
         self.optimizer.add_rules(
             data_insert_score=data_insert_score,
             convert_cast=convert_cast,
-            compound_match_data_compare=partial(compound_match_data_compare, opt=self.optimizer),
+            compound_match_data_compare=partial(
+                compound_match_data_compare, opt=self.optimizer
+            ),
             store_set_data_compare=partial(store_set_data_compare, opt=self.optimizer),
             convert_data_arithmetic=partial(convert_data_arithmetic, self.optimizer),
-            convert_data_order_operation=partial(convert_data_order_operation, opt=self.optimizer),
+            convert_data_order_operation=partial(
+                convert_data_order_operation, opt=self.optimizer
+            ),
             discard_casting=discard_casting,
             init_score_boolean_result=init_score_boolean_result,
             apply_temp_source_reuse=partial(apply_temp_source_reuse, self.optimizer),
@@ -255,7 +259,9 @@ class Expression:
             type_checker=self.type_checker,
         )
 
-        self.ast_converter = AstConverter(default_nbt_type=self.opts.default_nbt_type, mc=self.mc)
+        self.ast_converter = AstConverter(
+            default_nbt_type=self.opts.default_nbt_type, mc=self.mc
+        )
 
     def inject_command(self, *cmds: str | AstCommand):
         commands = self.commands
@@ -279,23 +285,24 @@ class Expression:
         yield self.commands
 
         self.commands = prev
-    
+
     @contextmanager
-    def anonymous_function(self, template: str = "anonymous_{incr}") -> t.Generator[str, None, None]:
+    def anonymous_function(
+        self, template: str = "anonymous_{incr}"
+    ) -> t.Generator[str, None, None]:
         namespace, resolved = self.nested_location.resolve()
         location = self.generator.format(f"{namespace}:{resolved}/{template}")
 
         with self.runtime.scope() as cmds:
             yield location
-        
+
         cmd = self.mc.parse(f"execute function {location}:\n  ...", using="command")
         root = AstRoot(commands=AstChildren(cmds))
         self.runtime.commands.append(insert_nested_commands(cmd, root))
 
-    
-    def unroll(self, node: ExpressionNode) -> tuple[
-        Iterable[IrOperation], IrSource | IrLiteral, UnrollHelper
-    ]:
+    def unroll(
+        self, node: ExpressionNode
+    ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral, UnrollHelper]:
         helper = UnrollHelper(
             score_manager=self.temp_score, data_manager=self.temp_data
         )
@@ -314,7 +321,7 @@ class Expression:
             score = self.optimizer.generate_score()
             operations = (IrSet(left=score, right=result),)
             result = score
-        
+
         source = result.to_tuple()
 
         nodes, _ = self.optimizer(operations, temporaries=helper.temporaries)
@@ -347,7 +354,7 @@ class Expression:
 
         with self.runtime.scope() as cmds:
             yield
-        
+
         branch = IrBranch(target=result, children=IrChildren.from_ast(cmds))
 
         nodes, _ = self.optimizer(

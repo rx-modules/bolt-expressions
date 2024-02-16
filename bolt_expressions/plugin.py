@@ -7,7 +7,12 @@ from bolt.utils import internal
 from mecha import Mecha
 
 import bolt_expressions as bolt_expressions_module
-from .ast import ConstantScoreChecker, ObjectiveChecker, RunExecuteTransformer, SourceJsonConverter
+from .ast import (
+    ConstantScoreChecker,
+    ObjectiveChecker,
+    RunExecuteTransformer,
+    SourceJsonConverter,
+)
 from .node import Expression
 from .expose import wrapped_min, wrapped_max
 from .api import Scoreboard, Data
@@ -20,7 +25,7 @@ __all__ = [
 
 def bolt_expressions(ctx: Context):
     ctx.require("bolt_control_flow")
-    
+
     expr = ctx.inject(Expression)
     scoreboard = ctx.inject(Scoreboard)
     data = ctx.inject(Data)

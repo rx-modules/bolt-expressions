@@ -77,15 +77,17 @@ def insert_nested_commands(execute: AstCommand, root: AstRoot) -> AstCommand:
     """Inserts nested commands to the end of an execute command."""
 
     subcommand = None
-    
+
     if len(execute.arguments):
         subcommand = execute.arguments[-1]
-    
+
     if isinstance(subcommand, AstRoot):
         return replace(execute, arguments=AstChildren((*execute.arguments[:-1], root)))
 
     if not isinstance(subcommand, AstCommand):
-        commands = AstCommand(identifier="execute:commands", arguments=AstChildren((root,)))
+        commands = AstCommand(
+            identifier="execute:commands", arguments=AstChildren((root,))
+        )
         arguments = AstChildren((*execute.arguments, commands))
         identifier = execute.identifier + ":subcommand"
         return replace(execute, identifier=identifier, arguments=arguments)

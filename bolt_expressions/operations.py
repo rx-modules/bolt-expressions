@@ -176,7 +176,9 @@ class Insert(BinaryOperation):
 
     index: int = 0
 
-    def create_operation(self, left: IrSource, right: IrSource | IrLiteral | IrCondition) -> IrInsert:
+    def create_operation(
+        self, left: IrSource, right: IrSource | IrLiteral | IrCondition
+    ) -> IrInsert:
         return IrInsert(left=left, right=right, index=self.index)
 
 
@@ -194,7 +196,9 @@ class Set(BinaryOperation):
     op: ClassVar[str] = "set"
     in_place: ClassVar[bool] = True
 
-    def create_operation(self, left: IrSource, right: IrSource | IrLiteral | IrCondition) -> IrSet:
+    def create_operation(
+        self, left: IrSource, right: IrSource | IrLiteral | IrCondition
+    ) -> IrSet:
         return IrSet(left=left, right=right)
 
 
@@ -205,7 +209,9 @@ class Cast(BinaryOperation):
 
     cast_type: NbtType = Any
 
-    def create_operation(self, left: IrSource, right: IrSource | IrLiteral | IrCondition) -> IrCast:
+    def create_operation(
+        self, left: IrSource, right: IrSource | IrLiteral | IrCondition
+    ) -> IrCast:
         return IrCast(left=left, right=right, cast_type=self.cast_type)
 
 
@@ -260,11 +266,14 @@ class UnaryCondition(UnaryOperation):
         if not isinstance(target_var, IrSource):
             raise ValueError("Operand must be a source node.")
 
-        condition = IrUnaryCondition(op=self.op, target=target_var, negated=self.negated)
+        condition = IrUnaryCondition(
+            op=self.op, target=target_var, negated=self.negated
+        )
         temp_var = helper.create_temporary(ResultType.score)
         op = IrSet(left=temp_var, right=condition)
 
         return (*target_nodes, op), temp_var
+
 
 @dataclass
 class BinaryCondition(BinaryOperation):
@@ -275,7 +284,9 @@ class BinaryCondition(BinaryOperation):
         latter_nodes, latter_var = convert_node(self.latter, self.ctx).unroll(helper)
 
         temp_var = helper.create_temporary(ResultType.score)
-        condition = IrBinaryCondition(op=self.op, left=former_var, right=latter_var, negated=self.negated)
+        condition = IrBinaryCondition(
+            op=self.op, left=former_var, right=latter_var, negated=self.negated
+        )
         op = IrSet(left=temp_var, right=condition)
 
         return (*former_nodes, *latter_nodes, op), temp_var
@@ -284,24 +295,31 @@ class BinaryCondition(BinaryOperation):
 class Boolean(UnaryCondition):
     op: ClassVar[str] = "boolean"
 
+
 class Not(UnaryCondition):
     op: ClassVar[str] = "boolean"
     negated: ClassVar[bool] = True
 
+
 class LessThan(BinaryCondition):
     op: ClassVar[str] = "less_than"
+
 
 class LessThanOrEqualTo(BinaryCondition):
     op: ClassVar[str] = "less_than_or_equal_to"
 
+
 class GreaterThan(BinaryCondition):
     op: ClassVar[str] = "greater_than"
+
 
 class GreaterThanOrEqualTo(BinaryCondition):
     op: ClassVar[str] = "greater_than_or_equal_to"
 
+
 class Equal(BinaryCondition):
     op: ClassVar[str] = "equal"
+
 
 class NotEqual(BinaryCondition):
     op: ClassVar[str] = "equal"

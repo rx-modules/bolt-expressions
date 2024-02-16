@@ -131,6 +131,7 @@ def resolve(
     source = expr.resolve(op, lazy=lazy)
     return get_source_from_tuple(expr, source)
 
+
 def get_source_from_tuple(expr: Expression, t: SourceTuple) -> "Source":
     if isinstance(t, DataTuple):
         return DataSource(t.type, t.target, t.path, ctx=expr)
@@ -139,12 +140,18 @@ def get_source_from_tuple(expr: Expression, t: SourceTuple) -> "Source":
 
 
 @overload
-def create_result(expr: Expression, result_type: t.Literal[ResultType.data]) -> "DataSource":
+def create_result(
+    expr: Expression, result_type: t.Literal[ResultType.data]
+) -> "DataSource":
     ...
 
+
 @overload
-def create_result(expr: Expression, result_type: t.Literal[ResultType.score]) -> "ScoreSource":
+def create_result(
+    expr: Expression, result_type: t.Literal[ResultType.score]
+) -> "ScoreSource":
     ...
+
 
 def create_result(expr: Expression, result_type: ResultType) -> "Source":
     if result_type == ResultType.score:
@@ -163,12 +170,13 @@ def branch(self: "Source") -> Generator[bool, None, None]:
     with self.expr.resolve_branch(self):
         yield True
 
+
 @contextmanager
 def multibranch(
     source: "Source",
     info: BranchInfo,
     root_function: bool = False,
-    dup_exists: bool = False
+    dup_exists: bool = False,
 ):
     if info.branch_type != BranchType.IF_ELSE:
         yield NotImplemented
@@ -178,19 +186,25 @@ def multibranch(
     mecha = source.expr.mc
 
     if isinstance(info.parent_cases, WrappedCases):
-        yield MultiBranchCase(target=source, is_nested=True, runtime=runtime, mecha=mecha)
+        yield MultiBranchCase(
+            target=source, is_nested=True, runtime=runtime, mecha=mecha
+        )
         return
-    
+
     if root_function:
         with source.expr.anonymous_function("if_else_{incr}"):
-            yield MultiBranchCase(target=source, is_nested=True, runtime=runtime, mecha=mecha)
+            yield MultiBranchCase(
+                target=source, is_nested=True, runtime=runtime, mecha=mecha
+            )
         return
-    
+
     dup = source.__dup__()
 
     if dup_exists:
         with source.expr.optimizer.defined(dup.to_tuple()):
-            yield MultiBranchCase(target=dup, is_nested=False, runtime=runtime, mecha=mecha)
+            yield MultiBranchCase(
+                target=dup, is_nested=False, runtime=runtime, mecha=mecha
+            )
     else:
         yield MultiBranchCase(target=dup, is_nested=False, runtime=runtime, mecha=mecha)
 
@@ -212,12 +226,12 @@ class MultiBranchCase(WrappedCases):
                 with self.target.__not__().__branch__():
                     yield CaseResult.maybe()
             return
-        
+
         if case:
             with self.target.__branch__():
                 with self.runtime.scope() as cmds:
                     yield CaseResult.maybe()
-                
+
                 cmd = self.mecha.parse("return run execute:\n  ...", using="command")
                 root = AstRoot(commands=AstChildren(cmds))
                 self.runtime.commands.append(insert_nested_commands(cmd, root))
@@ -393,11 +407,11 @@ class Source(ExpressionNode, ABC):
     @abstractmethod
     def __rebind__(self, value: Any) -> "Source":
         ...
-    
+
     @abstractmethod
     def __branch__(self) -> ContextManager[bool]:
         ...
-    
+
     @abstractmethod
     def __dup__(self) -> "Source":
         ...
@@ -408,7 +422,7 @@ class Source(ExpressionNode, ABC):
 
     def __logical_and__(self, other: Callable[[], Any]):
         t = self.__dup__()
-        
+
         with t.__branch__():
             t.__rebind__(other())
 
@@ -421,7 +435,7 @@ class Source(ExpressionNode, ABC):
             t.__rebind__(other())
 
         return t
-    
+
     @abstractmethod
     @operator_method
     def component(self) -> Any:
@@ -446,8 +460,8 @@ class ScoreSource(Source):
     __le__ = binary_operator(LessThanOrEqualTo)
     __gt__ = binary_operator(GreaterThan)
     __ge__ = binary_operator(GreaterThanOrEqualTo)
-    __eq__ = binary_operator(Equal) # type: ignore
-    __ne__ = binary_operator(NotEqual) # type: ignore
+    __eq__ = binary_operator(Equal)  # type: ignore
+    __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
     __branch__ = branch
     __multibranch__ = partial(multibranch, dup_exists=True)
@@ -518,8 +532,8 @@ class GenericOperatorHandler(OperatorHandler):
     __le__ = binary_operator(LessThanOrEqualTo)
     __gt__ = binary_operator(GreaterThan)
     __ge__ = binary_operator(GreaterThanOrEqualTo)
-    __eq__ = binary_operator(Equal) # type: ignore
-    __ne__ = binary_operator(NotEqual) # type: ignore
+    __eq__ = binary_operator(Equal)  # type: ignore
+    __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
 
     @operator_method(returns=False)
@@ -556,22 +570,22 @@ class NumericOperatorHandler(OperatorHandler):
     __le__ = binary_operator(LessThanOrEqualTo)
     __gt__ = binary_operator(GreaterThan)
     __ge__ = binary_operator(GreaterThanOrEqualTo)
-    __eq__ = binary_operator(Equal) # type: ignore
-    __ne__ = binary_operator(NotEqual) # type: ignore
+    __eq__ = binary_operator(Equal)  # type: ignore
+    __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
 
 
 class StringOperatorHandler(OperatorHandler):
-    __eq__ = binary_operator(Equal) # type: ignore
-    __ne__ = binary_operator(NotEqual) # type: ignore
+    __eq__ = binary_operator(Equal)  # type: ignore
+    __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
 
 
 class SequenceOperatorHandler(OperatorHandler):
     list_index: ClassVar[bool] = True
 
-    __eq__ = binary_operator(Equal) # type: ignore
-    __ne__ = binary_operator(NotEqual) # type: ignore
+    __eq__ = binary_operator(Equal)  # type: ignore
+    __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
 
     @operator_method(returns=False)
@@ -599,8 +613,8 @@ class CompoundOperatorHandler(OperatorHandler):
     compound_match: ClassVar[bool] = True
 
     __or__, __ror__ = binary_operator(Merge, reverse=True)
-    __eq__ = binary_operator(Equal) # type: ignore
-    __ne__ = binary_operator(NotEqual) # type: ignore
+    __eq__ = binary_operator(Equal)  # type: ignore
+    __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
 
     @operator_method(returns=False)
@@ -621,7 +635,7 @@ class DataSourceOperator:
 
     def __set_name__(self, owner: Any, name: str):
         self.operator = name
-    
+
     def __call__(self, obj: Any, /, *args: Any, **kwargs: Any) -> Any:
         f = self.__get__(obj, type(obj))
         return f(*args, **kwargs)
@@ -676,8 +690,8 @@ class DataSource(Source):
     __le__ = DataSourceOperator(_not_implemented)
     __gt__ = DataSourceOperator(_not_implemented)
     __ge__ = DataSourceOperator(_not_implemented)
-    __eq__ = DataSourceOperator(_not_implemented) # type: ignore
-    __ne__ = DataSourceOperator(_not_implemented) # type: ignore
+    __eq__ = DataSourceOperator(_not_implemented)  # type: ignore
+    __ne__ = DataSourceOperator(_not_implemented)  # type: ignore
     __not__ = DataSourceOperator(_not_implemented)
 
     @property

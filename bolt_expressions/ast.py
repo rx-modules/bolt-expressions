@@ -4,7 +4,15 @@ from functools import cached_property
 from typing import Any, Callable, Iterable, cast
 
 from beet.core.utils import required_field
-from mecha import AstCommand, AstNode, AstObjective, AstPlayerName, MutatingReducer, Reducer, rule
+from mecha import (
+    AstCommand,
+    AstNode,
+    AstObjective,
+    AstPlayerName,
+    MutatingReducer,
+    Reducer,
+    rule,
+)
 
 from .sources import Source
 
@@ -14,6 +22,7 @@ __all__ = [
     "ObjectiveChecker",
     "SourceJsonConverter",
 ]
+
 
 @dataclass
 class RunExecuteTransformer(MutatingReducer):
