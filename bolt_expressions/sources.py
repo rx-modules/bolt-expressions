@@ -562,11 +562,17 @@ class NumericOperatorHandler(OperatorHandler):
 
 
 class StringOperatorHandler(OperatorHandler):
-    ...
+    __eq__ = binary_operator(Equal) # type: ignore
+    __ne__ = binary_operator(NotEqual) # type: ignore
+    __not__ = unary_operator(Not)
 
 
 class SequenceOperatorHandler(OperatorHandler):
     list_index: ClassVar[bool] = True
+
+    __eq__ = binary_operator(Equal) # type: ignore
+    __ne__ = binary_operator(NotEqual) # type: ignore
+    __not__ = unary_operator(Not)
 
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
@@ -593,6 +599,9 @@ class CompoundOperatorHandler(OperatorHandler):
     compound_match: ClassVar[bool] = True
 
     __or__, __ror__ = binary_operator(Merge, reverse=True)
+    __eq__ = binary_operator(Equal) # type: ignore
+    __ne__ = binary_operator(NotEqual) # type: ignore
+    __not__ = unary_operator(Not)
 
     @operator_method(returns=False)
     def merge(self, value: Any):

@@ -15,8 +15,6 @@ from mecha.contrib.nested_location import NestedLocationResolver
 from pydantic import BaseModel
 from nbtlib import Path  # type: ignore
 
-# from rich.pretty import pprint
-
 
 from .optimizer import (
     ConstScoreManager,
@@ -38,6 +36,7 @@ from .optimizer import (
     branch_condition_propagation,
     convert_data_arithmetic,
     convert_cast,
+    compound_match_data_compare,
     convert_data_order_operation,
     convert_defined_boolean_condition,
     data_get_scaling,
@@ -55,6 +54,7 @@ from .optimizer import (
     rename_temp_scores,
     set_and_get_cleanup,
     set_to_self_removal,
+    store_set_data_compare,
 )
 from .typing import NbtTypeString
 from .casting import TypeCaster
@@ -221,9 +221,12 @@ class Expression:
         self.optimizer.add_rules(
             data_insert_score=data_insert_score,
             convert_cast=convert_cast,
+            compound_match_data_compare=partial(compound_match_data_compare, opt=self.optimizer),
+            store_set_data_compare=partial(store_set_data_compare, opt=self.optimizer),
             convert_data_arithmetic=partial(convert_data_arithmetic, self.optimizer),
             convert_data_order_operation=partial(convert_data_order_operation, opt=self.optimizer),
             discard_casting=discard_casting,
+            init_score_boolean_result=init_score_boolean_result,
             apply_temp_source_reuse=partial(apply_temp_source_reuse, self.optimizer),
             set_to_self_removal=set_to_self_removal,
             # features
@@ -237,13 +240,16 @@ class Expression:
             set_and_get_cleanup=set_and_get_cleanup,
             noncommutative_set_collapsing=noncommutative_set_collapsing,
             commutative_set_collapsing=commutative_set_collapsing,
-            rename_temp_scores=partial(rename_temp_scores, self.optimizer),
-            literal_to_constant_replacement=partial(literal_to_constant_replacement, self.optimizer),
+            literal_to_constant_replacement=partial(
+                literal_to_constant_replacement, self.optimizer
+            ),
             boolean_condition_propagation=boolean_condition_propagation,
             branch_condition_propagation=branch_condition_propagation,
-            convert_defined_boolean_condition=partial(convert_defined_boolean_condition, opt=self.optimizer),
-            init_score_boolean_result=init_score_boolean_result,
+            convert_defined_boolean_condition=partial(
+                convert_defined_boolean_condition, opt=self.optimizer
+            ),
             deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
+            rename_temp_scores=partial(rename_temp_scores, self.optimizer),
             # typing
             type_caster=self.type_caster,
             type_checker=self.type_checker,
@@ -311,9 +317,7 @@ class Expression:
         
         source = result.to_tuple()
 
-        with self.optimizer.temp(*helper.temporaries):
-            nodes = self.optimizer(operations)
-
+        nodes, _ = self.optimizer(operations, temporaries=helper.temporaries)
         cmds = self.ast_converter(nodes)
 
         if not lazy:
@@ -333,30 +337,29 @@ class Expression:
 
         if not isinstance(result, IrSource):
             return
-        
-        with self.optimizer.temp(*helper.temporaries):
-            nodes = self.optimizer(
-                operations,
-                rename_temp_scores=False,
-                deadcode_elimination=False,
-            )
+
+        nodes, temporaries = self.optimizer(
+            operations,
+            temporaries=helper.temporaries,
+            rename_temp_scores=False,
+            deadcode_elimination=False,
+        )
 
         with self.runtime.scope() as cmds:
             yield
         
         branch = IrBranch(target=result, children=IrChildren.from_ast(cmds))
-        helper.add_temporary(result.to_tuple())
 
-        with self.optimizer.temp(*helper.temporaries):
-            nodes = self.optimizer(
-                (*nodes, branch),
-                disable_all=True,
-                branch_condition_propagation=True,
-                convert_defined_boolean_condition=True,
-                rename_temp_scores=True,
-                deadcode_elimination=True,
-            )
-        
+        nodes, _ = self.optimizer(
+            (*nodes, branch),
+            disable_all=True,
+            temporaries=(*temporaries, result.to_tuple()),
+            branch_condition_propagation=True,
+            convert_defined_boolean_condition=True,
+            rename_temp_scores=True,
+            deadcode_elimination=True,
+        )
+
         cmds = self.ast_converter(nodes)
         self.inject_command(*cmds)
 

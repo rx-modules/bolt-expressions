@@ -34,10 +34,17 @@ from nbtlib import (  # type:ignore
     Path,
     NamedKey,
     CompoundMatch,
-    ListIndex,
 )
 
-from .typing import Accessor, NbtType, NbtValue, convert_tag, literal_types, unwrap_optional_type
+from .typing import (
+    Accessor,
+    NbtType,
+    NbtValue,
+    literal_types,
+    unwrap_optional_type,
+)
+
+from rich.pretty import pprint
 
 __all__ = [
     "Rule",
@@ -514,22 +521,24 @@ class Optimizer:
 
     @internal
     def optimize(
-        self, nodes: Iterable[IrOperation],
+        self,
+        nodes: Iterable[IrOperation],
+        temporaries: Iterable[SourceTuple] = (),
         disable_all: bool = False,
         **rules: bool
-    ) -> Iterable[IrOperation]:
+    ) -> tuple[Iterable[IrOperation], set[SourceTuple]]:
         """Performs the optimization by sending all nodes through the rules."""
 
         active_rules = {name: not disable_all for name, _ in self.rules} | rules
 
-        with self.temp():
+        with self.temp(*temporaries) as temporaries:
             for name, rule in self.rules:
                 if not active_rules.get(name):
                     continue
 
                 nodes = rule(nodes)
 
-            return tuple(nodes)
+            return tuple(nodes), temporaries
 
     __call__ = optimize
 
@@ -542,10 +551,11 @@ class Optimizer:
 
     @contextmanager
     def temp(self, *sources: IrSource | SourceTuple):
-        prev_temp = set(self.temp_sources)
+        prev_temp = self.temp_sources
+        self.temp_sources = self.temp_sources.copy()
         self.add_temp(*sources)
 
-        yield
+        yield self.temp_sources
 
         self.temp_sources = prev_temp
 
@@ -577,9 +587,10 @@ class Optimizer:
 
         return source in self.defined_sources
 
-    def generate_score(self) -> IrScore:
+    def generate_score(self, temp: bool = True) -> IrScore:
         source = self.temp_score()
-        self.add_temp(source)
+        if temp:
+            self.add_temp(source)
 
         return IrScore(holder=source.holder, obj=source.obj)
 
@@ -587,9 +598,10 @@ class Optimizer:
         holder, obj = self.const_score(value)
         return IrScore(holder=holder, obj=obj)
 
-    def generate_data(self) -> IrData:
+    def generate_data(self, temp: bool = True) -> IrData:
         source = self.temp_data()
-        self.add_temp(source)
+        if temp:
+            self.add_temp(source)
 
         return IrData(type=source.type, target=source.target, path=source.path)
 
@@ -850,10 +862,12 @@ def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
             yield node
 
 
-def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
-    map: dict[IrSource, list[int]] = {}
+Location = tuple[int, ...]
 
-    def add(source: Any, i: int):
+def get_source_usage(nodes: Iterable[IrNode]) -> dict[IrSource, list[Location]]:
+    map: dict[IrSource, list[Location]] = {}
+
+    def add(source: Any, i: Location):
         if isinstance(source, IrSource):
             indexes = map.setdefault(source, [])
             indexes.append(i)
@@ -864,16 +878,25 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
             add(source.right, i)
 
     for i, node in enumerate(nodes):
+        if not is_op(node):
+            continue
+
         for s in node.store:
-            add(s.value, i)
+            add(s.value, (i,))
 
         if is_binary(node):
-            if node.op not in ("set", "cast"):
-                add(node.left, i)
-            add(node.right, i)
+            if node.op in ("set", "cast") and len(node.store):
+                add(node.left, (i,))
+            add(node.right, (i,))
 
         if is_unary(node):
-            add(node.target, i)
+            add(node.target, (i,))
+
+        if isinstance(node, IrBranch):
+            children_usage = get_source_usage(node.children)
+            for source, usage in children_usage.items():
+                for u in usage:
+                    add(source, (i, *u))
 
     return map
 
@@ -915,7 +938,7 @@ def apply_temp_source_reuse(
             if right_usage is None:
                 continue
 
-            if left_usage is None or left_usage[0] > i and right_usage[-1] == i:
+            if left_usage is None or left_usage[0] > (i,) and right_usage[-1] == (i,):
                 replace_map[node.right] = node.left
 
     for node in all_nodes:
@@ -1065,54 +1088,63 @@ def rename_temp_scores(
     ):
         source_map: dict[IrSource, IrSource] = {}
 
-        def replace_operand(node: IrNode) -> IrNode:
+        def replace_node(node: Any) -> Any:
             if node in ignored_sources:
                 return node
+            
+            if is_op(node):
+                store = IrChildren(
+                    replace(s, value=replace_node(s.value)) for s in node.store
+                )
+                if isinstance(node, IrBranch):
+                    return replace(
+                        node,
+                        target=replace_node(node.target),
+                        store=store,
+                        children=IrChildren(replace_node(ch) for ch in node.children)
+                    )
+                if is_unary(node):
+                    return replace(
+                        node,
+                        store=store,
+                        target=replace_node(node.target)
+                    )
+                if is_binary(node):
+                    return replace(
+                        node,
+                        store=store,
+                        left=replace_node(node.left),
+                        right=replace_node(node.right)
+                    )
 
             if isinstance(node, IrUnaryCondition):
-                return replace(node, target=replace_operand(node.target))
-                
+                return replace(node, target=replace_node(node.target))
+
             if isinstance(node, IrBinaryCondition):
                 return replace(
                     node,
-                    left=replace_operand(node.left),
-                    right=replace_operand(node.right)
+                    left=replace_node(node.left),
+                    right=replace_node(node.right),
                 )
+
+            if isinstance(node, IrSource):
+                if not opt.is_temp(node):
+                    return node
+
+                if node not in source_map:
+                    if isinstance(node, IrScore):
+                        source_map[node] = opt.generate_score()
+                    elif isinstance(node, IrData):
+                        source_map[node] = opt.generate_data()
+                    else:
+                        source_map[node] = node
+
+                return source_map[node]
             
-            if not isinstance(node, IrSource):
-                return node
+            return node
 
-            if not opt.is_temp(node):
-                return node
-
-            if node not in source_map:
-                if isinstance(node, IrScore):
-                    source_map[node] = opt.generate_score()
-                elif isinstance(node, IrData):
-                    source_map[node] = opt.generate_data()
-                else:
-                    source_map[node] = node
-
-            return source_map[node]
-
-        for node in nodes:
-            if not is_op(node):
-                yield node
-                continue
-
-            store = IrChildren(replace(s, value=replace_operand(s.value)) for s in node.store)
-
-            if is_unary(node):
-                yield replace(node, target=replace_operand(node.target), store=store)
-            elif is_binary(node):
-                yield replace(
-                    node,
-                    left=replace_operand(node.left),
-                    right=replace_operand(node.right),
-                    store=store,
-                )
-            else:
-                yield replace(node, store=store)
+        for node in nodes:            
+            yield replace_node(node)
 
 
 def get_source_definitions(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
@@ -1216,7 +1248,7 @@ def deadcode_elimination(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterab
 
             target_usage = usage.get(target, [])
 
-            if any(use_i > node_i for use_i in target_usage):
+            if any(use_i > (node_i,) for use_i in target_usage):
                 yield node
                 continue
 
@@ -1248,8 +1280,8 @@ def convert_data_order_operation(nodes: Iterable[IrOperation], opt: Optimizer) -
             return score
         
         return node
-        
-    for node in nodes:
+
+    for node in nodes:    
         if is_unary(node):
             node = replace(node, target=replace_operand(node.target))
         elif is_binary(node):
@@ -1263,6 +1295,96 @@ def convert_data_order_operation(nodes: Iterable[IrOperation], opt: Optimizer) -
         
     yield from result
         
+
+def compound_match_data_compare(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    for node in nodes:
+        operands: list[OperandType] = []
+
+        for operand in node.operands:
+            if (
+                is_binary_condition(operand, "equal")
+                and isinstance(operand.left, IrData)
+                and isinstance(operand.right, IrLiteral)
+            ):
+                value = operand.right.value
+
+                if not isinstance(value, (Numeric, String)):
+                    operands.append(operand)
+                    continue
+
+                source = operand.left
+                negated = operand.negated
+                path = cast(tuple[Accessor, ...], tuple(source.path))
+                accessor = path[-1] if len(path) else None
+                match = None
+
+                if isinstance(accessor, NamedKey):
+                    subpath = path[:-1]
+                    match = CompoundMatch(Compound({accessor.key: value}))
+                else:
+                    temp = opt.generate_data(temp=False)
+
+                    yield IrUnary(op="remove", target=temp)
+                    yield IrSet(left=temp, right=source)
+
+                    accessor = cast(NamedKey, tuple(temp.path)[-1])
+                    source = temp
+                    subpath = ()
+                    match = CompoundMatch(Compound({accessor.key: value}))
+
+                new_path = Path.from_accessors((*subpath, match)) # type: ignore
+                new_source = replace(source, path=new_path)
+                operand = IrUnaryCondition(op="boolean", target=new_source, negated=negated)
+            
+            operands.append(operand)
+        
+        yield replace_operation(node, operands=operands)
+
+def store_set_data_compare(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    for node in nodes:
+        operands: list[OperandType] = []
+
+        for operand in node.operands:
+            if is_binary_condition(operand, "equal"):
+                data = operand.left
+                value = operand.right
+
+                if not isinstance(data, IrData):
+                    data, value = value, data
+                
+                if not isinstance(data, IrData) or not isinstance(value, (IrData, IrLiteral)):
+                    operands.append(operand)
+                    continue
+
+                result = opt.generate_score()
+                cmp = opt.generate_data()
+
+                opt.mark_defined(result)
+                yield IrSet(left=result, right=IrLiteral(value=Int(1)))
+                yield IrSet(left=cmp, right=data)
+
+                store = IrStore(type=StoreType.success, value=result)
+                set_op = IrSet(store=IrChildren((store,)), left=cmp, right=value)
+
+                if isinstance(value, IrData):
+                    inner_op = IrBranch(
+                        target=IrUnaryCondition(op="boolean", target=value),
+                        children=IrChildren((set_op,))
+                    )
+                else:
+                    inner_op = set_op
+
+                yield IrBranch(
+                    target=IrUnaryCondition(op="boolean", target=data),
+                    children=IrChildren((inner_op,))
+                )
+
+                operand = IrUnaryCondition(op="boolean", target=result, negated=True)
+
+            operands.append(operand)
+            
+        yield replace_operation(node, operands=operands)
+
 
 def init_score_boolean_result(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     all_nodes = tuple(nodes)
@@ -1284,11 +1406,13 @@ Op = TypeVar("Op", bound=IrOperation)
 
 def replace_operation(
     node: Op,
-    operands: tuple[OperandType, ...] | None = None,
+    operands: Iterable[OperandType] | None = None,
     **kwargs: Any
 ) -> Op:
     if operands is None:
         operands = node.operands
+    else:
+        operands = tuple(operands)
     
     if is_unary(node):
         return replace(node, target=operands[0], **kwargs)
