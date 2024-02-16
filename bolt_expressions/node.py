@@ -223,10 +223,14 @@ class Expression:
         self.optimizer.add_rules(
             data_insert_score=data_insert_score,
             convert_cast=convert_cast,
-            compound_match_data_compare=partial(compound_match_data_compare, opt=self.optimizer),
+            compound_match_data_compare=partial(
+                compound_match_data_compare, opt=self.optimizer
+            ),
             store_set_data_compare=partial(store_set_data_compare, opt=self.optimizer),
             convert_data_arithmetic=partial(convert_data_arithmetic, self.optimizer),
-            convert_data_order_operation=partial(convert_data_order_operation, opt=self.optimizer),
+            convert_data_order_operation=partial(
+                convert_data_order_operation, opt=self.optimizer
+            ),
             discard_casting=discard_casting,
             apply_temp_source_reuse=partial(apply_temp_source_reuse, self.optimizer),
             set_to_self_removal=set_to_self_removal,
@@ -242,10 +246,14 @@ class Expression:
             noncommutative_set_collapsing=noncommutative_set_collapsing,
             commutative_set_collapsing=commutative_set_collapsing,
             rename_temp_scores=partial(rename_temp_scores, self.optimizer),
-            literal_to_constant_replacement=partial(literal_to_constant_replacement, self.optimizer),
+            literal_to_constant_replacement=partial(
+                literal_to_constant_replacement, self.optimizer
+            ),
             boolean_condition_propagation=boolean_condition_propagation,
             branch_condition_propagation=branch_condition_propagation,
-            convert_defined_boolean_condition=partial(convert_defined_boolean_condition, opt=self.optimizer),
+            convert_defined_boolean_condition=partial(
+                convert_defined_boolean_condition, opt=self.optimizer
+            ),
             init_score_boolean_result=init_score_boolean_result,
             deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
             # typing
@@ -253,7 +261,9 @@ class Expression:
             type_checker=self.type_checker,
         )
 
-        self.ast_converter = AstConverter(default_nbt_type=self.opts.default_nbt_type, mc=self.mc)
+        self.ast_converter = AstConverter(
+            default_nbt_type=self.opts.default_nbt_type, mc=self.mc
+        )
 
     def inject_command(self, *cmds: str | AstCommand):
         commands = self.commands
@@ -277,23 +287,24 @@ class Expression:
         yield self.commands
 
         self.commands = prev
-    
+
     @contextmanager
-    def anonymous_function(self, template: str = "anonymous_{incr}") -> t.Generator[str, None, None]:
+    def anonymous_function(
+        self, template: str = "anonymous_{incr}"
+    ) -> t.Generator[str, None, None]:
         namespace, resolved = self.nested_location.resolve()
         location = self.generator.format(f"{namespace}:{resolved}/{template}")
 
         with self.runtime.scope() as cmds:
             yield location
-        
+
         cmd = self.mc.parse(f"execute function {location}:\n  ...", using="command")
         root = AstRoot(commands=AstChildren(cmds))
         self.runtime.commands.append(insert_nested_commands(cmd, root))
 
-    
-    def unroll(self, node: ExpressionNode) -> tuple[
-        Iterable[IrOperation], IrSource | IrLiteral, UnrollHelper
-    ]:
+    def unroll(
+        self, node: ExpressionNode
+    ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral, UnrollHelper]:
         helper = UnrollHelper(
             score_manager=self.temp_score, data_manager=self.temp_data
         )
@@ -312,7 +323,7 @@ class Expression:
             score = self.optimizer.generate_score()
             operations = (IrSet(left=score, right=result),)
             result = score
-        
+
         source = result.to_tuple()
 
         with self.optimizer.temp(*helper.temporaries):
@@ -337,7 +348,7 @@ class Expression:
 
         if not isinstance(result, IrSource):
             return
-                
+
         with self.optimizer.temp(*helper.temporaries):
             nodes = self.optimizer(
                 operations,
@@ -347,7 +358,7 @@ class Expression:
 
         with self.runtime.scope() as cmds:
             yield
-        
+
         branch = IrBranch(target=result, children=IrChildren.from_ast(cmds))
         helper.add_temporary(result.to_tuple())
 
@@ -360,7 +371,7 @@ class Expression:
                 rename_temp_scores=True,
                 deadcode_elimination=True,
             )
-        
+
         cmds = self.ast_converter(nodes)
         self.inject_command(*cmds)
 

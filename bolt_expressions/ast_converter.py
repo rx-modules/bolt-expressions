@@ -57,12 +57,12 @@ class AstConverter(Visitor):
         result = AstChildren(self.result)
         self.result = prev_result
         return result
-    
+
     def add_result(
         self,
         cmd: str,
         store: IrChildren[IrStore] | None = None,
-        children: AstChildren[AstCommand] | None = None
+        children: AstChildren[AstCommand] | None = None,
     ) -> None:
         if store:
             prefix = tuple(self.invoke(s) for s in store)
@@ -70,11 +70,11 @@ class AstConverter(Visitor):
 
         node = self.mc.parse(cmd, using="command")
 
-        if children:        
+        if children:
             node = insert_nested_commands(node, AstRoot(commands=children))
 
         self.result.append(node)
-    
+
     @rule(IrNode)
     def fallback(self, node: IrNode):
         raise TypeError(f"Could not convert object '{node}' to AST.")
@@ -96,7 +96,7 @@ class AstConverter(Visitor):
     @rule(IrLiteral)
     def literal(self, node: IrLiteral) -> str:
         return node.value.snbt()  # type: ignore
-    
+
     @rule(IrStore)
     def store(self, node: IrStore) -> Generator[IrNode, str, str]:
         value = yield node.value
@@ -110,7 +110,7 @@ class AstConverter(Visitor):
                 return f"execute store {type} {value} {nbt_type} 1 run"
             case _:
                 raise ValueError(f"Invalid store source '{node.value}'.")
-    
+
     @rule(IrBinaryCondition, op="less_than")
     def less_than(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
         left = yield node.left
@@ -152,7 +152,9 @@ class AstConverter(Visitor):
                 raise InvalidOperand(node.op, l, r)
 
     @rule(IrBinaryCondition, op="greater_than_or_equal_to")
-    def greater_than_or_qual_to(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
+    def greater_than_or_qual_to(
+        self, node: IrBinaryCondition
+    ) -> Generator[IrNode, str, str]:
         left = yield node.left
         right = yield node.right
         test = "unless" if node.negated else "if"
@@ -168,7 +170,9 @@ class AstConverter(Visitor):
                 raise InvalidOperand(node.op, l, r)
 
     @rule(IrBinaryCondition, op="less_than_or_equal_to")
-    def less_than_or_qual_to(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
+    def less_than_or_qual_to(
+        self, node: IrBinaryCondition
+    ) -> Generator[IrNode, str, str]:
         left = yield node.left
         right = yield node.right
         test = "unless" if node.negated else "if"
@@ -182,7 +186,7 @@ class AstConverter(Visitor):
                 return f"execute {test} score {right} matches {left}.."
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-    
+
     @rule(IrBinaryCondition, op="equal")
     def equal(self, node: IrBinaryCondition) -> Generator[IrNode, str, str]:
         left = yield node.left
@@ -198,7 +202,7 @@ class AstConverter(Visitor):
                 return f"execute {test} score {right} matches {left}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-    
+
     @rule(IrUnaryCondition, op="boolean")
     def boolean(self, node: IrUnaryCondition) -> Generator[IrNode, str, str]:
         target = yield node.target
@@ -215,7 +219,7 @@ class AstConverter(Visitor):
                 return f"execute {test} data {target}"
             case t:
                 raise InvalidOperand(node.op, t)
-    
+
     @rule(IrBranch)
     def branch(self, node: IrBranch) -> Generator[IrNode, str, None]:
         target = yield node.target
@@ -225,7 +229,7 @@ class AstConverter(Visitor):
                 cmd = yield IrUnaryCondition(op="boolean", target=source)
             case IrCondition():
                 cmd = target
-        
+
         children = self(node.children)
         self.add_result(cmd, node.store, children)
 
@@ -264,9 +268,7 @@ class AstConverter(Visitor):
     @rule(IrBinary, op="mod")
     @rule(IrBinary, op="min")
     @rule(IrBinary, op="max")
-    def binary_score_only(
-        self, node: IrBinary
-    ) -> Generator[IrNode, str, None]:
+    def binary_score_only(self, node: IrBinary) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -301,9 +303,7 @@ class AstConverter(Visitor):
         self.add_result(cmd, node.store)
 
     @rule(IrBinary, op="prepend")
-    def prepend(
-        self, node: IrBinary
-    ) -> Generator[IrNode, str, None]:
+    def prepend(self, node: IrBinary) -> Generator[IrNode, str, None]:
         left = yield node.left
         right = yield node.right
 
@@ -314,7 +314,7 @@ class AstConverter(Visitor):
                 cmd = f"data modify {left} prepend from {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
-        
+
         self.add_result(cmd, node.store)
 
     @rule(IrInsert)
@@ -363,9 +363,7 @@ class AstConverter(Visitor):
         self.add_result(cmd, node.store)
 
     @rule(IrUnary, op="reset")
-    def reset_op(
-        self, node: IrUnary
-    ) -> Generator[IrNode, str, None]:
+    def reset_op(self, node: IrUnary) -> Generator[IrNode, str, None]:
         target = yield node.target
 
         match node.target:
