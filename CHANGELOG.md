@@ -2,6 +2,19 @@
 
 <!--next-version-placeholder-->
 
+## v0.15.0 (2024-02-16)
+
+### Feature
+
+* Data comparison operator ([`749dd79`](https://github.com/rx-modules/bolt-expressions/commit/749dd79b6e96c4bec0fa79eaff9733982e1649c5))
+* Add and/or operator support for sources/lazy sources ([`f8013e9`](https://github.com/rx-modules/bolt-expressions/commit/f8013e94feac584b470ebbadeb861423b24c4416))
+* Improved if..elif..else with __multibranch__ ([`1746226`](https://github.com/rx-modules/bolt-expressions/commit/174622679945b3b09634316e212036d195eb51e6))
+* Add source branching and comparison operators ([`f8d8ec4`](https://github.com/rx-modules/bolt-expressions/commit/f8d8ec4b3612d080e17808e0a9bf02d3256a3f23))
+
+### Fix
+
+* Strip run execute from commands ([`c8648f2`](https://github.com/rx-modules/bolt-expressions/commit/c8648f229aa2201384d91d0bbcb7a9864133c4b9))
+
 ## v0.14.0 (2024-02-05)
 
 ### Feature
