@@ -1,0 +1,19 @@
+name: bolt-expressions-operation-condition
+minecraft: "1.20"
+
+data_pack:
+  load: [src]
+
+require:
+  - bolt
+  - bolt_expressions
+  # - mecha.contrib.debug_ast
+  # - bolt.contrib.debug_codegen
+
+pipeline:
+  - mecha
+
+output: dist
+
+meta:
+  generate_namespace: test

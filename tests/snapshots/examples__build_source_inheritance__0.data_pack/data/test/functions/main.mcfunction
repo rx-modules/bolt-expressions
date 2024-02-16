@@ -8,5 +8,4 @@ scoreboard players operation $a obj.temp = $value obj.temp
 execute store result score $i0 bolt.expr.temp run data get storage example:main a 1
 scoreboard players operation $a obj.temp -= $i0 bolt.expr.temp
 execute store result storage example:main a byte 1 run scoreboard players get $a obj.temp
-execute if data storage example:main {a: 0b} run say It's 0!
-execute unless data storage example:main {a: 0b} run say It's not 0...
+function test:main/if_else_0
