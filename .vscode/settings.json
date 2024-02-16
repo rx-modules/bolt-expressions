@@ -11,6 +11,7 @@
   "python.linting.pydocstyleEnabled": false,
   "python.linting.pylamaEnabled": false,
   "python.analysis.typeCheckingMode": "strict",
+  "python.defaultInterpreterPath": "./venv/bin/python",
   "python.analysis.diagnosticSeverityOverrides": {
     "reportPrivateUsage": "none",
   },
