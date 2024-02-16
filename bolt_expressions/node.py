@@ -38,6 +38,7 @@ from .optimizer import (
     branch_condition_propagation,
     convert_data_arithmetic,
     convert_cast,
+    compound_match_data_compare,
     convert_data_order_operation,
     convert_defined_boolean_condition,
     data_get_scaling,
@@ -55,6 +56,7 @@ from .optimizer import (
     rename_temp_scores,
     set_and_get_cleanup,
     set_to_self_removal,
+    store_set_data_compare,
 )
 from .typing import NbtTypeString
 from .casting import TypeCaster
@@ -221,6 +223,8 @@ class Expression:
         self.optimizer.add_rules(
             data_insert_score=data_insert_score,
             convert_cast=convert_cast,
+            compound_match_data_compare=partial(compound_match_data_compare, opt=self.optimizer),
+            store_set_data_compare=partial(store_set_data_compare, opt=self.optimizer),
             convert_data_arithmetic=partial(convert_data_arithmetic, self.optimizer),
             convert_data_order_operation=partial(convert_data_order_operation, opt=self.optimizer),
             discard_casting=discard_casting,
@@ -333,7 +337,7 @@ class Expression:
 
         if not isinstance(result, IrSource):
             return
-        
+                
         with self.optimizer.temp(*helper.temporaries):
             nodes = self.optimizer(
                 operations,

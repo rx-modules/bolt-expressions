@@ -577,9 +577,10 @@ class Optimizer:
 
         return source in self.defined_sources
 
-    def generate_score(self) -> IrScore:
+    def generate_score(self, temp: bool = True) -> IrScore:
         source = self.temp_score()
-        self.add_temp(source)
+        if temp:
+            self.add_temp(source)
 
         return IrScore(holder=source.holder, obj=source.obj)
 
@@ -587,9 +588,10 @@ class Optimizer:
         holder, obj = self.const_score(value)
         return IrScore(holder=holder, obj=obj)
 
-    def generate_data(self) -> IrData:
+    def generate_data(self, temp: bool = True) -> IrData:
         source = self.temp_data()
-        self.add_temp(source)
+        if temp:
+            self.add_temp(source)
 
         return IrData(type=source.type, target=source.target, path=source.path)
 
@@ -1264,6 +1266,96 @@ def convert_data_order_operation(nodes: Iterable[IrOperation], opt: Optimizer) -
     yield from result
         
 
+def compound_match_data_compare(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    for node in nodes:
+        operands: list[OperandType] = []
+
+        for operand in node.operands:
+            if (
+                is_binary_condition(operand, "equal")
+                and isinstance(operand.left, IrData)
+                and isinstance(operand.right, IrLiteral)
+            ):
+                value = operand.right.value
+
+                if not isinstance(value, (Numeric, String)):
+                    operands.append(operand)
+                    continue
+
+                source = operand.left
+                negated = operand.negated
+                path = cast(tuple[Accessor, ...], tuple(source.path))
+                accessor = path[-1] if len(path) else None
+                match = None
+
+                if isinstance(accessor, NamedKey):
+                    subpath = path[:-1]
+                    match = CompoundMatch(Compound({accessor.key: value}))
+                else:
+                    temp = opt.generate_data(temp=False)
+
+                    yield IrUnary(op="remove", target=temp)
+                    yield IrSet(left=temp, right=source)
+
+                    accessor = cast(NamedKey, tuple(temp.path)[-1])
+                    source = temp
+                    subpath = ()
+                    match = CompoundMatch(Compound({accessor.key: value}))
+
+                new_path = Path.from_accessors((*subpath, match)) # type: ignore
+                new_source = replace(source, path=new_path)
+                operand = IrUnaryCondition(op="boolean", target=new_source, negated=negated)
+            
+            operands.append(operand)
+        
+        yield replace_operation(node, operands=operands)
+
+def store_set_data_compare(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    for node in nodes:
+        operands: list[OperandType] = []
+
+        for operand in node.operands:
+            if is_binary_condition(operand, "equal"):
+                data = operand.left
+                value = operand.right
+
+                if not isinstance(data, IrData):
+                    data, value = value, data
+                
+                if not isinstance(data, IrData) or not isinstance(value, (IrData, IrLiteral)):
+                    operands.append(operand)
+                    continue
+
+                result = opt.generate_score(temp=False)
+                cmp = opt.generate_data(temp=False)
+
+                opt.mark_defined(result)
+                yield IrSet(left=result, right=IrLiteral(value=Int(1)))
+                yield IrSet(left=cmp, right=data)
+
+                store = IrStore(type=StoreType.success, value=result)
+                set_op = IrSet(store=IrChildren((store,)), left=cmp, right=value)
+
+                if isinstance(value, IrData):
+                    inner_op = IrBranch(
+                        target=IrUnaryCondition(op="boolean", target=value),
+                        children=IrChildren((set_op,))
+                    )
+                else:
+                    inner_op = set_op
+
+                yield IrBranch(
+                    target=IrUnaryCondition(op="boolean", target=data),
+                    children=IrChildren((inner_op,))
+                )
+
+                operand = IrUnaryCondition(op="boolean", target=result, negated=True)
+
+            operands.append(operand)
+            
+        yield replace_operation(node, operands=operands)
+
+
 def init_score_boolean_result(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     all_nodes = tuple(nodes)
     defs = get_source_definitions(all_nodes)
@@ -1284,11 +1376,13 @@ Op = TypeVar("Op", bound=IrOperation)
 
 def replace_operation(
     node: Op,
-    operands: tuple[OperandType, ...] | None = None,
+    operands: Iterable[OperandType] | None = None,
     **kwargs: Any
 ) -> Op:
     if operands is None:
         operands = node.operands
+    else:
+        operands = tuple(operands)
     
     if is_unary(node):
         return replace(node, target=operands[0], **kwargs)
