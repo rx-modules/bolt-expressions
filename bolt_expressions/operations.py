@@ -52,6 +52,7 @@ __all__ = [
 @dataclass(unsafe_hash=False, order=False, kw_only=True)
 class Operation(ExpressionNode, ABC):
     in_place: ClassVar[bool] = False
+    evaluates_target: ClassVar[bool] = True
     commutative: ClassVar[bool] = False
     op: ClassVar[str] = ""
     result: ClassVar[ResultType] = ResultType.score
@@ -78,7 +79,9 @@ class UnaryOperation(Operation):
 
     def unroll(self, helper: UnrollHelper) -> tuple[Iterable[IrOperation], IrSource]:
         target = convert_node(self.target, self.ctx)
-        target_nodes, target_value = target.unroll(helper)
+
+        with helper.provide(ignore_lazy=not self.evaluates_target):
+            target_nodes, target_value = target.unroll(helper)
 
         if not isinstance(target_value, IrSource):
             raise ValueError("Operand must be a source node.")
@@ -128,8 +131,9 @@ class BinaryOperation(Operation):
     def unroll(self, helper: UnrollHelper) -> tuple[Iterable[IrOperation], IrSource]:
         former = convert_node(self.former, self.ctx)
         latter = convert_node(self.latter, self.ctx)
-
-        former_nodes, former_value = former.unroll(helper)
+        
+        with helper.provide(ignore_lazy=not self.evaluates_target):
+            former_nodes, former_value = former.unroll(helper)
         latter_nodes, latter_value = latter.unroll(helper)
 
         if self.commutative:
@@ -195,6 +199,7 @@ class Prepend(BinaryOperation):
 class Set(BinaryOperation):
     op: ClassVar[str] = "set"
     in_place: ClassVar[bool] = True
+    evaluates_target: ClassVar[bool] = False
 
     def create_operation(
         self, left: IrSource, right: IrSource | IrLiteral | IrCondition
@@ -206,6 +211,7 @@ class Set(BinaryOperation):
 class Cast(BinaryOperation):
     op: ClassVar[str] = "cast"
     in_place: ClassVar[bool] = True
+    evaluates_target: ClassVar[bool] = False
 
     cast_type: NbtType = Any
 
@@ -223,6 +229,7 @@ class Enable(UnaryOperation):
 class Reset(UnaryOperation):
     op: ClassVar[str] = "reset"
     in_place: ClassVar[bool] = True
+    evaluates_target: ClassVar[bool] = False
 
 
 class Add(BinaryOperation):

@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial
-from typing import Iterable, Union
+from typing import Any, Iterable, Union
 import typing as t
 
 from beet import Context, Generator, Function
@@ -98,11 +98,21 @@ class ResultType(Enum):
 
 @dataclass
 class UnrollHelper:
-    ignored_sources: set[SourceTuple] = field(init=False, default_factory=set)
-    temporaries: set[SourceTuple] = field(init=False, default_factory=set)
-
     score_manager: TempScoreManager
     data_manager: TempDataManager
+
+    ignored_sources: set[SourceTuple] = field(init=False, default_factory=set)
+    temporaries: set[SourceTuple] = field(init=False, default_factory=set)
+    data: dict[str, Any] = field(default_factory=dict)
+
+    @contextmanager
+    def provide(self, **kwargs: Any):
+        prev_data = self.data
+        self.data = {**self.data, **kwargs}
+        
+        yield self.data
+
+        self.data = prev_data
 
     @contextmanager
     def ignore_source(self, source: SourceTuple):
@@ -324,6 +334,9 @@ class Expression:
 
         source = result.to_tuple()
 
+        if source in self.lazy_values:
+            del self.lazy_values[source]
+
         nodes, _ = self.optimizer(operations, temporaries=helper.temporaries)
         cmds = self.ast_converter(nodes)
 
@@ -344,6 +357,11 @@ class Expression:
 
         if not isinstance(result, IrSource):
             return
+        
+        result_tuple = result.to_tuple()
+
+        if result_tuple in self.lazy_values:
+            del self.lazy_values[result_tuple]
 
         nodes, temporaries = self.optimizer(
             operations,
@@ -360,7 +378,7 @@ class Expression:
         nodes, _ = self.optimizer(
             (*nodes, branch),
             disable_all=True,
-            temporaries=(*temporaries, result.to_tuple()),
+            temporaries=(*temporaries, result_tuple),
             branch_condition_propagation=True,
             convert_defined_boolean_condition=True,
             rename_temp_scores=True,
@@ -374,6 +392,9 @@ class Expression:
         self, source: SourceTuple, helper: UnrollHelper
     ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral] | None:
         if source in helper.ignored_sources:
+            return None
+        
+        if helper.data.get("ignore_lazy"):
             return None
 
         if entry := self.lazy_values.get(source):

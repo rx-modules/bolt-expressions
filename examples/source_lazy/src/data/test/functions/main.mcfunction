@@ -64,3 +64,35 @@ tellraw @a (obj["@s"] * 5)
 v = (obj["$v"] * 5) / obj["$w"]
 obj["$v"] = 0
 if score var v matches 1.. say Hello 
+
+
+def static_vars(f):
+  def score_format(i: int):
+    return f"${f.__name__}{i}"
+  def data_format(i: int):
+    return f"{f.__name__}{i}"
+
+  def decorated(*args, **kwargs):
+    with
+      Expression.temp_score.override(format=score_format, reset=True),
+      Expression.temp_data.override(format=data_format, reset=True):
+      return f(*args, **kwargs)
+  
+  return decorated
+
+@static_vars
+def sum(a, b):
+  execute function ~/sum:
+    r = a + b
+    r += 5
+
+    if temp.arr[0] == 0:
+      a = r
+
+  return r
+
+
+a, b = obj["$a", "$b"]
+
+sum(a, b)
+sum(a, b)

@@ -46,3 +46,5 @@ scoreboard players operation $5ws9foxn8m17m_30 bolt.expr.temp *= $5 bolt.expr.co
 scoreboard players operation $5ws9foxn8m17m_30 bolt.expr.temp /= $w obj.temp
 scoreboard players set $v obj.temp 0
 execute if score $5ws9foxn8m17m_30 bolt.expr.temp matches 1.. run say Hello 
+function test:data/test/functions/main/sum
+function test:data/test/functions/main/sum
