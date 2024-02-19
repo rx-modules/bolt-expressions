@@ -131,6 +131,22 @@ class IrData(IrSource):
     def to_tuple(self) -> "DataTuple":
         return DataTuple(self.type, self.target, self.path)
 
+@dataclass(frozen=True, kw_only=True)
+class IrDataString(IrData):
+    range: int | tuple[int | None, int | None]
+
+    @property
+    def normalized_range(self) -> tuple[int, int | None]:
+        if isinstance(self.range, tuple):
+            start, end = self.range
+        else:
+            start = self.range
+            end = None if start == -1 else self.range + 1
+        
+        if start is None:
+            start = 0
+        
+        return (start, end)
 
 @dataclass(frozen=True, kw_only=True)
 class IrLiteral(IrNode):
@@ -1153,8 +1169,9 @@ def rename_temp_scores(
 
             return node
 
-        for node in nodes:
-            yield replace_node(node)
+        nodes = [replace_node(node) for node in nodes]
+    
+    yield from nodes
 
 
 def get_source_definitions(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
@@ -1194,6 +1211,32 @@ def get_node_dependencies(node: IrNode) -> tuple[IrSource, ...]:
         result.append(node)
 
     return tuple(result)
+
+
+def data_string_propagation(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    all_nodes = tuple(nodes)
+    defs = get_source_definitions(all_nodes)
+
+    for i, node in enumerate(all_nodes):
+        if (
+            not is_binary(node, ("append", "prepend", "merge", "insert", "set"))
+            or not isinstance(node.right, IrSource)
+        ):
+            yield node
+            continue
+
+        cond_def_i = get_reaching_definition(defs, node.right, i)
+        if cond_def_i is None:
+            yield node
+            continue
+
+        cond_def = all_nodes[cond_def_i]
+
+        if is_binary(cond_def, "set") and isinstance(cond_def.right, IrDataString):
+            yield replace(node, right=cond_def.right)
+            continue
+
+        yield node
 
 
 def negate_condition(node: IrCondition):

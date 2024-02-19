@@ -14,6 +14,7 @@ from .optimizer import (
     IrCast,
     IrCondition,
     IrData,
+    IrDataString,
     IrInsert,
     IrLiteral,
     IrNode,
@@ -295,6 +296,12 @@ class AstConverter(Visitor):
         match node.left, node.right:
             case IrData(), IrLiteral():
                 cmd = f"data modify {left} append value {right}"
+            case IrData(), IrDataString() as s:
+                start, end = s.normalized_range
+                cmd = f"data modify {left} append string {right} {start}"
+                if end is not None:
+                    cmd += f" {end}"
+
             case IrData(), IrData():
                 cmd = f"data modify {left} append from {right}"
             case l, r:
@@ -310,6 +317,11 @@ class AstConverter(Visitor):
         match node.left, node.right:
             case IrData(), IrLiteral():
                 cmd = f"data modify {left} prepend value {right}"
+            case IrData(), IrDataString() as s:
+                start, end = s.normalized_range
+                cmd = f"data modify {left} prepend string {right} {start}"
+                if end is not None:
+                    cmd += f" {end}"
             case IrData(), IrData():
                 cmd = f"data modify {left} prepend from {right}"
             case l, r:
@@ -326,6 +338,11 @@ class AstConverter(Visitor):
         match node.left, node.right:
             case IrData(), IrLiteral():
                 cmd = f"data modify {left} insert {index} value {right}"
+            case IrData(), IrDataString() as s:
+                start, end = s.normalized_range
+                cmd = f"data modify {left} insert {index} string {right} {start}"
+                if end is not None:
+                    cmd += f" {end}"
             case IrData(), IrData():
                 cmd = f"data modify {left} insert {index} from {right}"
             case l, r:
@@ -343,6 +360,11 @@ class AstConverter(Visitor):
                 cmd = f"data merge {left} {right}"
             case IrData() as l, IrLiteral() if len(l.path):
                 cmd = f"data modify {left} merge value {right}"
+            case IrData() as l, IrDataString() as s if len(l.path):
+                start, end = s.normalized_range
+                cmd = f"data modify {left} merge string {right} {start}"
+                if end is not None:
+                    cmd += f" {end}"
             case IrData() as l, IrData() if len(l.path):
                 cmd = f"data modify {left} merge from {right}"
             case l, r:
@@ -432,6 +454,11 @@ class AstConverter(Visitor):
                 cmd = f"scoreboard players operation {left} = {right}"
             case IrData(), IrLiteral():
                 cmd = f"data modify {left} set value {right}"
+            case IrData(), IrDataString() as s:
+                start, end = s.normalized_range
+                cmd = f"data modify {left} set string {right} {start}"
+                if end is not None:
+                    cmd += f" {end}"
             case IrData(), IrData():
                 cmd = f"data modify {left} set from {right}"
             case IrScore(), IrCondition():

@@ -42,6 +42,7 @@ from .optimizer import (
     data_get_scaling,
     data_insert_score,
     data_set_scaling,
+    data_string_propagation,
     deadcode_elimination,
     discard_casting,
     init_score_boolean_result,
@@ -158,6 +159,14 @@ class ExpressionNode(ABC):
     ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral]:
         ...
 
+@dataclass(order=False, eq=False, kw_only=True)
+class Unrolled(ExpressionNode):
+    operations: Iterable[IrOperation] = ()
+    value: IrSource | IrLiteral
+
+    def unroll(self, helper: UnrollHelper):
+        return self.operations, self.value
+
 
 ResolveResult = SourceTuple | NbtValue | None
 
@@ -254,6 +263,7 @@ class Expression:
             set_and_get_cleanup=set_and_get_cleanup,
             noncommutative_set_collapsing=noncommutative_set_collapsing,
             commutative_set_collapsing=commutative_set_collapsing,
+            data_string_propagation=data_string_propagation,
             literal_to_constant_replacement=partial(
                 literal_to_constant_replacement, self.optimizer
             ),

@@ -24,13 +24,14 @@ from mecha import AstChildren, AstRoot, Mecha
 from nbtlib import Compound, Path, ListIndex, CompoundMatch, NamedKey  # type: ignore
 from bolt_control_flow import BranchInfo, BranchType, Case, CaseResult, WrappedCases
 
-from .node import Expression, UnrollHelper
+from .node import Expression, UnrollHelper, Unrolled
 from .typing import NbtType, is_compound_type, format_type
 from .utils import insert_nested_commands, type_name
 
 from .optimizer import (
     DataTuple,
     IrData,
+    IrDataString,
     IrScore,
     DataTargetType,
     ScoreTuple,
@@ -324,6 +325,13 @@ class OperatorHandler:
                 return cast(OperatorMethod[..., Any], attr)
 
         return default
+    
+    def get_item(self, key: Any) -> Any:
+        return None
+    
+    def set_item(self, key: Any, value: Any):
+        child = self.target.__getitem__(key)
+        child.__rebind__(value)
 
 
 UnaryOp = TypeVar("UnaryOp", bound=UnaryOperation)
@@ -580,6 +588,39 @@ class StringOperatorHandler(OperatorHandler):
     __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
 
+    @internal
+    def get_item(self, key: Any):
+        if isinstance(key, (int, slice)):
+            return self.slice(key)
+        
+        return None
+    
+    @internal
+    def set_item(self, key: Any, value: Any):
+        if isinstance(key, (int, slice)):
+            raise TypeError(f"String data source does not support index/slice assignment.")
+        
+        return super().set_item(key, value)
+    
+    @operator_method
+    def slice(self, value: int | slice):
+        expr = self.target.expr
+
+        range = (value.start, value.stop) if isinstance(value, slice) else value
+            
+        target = self.target
+        source = IrDataString(
+            type=target._type,
+            target=target._target,
+            path=target._path,
+            nbt_type=target.readtype,
+            range=range
+        )
+        result = create_result(expr, ResultType.data)[str]
+        resolve(expr, Unrolled(value=source, ctx=expr), result=result, lazy=True)
+
+        return result
+
 
 class SequenceOperatorHandler(OperatorHandler):
     list_index: ClassVar[bool] = True
@@ -761,8 +802,7 @@ class DataSource(Source):
 
     @internal
     def __setitem__(self, key: str, value):
-        child = self.__getitem__(key)
-        child.__rebind__(value)
+        self.operator_handler.set_item(key, value)
 
     def __getitem__(
         self, key: Union[slice, str, dict[str, Any], int, NbtType, Path]
@@ -770,6 +810,9 @@ class DataSource(Source):
         if self.is_lazy():
             self.evaluate()
             return self[key]
+        
+        if result := self.operator_handler.get_item(key):
+            return result
 
         if is_type(key, allow_dict=False):
             return replace(self, writetype=convert_type(key) or Any)

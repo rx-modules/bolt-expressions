@@ -99,8 +99,7 @@ string = storage.msg[str]
 
 with assert_exception(TypeError):
     string.value
-with assert_exception(TypeError):
-    string[0]
+string[0:5]
 with assert_exception(TypeError):
     string({})
 
@@ -157,3 +156,20 @@ with assert_exception(TypeCheckDiagnostic):
 storage.flags[ByteArray] = [1,2,3,127]
 with assert_exception(TypeCheckDiagnostic):
     storage.flags[ByteArray] = [1,2,3,128]
+
+message = storage.message[str]
+
+storage.arr.append(message[0])
+storage.arr.prepend(message[1:-1])
+storage.arr.insert(0, message[3:])
+storage.arr.merge(message[:3])
+
+message = message[1:]
+
+tellraw @a message[5:10]
+
+
+ch = message[0]
+say ch
+
+ch.evaluate()

@@ -62,3 +62,12 @@ execute store result storage name:path new_item int 1 run data get storage bolt.
 data modify storage name:path name set value "george"
 data modify storage name:path flag set value 127b
 data modify storage name:path flags set value [B; 1B, 2B, 3B, 127B]
+data modify storage name:path arr append string storage name:path message 0 1
+data modify storage name:path arr prepend string storage name:path message 1 -1
+data modify storage name:path arr insert 0 string storage name:path message 3
+data modify storage name:path arr merge string storage name:path message 0 3
+data modify storage name:path message set string storage name:path message 1
+data modify storage bolt.expr:temp 2384k242hd495_12 set string storage name:path message 5 10
+tellraw @a {"nbt": "2384k242hd495_12", "storage": "bolt.expr:temp"}
+data modify storage bolt.expr:temp 2384k242hd495_13 set string storage name:path message 0 1
+say storage bolt.expr:temp 2384k242hd495_13
