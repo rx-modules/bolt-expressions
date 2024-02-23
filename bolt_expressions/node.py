@@ -112,7 +112,7 @@ class UnrollHelper:
     def provide(self, **kwargs: Any):
         prev_data = self.data
         self.data = {**self.data, **kwargs}
-        
+
         yield self.data
 
         self.data = prev_data
@@ -160,6 +160,7 @@ class ExpressionNode(ABC):
         self, helper: UnrollHelper
     ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral]:
         ...
+
 
 @dataclass(order=False, eq=False, kw_only=True)
 class Unrolled(ExpressionNode):
@@ -370,7 +371,7 @@ class Expression:
 
         if not isinstance(result, IrSource):
             return
-        
+
         result_tuple = result.to_tuple()
 
         if result_tuple in self.lazy_values:
@@ -406,7 +407,7 @@ class Expression:
     ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral] | None:
         if source in helper.ignored_sources:
             return None
-        
+
         if helper.data.get("ignore_lazy"):
             return None
 

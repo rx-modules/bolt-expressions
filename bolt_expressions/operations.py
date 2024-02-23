@@ -101,10 +101,10 @@ class UnaryOperation(Operation):
         if self.stores_result:
             operation = self.create_operation(target_value)
 
-            store = IrChildren((
-                *operation.store, IrStore(type=StoreType.result, value=temp_var)
-            ))
-            operation = replace(operation,store=store)
+            store = IrChildren(
+                (*operation.store, IrStore(type=StoreType.result, value=temp_var))
+            )
+            operation = replace(operation, store=store)
         else:
             operations.append(IrSet(left=temp_var, right=target_value))
             operation = self.create_operation(temp_var)
@@ -145,7 +145,7 @@ class BinaryOperation(Operation):
     def unroll(self, helper: UnrollHelper) -> tuple[Iterable[IrOperation], IrSource]:
         former = convert_node(self.former, self.ctx)
         latter = convert_node(self.latter, self.ctx)
-        
+
         with helper.provide(ignore_lazy=not self.evaluates_target):
             former_nodes, former_value = former.unroll(helper)
         latter_nodes, latter_value = latter.unroll(helper)
@@ -169,10 +169,10 @@ class BinaryOperation(Operation):
         operation = self.create_operation(temp_var, latter_value)
 
         if self.stores_result:
-            store = IrChildren((
-                *operation.store, IrStore(type=StoreType.result, value=temp_var)
-            ))
-            operation = replace(operation,store=store)
+            store = IrChildren(
+                (*operation.store, IrStore(type=StoreType.result, value=temp_var))
+            )
+            operation = replace(operation, store=store)
 
         operations.append(operation)
 

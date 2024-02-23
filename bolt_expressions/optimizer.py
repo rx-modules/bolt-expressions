@@ -132,6 +132,7 @@ class IrData(IrSource):
     def to_tuple(self) -> "DataTuple":
         return DataTuple(self.type, self.target, self.path)
 
+
 @dataclass(frozen=True, kw_only=True)
 class IrDataString(IrData):
     range: int | tuple[int | None, int | None]
@@ -143,11 +144,12 @@ class IrDataString(IrData):
         else:
             start = self.range
             end = None if start == -1 else self.range + 1
-        
+
         if start is None:
             start = 0
-        
+
         return (start, end)
+
 
 @dataclass(frozen=True, kw_only=True)
 class IrLiteral(IrNode):
@@ -900,6 +902,7 @@ def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
 
 Location = tuple[int, ...]
 
+
 def get_source_usage(nodes: Iterable[IrNode]) -> dict[SourceTuple, list[Location]]:
     map: dict[SourceTuple, list[Location]] = {}
 
@@ -922,12 +925,12 @@ def get_source_usage(nodes: Iterable[IrNode]) -> dict[SourceTuple, list[Location
 
         for s in node.store:
             add(s.value, (i,))
-        
+
         if is_binary(node) and node.store:
             add(node.left, (i,))
 
         for operand in node.operands:
-            add(operand, (i, ))
+            add(operand, (i,))
 
         if isinstance(node, IrBranch):
             children_usage = get_source_usage(node.children)
@@ -1179,7 +1182,7 @@ def rename_temp_scores(
             return node
 
         nodes = [replace_node(node) for node in nodes]
-    
+
     yield from nodes
 
 
@@ -1227,10 +1230,9 @@ def data_string_propagation(nodes: Iterable[IrOperation]) -> Iterable[IrOperatio
     defs = get_source_definitions(all_nodes)
 
     for i, node in enumerate(all_nodes):
-        if (
-            not is_binary(node, ("append", "prepend", "merge", "insert", "set"))
-            or not isinstance(node.right, IrSource)
-        ):
+        if not is_binary(
+            node, ("append", "prepend", "merge", "insert", "set")
+        ) or not isinstance(node.right, IrSource):
             yield node
             continue
 
@@ -1321,12 +1323,11 @@ def deadcode_elimination(
         for store_el in node.store:
             source = store_el.value
 
-            if (
-                not opt.is_temp(source)
-                or any(use_i > (node_i,) for use_i in usage.get(source.to_tuple(), []))
+            if not opt.is_temp(source) or any(
+                use_i > (node_i,) for use_i in usage.get(source.to_tuple(), [])
             ):
                 store.append(store_el)
-        
+
         if store != node.store:
             node = replace(node, store=IrChildren(store))
 
@@ -1561,10 +1562,7 @@ def store_result_inlining(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]
     removed: set[int] = set()
 
     for i, node in enumerate(nodes):
-        if (
-            not isinstance(node, IrCast)
-            or not isinstance(node.right, IrSource)
-        ):
+        if not isinstance(node, IrCast) or not isinstance(node.right, IrSource):
             continue
 
         source_def_i = get_reaching_definition(defs, node.right, i)
@@ -1579,15 +1577,15 @@ def store_result_inlining(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]
             type=StoreType.result,
             value=node.left,
             cast_type=node.cast_type,
-            scale=node.scale
+            scale=node.scale,
         )
         source_stores = stores.setdefault(source_def_i, [])
         source_stores.append(store)
         removed.add(i)
-    
+
     for i, node in enumerate(nodes):
         if store := stores.get(i):
             node = replace(node, store=IrChildren((*node.store, *store)))
-        
+
         if i not in removed:
             yield node

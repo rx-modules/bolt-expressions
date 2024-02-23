@@ -10,6 +10,7 @@ T = TypeVar("T")
 binary_min = binary_operator(Min)
 binary_max = binary_operator(Max)
 
+
 def wrapped_min(f: Any, *args: T, **kwargs: Any) -> Union[T, Any]:
     values = args
 
@@ -55,5 +56,5 @@ def wrapped_max(f: Any, *args: T, **kwargs: Any) -> Union[T, Any]:
 def wrapped_len(f: Any, obj: Any, /) -> Any:
     if not isinstance(obj, Source):
         return f(obj)
-    
+
     return length(obj)

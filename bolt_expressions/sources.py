@@ -294,13 +294,14 @@ def operator_method(
 def operator_method(func: Callable[P, T]) -> OperatorMethod[P, T]:
     ...
 
+
 @overload
 def operator_method(
     func: Callable[P, T],
     *,
     lazy: bool = False,
     is_internal: bool = True,
-    returns: bool = True
+    returns: bool = True,
 ) -> OperatorMethod[P, T]:
     ...
 
@@ -338,10 +339,10 @@ class OperatorHandler:
                 return cast(OperatorMethod[..., Any], attr)
 
         return default
-    
+
     def get_item(self, key: Any) -> Any:
         return None
-    
+
     def set_item(self, key: Any, value: Any):
         child = self.target.__getitem__(key)
         child.__rebind__(value)
@@ -562,7 +563,7 @@ class GenericOperatorHandler(OperatorHandler):
     __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
     __len__ = length
-    
+
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
         return Insert(
@@ -612,29 +613,31 @@ class StringOperatorHandler(OperatorHandler):
     def get_item(self, key: Any):
         if isinstance(key, (int, slice)):
             return self.slice(key)
-        
+
         return None
-    
+
     @internal
     def set_item(self, key: Any, value: Any):
         if isinstance(key, (int, slice)):
-            raise TypeError(f"String data source does not support index/slice assignment.")
-        
+            raise TypeError(
+                f"String data source does not support index/slice assignment."
+            )
+
         return super().set_item(key, value)
-    
+
     @operator_method
     def slice(self, value: int | slice):
         expr = self.target.expr
 
         range = (value.start, value.stop) if isinstance(value, slice) else value
-            
+
         target = self.target
         source = IrDataString(
             type=target._type,
             target=target._target,
             path=target._path,
             nbt_type=target.readtype,
-            range=range
+            range=range,
         )
         result = create_result(expr, ResultType.data)[str]
         resolve(expr, Unrolled(value=source, ctx=expr), result=result, lazy=True)
@@ -649,7 +652,7 @@ class SequenceOperatorHandler(OperatorHandler):
     __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
     __len__ = length
-    
+
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
         return Insert(
@@ -833,7 +836,7 @@ class DataSource(Source):
         if self.is_lazy():
             self.evaluate()
             return self[key]
-        
+
         result = self.operator_handler.get_item(key)
         if result is not None:
             return result
