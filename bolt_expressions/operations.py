@@ -9,8 +9,10 @@ from .optimizer import (
     IrBinary,
     IrBinaryCondition,
     IrCast,
+    IrChildren,
     IrCondition,
     IrData,
+    IrGetLength,
     IrInsert,
     IrLiteral,
     IrNode,
@@ -18,8 +20,10 @@ from .optimizer import (
     IrScore,
     IrSet,
     IrSource,
+    IrStore,
     IrUnary,
     IrUnaryCondition,
+    StoreType,
 )
 from .node import ExpressionNode, ResultType, UnrollHelper
 from .literals import convert_node
@@ -56,6 +60,7 @@ class Operation(ExpressionNode, ABC):
     commutative: ClassVar[bool] = False
     op: ClassVar[str] = ""
     result: ClassVar[ResultType] = ResultType.score
+    stores_result: ClassVar[bool] = False
 
     @property
     @abstractmethod
@@ -92,9 +97,18 @@ class UnaryOperation(Operation):
             temp_var = target_value
         else:
             temp_var = helper.create_temporary(self.result)
-            operations.append(IrSet(left=temp_var, right=target_value))
 
-        operation = self.create_operation(temp_var)
+        if self.stores_result:
+            operation = self.create_operation(target_value)
+
+            store = IrChildren((
+                *operation.store, IrStore(type=StoreType.result, value=temp_var)
+            ))
+            operation = replace(operation,store=store)
+        else:
+            operations.append(IrSet(left=temp_var, right=target_value))
+            operation = self.create_operation(temp_var)
+
         operations.append(operation)
 
         return operations, temp_var
@@ -153,6 +167,13 @@ class BinaryOperation(Operation):
             operations.append(IrSet(left=temp_var, right=former_value))
 
         operation = self.create_operation(temp_var, latter_value)
+
+        if self.stores_result:
+            store = IrChildren((
+                *operation.store, IrStore(type=StoreType.result, value=temp_var)
+            ))
+            operation = replace(operation,store=store)
+
         operations.append(operation)
 
         return operations, temp_var
@@ -262,6 +283,14 @@ class Min(BinaryOperation):
 class Max(BinaryOperation):
     op: ClassVar[str] = "max"
     commutative: ClassVar[bool] = True
+
+
+class GetLength(UnaryOperation):
+    op: ClassVar[str] = "get_length"
+    stores_result: ClassVar[bool] = True
+
+    def create_operation(self, target: IrSource) -> IrUnary:
+        return IrGetLength(target=target)
 
 
 class UnaryCondition(UnaryOperation):

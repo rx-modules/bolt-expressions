@@ -7,6 +7,7 @@ from typing import (
     Any,
     Callable,
     ClassVar,
+    Concatenate,
     ContextManager,
     Generator,
     Generic,
@@ -65,6 +66,7 @@ from .operations import (
     Reset,
     ResultType,
     Set,
+    GetLength,
     Subtract,
     UnaryOperation,
 )
@@ -94,6 +96,7 @@ SOLO_COLON = slice(None, None, None)
 
 
 T = TypeVar("T")
+Y = TypeVar("Y")
 P = ParamSpec("P")
 
 
@@ -122,7 +125,7 @@ def resolve(
     if result_type and result is None:
         result = create_result(expr, result_type)
 
-    if in_place or not result:
+    if in_place or result is None:
         op = value_node
     elif cast is None:
         op = Set(former=result, latter=value_node, ctx=expr)
@@ -250,7 +253,7 @@ class OperatorMethod(Generic[P, T]):
 
     @internal
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
-        if self.target and not self.lazy:
+        if self.target is not None and not self.lazy:
             self.target.evaluate()
 
         value = self.func(*args, **kwargs)
@@ -263,7 +266,7 @@ class OperatorMethod(Generic[P, T]):
         if self.returns:
             return result
 
-    def __get__(self, obj: Any, objtype: Any = None):
+    def __get__(self, obj: Any, objtype: Any = None) -> Any:
         if isinstance(obj, OperatorHandler):
             target = obj.target
         elif isinstance(obj, Source):
@@ -289,6 +292,16 @@ def operator_method(
 
 @overload
 def operator_method(func: Callable[P, T]) -> OperatorMethod[P, T]:
+    ...
+
+@overload
+def operator_method(
+    func: Callable[P, T],
+    *,
+    lazy: bool = False,
+    is_internal: bool = True,
+    returns: bool = True
+) -> OperatorMethod[P, T]:
     ...
 
 
@@ -525,6 +538,11 @@ def parse_compound(value: Union[str, dict, Path, Compound]):
     return Path(value)
 
 
+@operator_method(lazy=True)
+def length(obj: Source):
+    return GetLength(target=obj, ctx=obj.expr)
+
+
 class GenericOperatorHandler(OperatorHandler):
     list_index: ClassVar[bool] = True
     named_key: ClassVar[bool] = True
@@ -543,7 +561,8 @@ class GenericOperatorHandler(OperatorHandler):
     __eq__ = binary_operator(Equal)  # type: ignore
     __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
-
+    __len__ = length
+    
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
         return Insert(
@@ -587,6 +606,7 @@ class StringOperatorHandler(OperatorHandler):
     __eq__ = binary_operator(Equal)  # type: ignore
     __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
+    __len__ = length
 
     @internal
     def get_item(self, key: Any):
@@ -628,7 +648,8 @@ class SequenceOperatorHandler(OperatorHandler):
     __eq__ = binary_operator(Equal)  # type: ignore
     __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
-
+    __len__ = length
+    
     @operator_method(returns=False)
     def insert(self, index: int, value: Any):
         return Insert(
@@ -657,6 +678,7 @@ class CompoundOperatorHandler(OperatorHandler):
     __eq__ = binary_operator(Equal)  # type: ignore
     __ne__ = binary_operator(NotEqual)  # type: ignore
     __not__ = unary_operator(Not)
+    __len__ = length
 
     @operator_method(returns=False)
     def merge(self, value: Any):
@@ -734,6 +756,7 @@ class DataSource(Source):
     __eq__ = DataSourceOperator(_not_implemented)  # type: ignore
     __ne__ = DataSourceOperator(_not_implemented)  # type: ignore
     __not__ = DataSourceOperator(_not_implemented)
+    # __len__ = DataSourceOperator()
 
     @property
     def operator_handler(self) -> OperatorHandler:
@@ -811,7 +834,8 @@ class DataSource(Source):
             self.evaluate()
             return self[key]
         
-        if result := self.operator_handler.get_item(key):
+        result = self.operator_handler.get_item(key)
+        if result is not None:
             return result
 
         if is_type(key, allow_dict=False):

@@ -14,7 +14,7 @@ from .ast import (
     SourceJsonConverter,
 )
 from .node import Expression
-from .expose import wrapped_min, wrapped_max
+from .expose import wrapped_len, wrapped_min, wrapped_max
 from .api import Scoreboard, Data
 
 __all__ = [
@@ -58,6 +58,7 @@ def bolt_expressions(ctx: Context):
 
     runtime.expose("min", partial(wrapped_min, runtime.globals.get("min", min)))
     runtime.expose("max", partial(wrapped_max, runtime.globals.get("max", max)))
+    runtime.expose("len", partial(wrapped_len, runtime.globals.get("len", len)))
 
     if not expr.opts.disable_commands:
         ctx.require("bolt_expressions.contrib.commands")

@@ -1,6 +1,6 @@
 from typing import Any, Iterable, TypeVar, Union
 
-from .sources import binary_operator
+from .sources import Source, binary_operator, length, operator_method
 from .operations import Min, Max
 
 from .node import ExpressionNode
@@ -9,7 +9,6 @@ T = TypeVar("T")
 
 binary_min = binary_operator(Min)
 binary_max = binary_operator(Max)
-
 
 def wrapped_min(f: Any, *args: T, **kwargs: Any) -> Union[T, Any]:
     values = args
@@ -51,3 +50,10 @@ def wrapped_max(f: Any, *args: T, **kwargs: Any) -> Union[T, Any]:
         return binary_max(node, wrapped_max(f, *remaining, **kwargs))
 
     return f(*args, **kwargs)
+
+
+def wrapped_len(f: Any, obj: Any, /) -> Any:
+    if not isinstance(obj, Source):
+        return f(obj)
+    
+    return length(obj)

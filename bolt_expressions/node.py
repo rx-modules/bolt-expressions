@@ -63,6 +63,7 @@ from .check import TypeChecker
 from .ast_converter import AstConverter
 from .utils import identifier_generator, insert_nested_commands
 
+from rich.pretty import pprint
 
 __all__ = [
     "ExpressionOptions",

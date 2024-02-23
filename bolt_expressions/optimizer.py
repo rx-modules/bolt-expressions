@@ -43,6 +43,7 @@ from .typing import (
     literal_types,
     unwrap_optional_type,
 )
+from rich.pretty import pprint
 
 __all__ = [
     "Rule",
@@ -206,6 +207,8 @@ class StoreType(Enum):
 class IrStore(IrNode):
     type: StoreType
     value: IrSource
+    scale: float = 1
+    cast_type: NbtType = Any
 
 
 OperandType = IrLiteral | IrSource | IrCondition
@@ -267,6 +270,12 @@ class IrBinary(IrOperation):
             return (self.right,)
 
         return (self.left, self.right)
+
+
+@dataclass(frozen=True, kw_only=True)
+class IrGetLength(IrUnary):
+    op: str = field(default="get_length", init=False)
+    destructive: bool = field(default=False, init=False)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -891,12 +900,14 @@ def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
 
 Location = tuple[int, ...]
 
-
-def get_source_usage(nodes: Iterable[IrNode]) -> dict[IrSource, list[Location]]:
-    map: dict[IrSource, list[Location]] = {}
+def get_source_usage(nodes: Iterable[IrNode]) -> dict[SourceTuple, list[Location]]:
+    map: dict[SourceTuple, list[Location]] = {}
 
     def add(source: Any, i: Location):
-        if isinstance(source, IrSource):
+        if isinstance(source, (IrSource, SourceTuple)):
+            if isinstance(source, IrSource):
+                source = source.to_tuple()
+
             indexes = map.setdefault(source, [])
             indexes.append(i)
         elif isinstance(source, IrUnaryCondition):
@@ -911,14 +922,12 @@ def get_source_usage(nodes: Iterable[IrNode]) -> dict[IrSource, list[Location]]:
 
         for s in node.store:
             add(s.value, (i,))
+        
+        if is_binary(node) and node.store:
+            add(node.left, (i,))
 
-        if is_binary(node):
-            if node.op in ("set", "cast") and len(node.store):
-                add(node.left, (i,))
-            add(node.right, (i,))
-
-        if is_unary(node):
-            add(node.target, (i,))
+        for operand in node.operands:
+            add(operand, (i, ))
 
         if isinstance(node, IrBranch):
             children_usage = get_source_usage(node.children)
@@ -960,8 +969,8 @@ def apply_temp_source_reuse(
             and opt.is_temp(node.right)
             and type(node.left) is type(node.right)
         ):
-            left_usage = usage_map.get(node.left)
-            right_usage = usage_map.get(node.right)
+            left_usage = usage_map.get(node.left.to_tuple())
+            right_usage = usage_map.get(node.right.to_tuple())
 
             if right_usage is None:
                 continue
@@ -1307,16 +1316,30 @@ def deadcode_elimination(
             yield node
             continue
 
+        store: list[IrStore] = []
+
+        for store_el in node.store:
+            source = store_el.value
+
+            if (
+                not opt.is_temp(source)
+                or any(use_i > (node_i,) for use_i in usage.get(source.to_tuple(), []))
+            ):
+                store.append(store_el)
+        
+        if store != node.store:
+            node = replace(node, store=IrChildren(store))
+
         for target in node.targets:
             if not opt.is_temp(target):
                 yield node
-                continue
+                break
 
-            target_usage = usage.get(target, [])
+            target_usage = usage.get(target.to_tuple(), [])
 
             if any(use_i > (node_i,) for use_i in target_usage):
                 yield node
-                continue
+                break
 
 
 def convert_data_order_operation(

@@ -102,13 +102,13 @@ class AstConverter(Visitor):
     def store(self, node: IrStore) -> Generator[IrNode, str, str]:
         value = yield node.value
         type = node.type.value
+        nbt_type = self.serialize_nbt_type(node.cast_type)
 
         match node.value:
             case IrScore():
                 return f"execute store {type} score {value} run"
-            case IrData() as d:
-                nbt_type = self.serialize_nbt_type(d.nbt_type)
-                return f"execute store {type} {value} {nbt_type} 1 run"
+            case IrData():
+                return f"execute store {type} {value} {nbt_type} {node.scale} run"
             case _:
                 raise ValueError(f"Invalid store source '{node.value}'.")
 
@@ -495,5 +495,17 @@ class AstConverter(Visitor):
                 cmd = f"execute store success score {left} run {right}"
             case l, r:
                 raise InvalidOperand(node.op, l, r)
+
+        self.add_result(cmd, node.store)
+
+    @rule(IrUnary, op="get_length")
+    def get_length(self, node: IrUnary) -> Generator[IrNode, str, None]:
+        target = yield node.target
+
+        match node.target:
+            case IrData():
+                cmd = f"data get {target}"
+            case t:
+                raise InvalidOperand(node.op, t)
 
         self.add_result(cmd, node.store)

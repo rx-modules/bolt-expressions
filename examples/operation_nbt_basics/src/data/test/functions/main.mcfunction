@@ -48,3 +48,9 @@ function ./literals:
     player.Inventory[:].tag.list = [{"bar": 2.5}, {"baz": false}]
     player.Inventory[:].tag.list = {}
     player.Inventory[:].tag.list = {"foo": 2, "baz": Short(-1)}
+
+
+obj["@s"] =  len(temp.items)
+temp.value[Short] = len(temp.items)
+
+obj["$x"] = len(temp.a) + len(temp.b)
