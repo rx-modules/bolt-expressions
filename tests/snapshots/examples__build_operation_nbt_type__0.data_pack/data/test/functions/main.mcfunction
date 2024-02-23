@@ -7,22 +7,18 @@ data modify storage demo n set from storage bolt.expr:temp 2384k242hd495_4
 execute store result storage bolt.expr:temp 2384k242hd495_5 float 1 run data get storage bolt.expr:temp 2384k242hd495_4 1
 data modify storage demo m set from storage bolt.expr:temp 2384k242hd495_5
 execute store result score $i0 bolt.expr.temp run data get storage demo x 100
-scoreboard players add $i0 bolt.expr.temp 1
-execute store result storage bolt.expr:temp 2384k242hd495_12 double 0.01 run scoreboard players get $i0 bolt.expr.temp
+execute store result storage bolt.expr:temp 2384k242hd495_12 double 0.01 run scoreboard players add $i0 bolt.expr.temp 1
 data modify storage demo x set from storage bolt.expr:temp 2384k242hd495_12
 execute store result score $i0 bolt.expr.temp run data get storage demo num 100
-scoreboard players add $i0 bolt.expr.temp 1
-execute store result storage bolt.expr:temp 2384k242hd495_19 double 1 run scoreboard players get $i0 bolt.expr.temp
+execute store result storage bolt.expr:temp 2384k242hd495_19 double 1 run scoreboard players add $i0 bolt.expr.temp 1
 execute store result storage demo num double 0.01 run data get storage bolt.expr:temp 2384k242hd495_19 1
 execute store result storage bolt.expr:temp 2384k242hd495_24 short 1 run scoreboard players get $val obj
 execute store result storage demo a int 100 run data get storage bolt.expr:temp 2384k242hd495_24 1
 execute store result storage demo a double 0.1 run data get storage bolt.expr:temp 2384k242hd495_24 1
 scoreboard players operation $i0 bolt.expr.temp = $a obj
-scoreboard players add $i0 bolt.expr.temp 1
-execute store result storage demo a int 1 run scoreboard players get $i0 bolt.expr.temp
+execute store result storage demo a int 1 run scoreboard players add $i0 bolt.expr.temp 1
 scoreboard players operation $i0 bolt.expr.temp = $b obj
-scoreboard players add $i0 bolt.expr.temp 2
-execute store result storage bolt.expr:temp 2384k242hd495_32 double 1 run scoreboard players get $i0 bolt.expr.temp
+execute store result storage bolt.expr:temp 2384k242hd495_32 double 1 run scoreboard players add $i0 bolt.expr.temp 2
 execute store result storage demo a double 0.1 run data get storage bolt.expr:temp 2384k242hd495_32 1
 say nicer
 execute store result storage bolt.expr:temp 2384k242hd495_37 double 0.01 run scoreboard players get $foo obj
@@ -42,8 +38,7 @@ execute store result storage demo value double 0.1 run scoreboard players get @s
 execute store result storage demo value byte 1 run scoreboard players get @s obj
 execute store result score $i0 bolt.expr.temp run data get storage demo x1 100
 execute store result score $i1 bolt.expr.temp run data get storage demo x2 100
-scoreboard players operation $i0 bolt.expr.temp += $i1 bolt.expr.temp
-execute store result storage demo value double 0.005 run scoreboard players get $i0 bolt.expr.temp
+execute store result storage demo value double 0.005 run scoreboard players operation $i0 bolt.expr.temp += $i1 bolt.expr.temp
 say casting to byte before appending to list
 execute store result storage demo value byte 1 run scoreboard players get $value obj
 data modify storage demo list append from storage demo value

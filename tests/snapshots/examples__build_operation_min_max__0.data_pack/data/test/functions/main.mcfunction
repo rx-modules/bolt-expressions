@@ -38,8 +38,7 @@ scoreboard players operation $f abc.main > $p abc.main
 execute store result score $i0 bolt.expr.temp run data get storage example:main a 1
 execute store result score $i1 bolt.expr.temp run data get storage example:main b 1
 scoreboard players operation $i0 bolt.expr.temp < $i1 bolt.expr.temp
-scoreboard players operation $i0 bolt.expr.temp < $a abc.main
-execute store result storage example:main value int 1 run scoreboard players get $i0 bolt.expr.temp
+execute store result storage example:main value int 1 run scoreboard players operation $i0 bolt.expr.temp < $a abc.main
 execute store result score $result abc.main run data get storage example:main b 1
 execute store result score $i0 bolt.expr.temp run data get storage example:main c 1
 scoreboard players operation $result abc.main < $i0 bolt.expr.temp

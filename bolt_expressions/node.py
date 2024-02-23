@@ -56,6 +56,7 @@ from .optimizer import (
     set_and_get_cleanup,
     set_to_self_removal,
     store_set_data_compare,
+    store_result_inlining,
 )
 from .typing import NbtTypeString
 from .casting import TypeCaster
@@ -264,6 +265,7 @@ class Expression:
             set_and_get_cleanup=set_and_get_cleanup,
             noncommutative_set_collapsing=noncommutative_set_collapsing,
             commutative_set_collapsing=commutative_set_collapsing,
+            store_result_inlining=store_result_inlining,
             data_string_propagation=data_string_propagation,
             literal_to_constant_replacement=partial(
                 literal_to_constant_replacement, self.optimizer

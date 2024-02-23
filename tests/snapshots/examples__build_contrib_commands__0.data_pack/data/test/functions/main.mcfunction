@@ -20,5 +20,4 @@ scoreboard players add $foo obj.temp 10
 scoreboard players operation $i0 bolt.expr.temp = $delta obj.temp
 scoreboard players add $i0 bolt.expr.temp 10
 execute store result score $i1 bolt.expr.temp run data get storage example:main value 1
-scoreboard players operation $i0 bolt.expr.temp += $i1 bolt.expr.temp
-execute store result storage example:main value int 1 run scoreboard players get $i0 bolt.expr.temp
+execute store result storage example:main value int 1 run scoreboard players operation $i0 bolt.expr.temp += $i1 bolt.expr.temp

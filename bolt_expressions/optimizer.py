@@ -1550,3 +1550,44 @@ def convert_defined_boolean_condition(
             operands.append(operand)
 
         yield replace_operation(node, operands=tuple(operands))
+
+
+def store_result_inlining(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    nodes = tuple(nodes)
+
+    defs = get_source_definitions(nodes)
+
+    stores: dict[int, list[IrStore]] = {}
+    removed: set[int] = set()
+
+    for i, node in enumerate(nodes):
+        if (
+            not isinstance(node, IrCast)
+            or not isinstance(node.right, IrSource)
+        ):
+            continue
+
+        source_def_i = get_reaching_definition(defs, node.right, i)
+
+        if source_def_i is None:
+            continue
+
+        if source_def_i != (i - 1):
+            continue
+
+        store = IrStore(
+            type=StoreType.result,
+            value=node.left,
+            cast_type=node.cast_type,
+            scale=node.scale
+        )
+        source_stores = stores.setdefault(source_def_i, [])
+        source_stores.append(store)
+        removed.add(i)
+    
+    for i, node in enumerate(nodes):
+        if store := stores.get(i):
+            node = replace(node, store=IrChildren((*node.store, *store)))
+        
+        if i not in removed:
+            yield node

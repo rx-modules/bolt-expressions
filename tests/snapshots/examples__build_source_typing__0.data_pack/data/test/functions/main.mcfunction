@@ -57,8 +57,7 @@ data modify storage name:path value prepend value 0.0d
 data modify storage name:path value insert 4 value 13.0d
 data modify storage bolt.expr:temp i0 set value {id: "bla", Count: 5, tag: {CustomModelData: 14.2f, Items: [{id: "stone", Count: 3}]}}
 data modify storage bolt.expr:temp i0 merge from storage name:path other_item
-data modify storage bolt.expr:temp i0 merge value {tag: {Items: [{Count: 23}]}}
-execute store result storage name:path new_item int 1 run data get storage bolt.expr:temp i0 1
+execute store result storage name:path new_item int 1 run data modify storage bolt.expr:temp i0 merge value {tag: {Items: [{Count: 23}]}}
 data modify storage name:path name set value "george"
 data modify storage name:path flag set value 127b
 data modify storage name:path flags set value [B; 1B, 2B, 3B, 127B]
