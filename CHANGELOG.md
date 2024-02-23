@@ -2,6 +2,18 @@
 
 <!--next-version-placeholder-->
 
+## v0.16.0 (2024-02-23)
+
+### Feature
+
+* Overloaded len function for data sources ([`792657b`](https://github.com/rx-modules/bolt-expressions/commit/792657baa2de8c9f5d88c8e15c22363d97550ce6))
+* Add string data source indexing and slicing ([`4b5fa58`](https://github.com/rx-modules/bolt-expressions/commit/4b5fa58cb83efdc6fcfadc3f270631786b7c1298))
+
+### Fix
+
+* Add store result inlining rule ([`006750b`](https://github.com/rx-modules/bolt-expressions/commit/006750bfb95d2ab1c29a95d21e3204c599d8405a))
+* Lazy sources should discard previous value when reused ([`2101335`](https://github.com/rx-modules/bolt-expressions/commit/2101335ad560208d2f2f38959f5ea8966c5baf80))
+
 ## v0.15.0 (2024-02-16)
 
 ### Feature
