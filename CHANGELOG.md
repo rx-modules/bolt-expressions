@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.16.1 (2024-06-23)
+
+### Fix
+
+* Remove scientific notation formatting for small scale numbers ([`e72080d`](https://github.com/rx-modules/bolt-expressions/commit/e72080d2ffada4fd6c4adc912b90e08a84569505))
+
 ## v0.16.0 (2024-02-23)
 
 ### Feature
