@@ -39,3 +39,16 @@ temp.list.prepend(obj["$value"] * 100)
 
 say # insert scaled score
 temp.list.insert(3, obj["$value"] * 100)
+
+
+TICKS_PER_SECOND = 20
+TICKS_PER_MINUTE = TICKS_PER_SECOND * 60
+TICKS_PER_HOUR = TICKS_PER_MINUTE * 60
+
+temp.hours = (obj["ticks_since_death"] - temp.death_gametime) / TICKS_PER_HOUR
+
+obj["ticks_since_death"] = obj["ticks_since_death"] % TICKS_PER_MINUTE
+temp.minutes = obj["ticks_since_death"] / TICKS_PER_MINUTE
+
+obj["ticks_since_death"] = obj["ticks_since_death"] % TICKS_PER_SECOND
+temp.seconds = obj["ticks_since_death"] / TICKS_PER_SECOND

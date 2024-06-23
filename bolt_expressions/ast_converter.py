@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Generator, Iterable, cast
 from mecha import AstChildren, AstCommand, Mecha, Visitor, rule, AstRoot
+from mecha.utils import number_to_string
 from nbtlib import Byte, Short, Int, Long, Float, Double  # type: ignore
 
 from .typing import NBT_TYPE_STRING, NbtTypeString, NumericNbtValue
@@ -108,7 +109,8 @@ class AstConverter(Visitor):
             case IrScore():
                 return f"execute store {type} score {value} run"
             case IrData():
-                return f"execute store {type} {value} {nbt_type} {node.scale} run"
+                scale = number_to_string(node.scale)
+                return f"execute store {type} {value} {nbt_type} {scale} run"
             case _:
                 raise ValueError(f"Invalid store source '{node.value}'.")
 
@@ -476,7 +478,7 @@ class AstConverter(Visitor):
         right = yield node.right
 
         nbt_type = self.serialize_nbt_type(node.cast_type)
-        scale = node.scale
+        scale = number_to_string(node.scale)
 
         match node.left, node.right:
             case IrData(), IrLiteral():

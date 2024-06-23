@@ -33,3 +33,10 @@ say # insert scaled score
 scoreboard players operation $i0 bolt.expr.temp = $value obj
 data modify storage demo list insert 3 value 0
 execute store result storage demo list[3] int 100 run scoreboard players get $i0 bolt.expr.temp
+scoreboard players operation $i0 bolt.expr.temp = ticks_since_death obj
+execute store result score $i1 bolt.expr.temp run data get storage demo death_gametime 1
+execute store result storage demo hours double 0.00001388888888888889 run scoreboard players operation $i0 bolt.expr.temp -= $i1 bolt.expr.temp
+scoreboard players operation ticks_since_death obj %= $1200 bolt.expr.const
+execute store result storage demo minutes double 0.0008333333333333334 run scoreboard players get ticks_since_death obj
+scoreboard players operation ticks_since_death obj %= $20 bolt.expr.const
+execute store result storage demo seconds double 0.05 run scoreboard players get ticks_since_death obj

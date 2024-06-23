@@ -73,9 +73,7 @@ def static_vars(f):
     return f"{f.__name__}{i}"
 
   def decorated(*args, **kwargs):
-    with
-      Expression.temp_score.override(format=score_format, reset=True),
-      Expression.temp_data.override(format=data_format, reset=True):
+    with Expression.temp_score.override(format=score_format, reset=True), Expression.temp_data.override(format=data_format, reset=True):
       return f(*args, **kwargs)
   
   return decorated
