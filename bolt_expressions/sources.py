@@ -108,9 +108,7 @@ def resolve(
     cast: NbtType | None = None,
     lazy: bool = False,
 ):
-    value_node = (
-        value if isinstance(value, ExpressionNode) else Literal(value=value, ctx=expr)
-    )
+    value_node = convert_node(value, expr)
 
     result_type = None
     in_place = False

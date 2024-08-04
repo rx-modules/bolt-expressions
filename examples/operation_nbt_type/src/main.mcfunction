@@ -10,7 +10,7 @@ temp.value = Data.cast(obj["$a"], "byte")
 
 temp.pos[0] = Data.cast(obj["$x"] / 100, "double")
 
-n = Data.cast(obj["$n"], "int")
+n = Data.cast(obj["$n"], "int").evaluate()
 
 temp.n = n
 temp.m = Data.cast(n, "float")
@@ -19,7 +19,7 @@ temp.m = Data.cast(n, "float")
 temp.x = Data.cast((temp.x*100 + 1) / 100, "double")
 temp.num = Data.cast(temp.num*100 + 1, "double") / 100
 
-s = Data.cast(obj["$val"], "short")
+s = Data.cast(obj["$val"], "short").evaluate()
 temp.a = s * 100
 temp.a = s / 10
 
@@ -80,3 +80,7 @@ x[Any] = temp.arbitrary
 
 say casts to a double
 x = temp.arbitrary
+
+
+temp.elements[0] = Data.cast(obj["$value"] / 10, Double)
+temp.elements[0][Double] = obj["$value"] / 10

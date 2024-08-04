@@ -9,6 +9,7 @@ from .node import Expression
 from .sources import (
     DataSource,
     ScoreSource,
+    resolve,
 )
 
 
@@ -162,7 +163,7 @@ class Data:
         if isinstance(nbt_type, str):
             nbt_type = literal_types[nbt_type]
 
-        source = self.dummy(nbt_type)
-        source.__rebind__(value)
+        result = self.dummy(nbt_type)
+        resolve(self.expr, value, result, nbt_type, lazy=True)
 
-        return source
+        return result

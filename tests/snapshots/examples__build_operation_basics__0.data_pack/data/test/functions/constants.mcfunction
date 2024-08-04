@@ -3,9 +3,7 @@ scoreboard players remove @s abc.main 20
 scoreboard players operation @s abc.main *= $30 bolt.expr.const
 scoreboard players operation @s abc.main /= $40 bolt.expr.const
 scoreboard players operation @s abc.main %= $50 bolt.expr.const
-scoreboard players operation $a abc.main = $a abc.main
 scoreboard players operation $a abc.main *= $-1 bolt.expr.const
-scoreboard players operation $b abc.main = $b abc.main
 scoreboard players operation $b abc.main /= $-1 bolt.expr.const
 scoreboard players operation $c abc.main /= $2 bolt.expr.const
 scoreboard players operation $d abc.main /= $10 bolt.expr.const
