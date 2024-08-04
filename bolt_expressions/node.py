@@ -45,6 +45,8 @@ from .optimizer import (
     data_string_propagation,
     deadcode_elimination,
     discard_casting,
+    discard_non_numerical_casting,
+    composite_literal_expansion,
     init_score_boolean_result,
     literal_to_constant_replacement,
     multiply_divide_by_fraction,
@@ -241,6 +243,9 @@ class Expression:
             default_floating_nbt_type=self.opts.default_floating_nbt_type,
         )
         self.optimizer.add_rules(
+            composite_literal_expansion=partial(
+                composite_literal_expansion, opt=self.optimizer, ctx=self.ctx
+            ),
             data_insert_score=data_insert_score,
             convert_cast=convert_cast,
             compound_match_data_compare=partial(
@@ -255,9 +260,11 @@ class Expression:
             init_score_boolean_result=init_score_boolean_result,
             apply_temp_source_reuse=partial(apply_temp_source_reuse, self.optimizer),
             set_to_self_removal=set_to_self_removal,
+
             # features
             data_set_scaling=partial(data_set_scaling, opt=self.optimizer),
             data_get_scaling=data_get_scaling,
+
             # cleanup
             multiply_divide_by_fraction=multiply_divide_by_fraction,
             multiply_divide_by_one_removal=multiply_divide_by_one_removal,
@@ -277,10 +284,17 @@ class Expression:
                 convert_defined_boolean_condition, opt=self.optimizer
             ),
             deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
-            rename_temp_scores=partial(rename_temp_scores, self.optimizer),
+
             # typing
             type_caster=self.type_caster,
             type_checker=self.type_checker,
+
+            # post type-checking cleanup
+            discard_non_numerical_casting=discard_non_numerical_casting,
+            apply_temp_source_reuse2=partial(apply_temp_source_reuse, self.optimizer),
+            set_to_self_removal2=set_to_self_removal,
+            rename_temp_scores=partial(rename_temp_scores, self.optimizer),
+
         )
 
         self.ast_converter = AstConverter(

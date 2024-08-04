@@ -24,6 +24,7 @@ from .typing import (
     access_type,
     convert_type,
     get_dict_fields,
+    infer_type,
     is_alias,
     is_array_type,
     is_compound_alias,
@@ -59,29 +60,6 @@ __all__ = [
     "check_type",
     "TypeChecker",
 ]
-
-
-def infer_dict(value: dict[str, NbtValue]) -> NbtType | None:
-    return convert_type({key: infer_type(val) for key, val in value.items()})
-
-
-def infer_list(value: list[NbtValue]) -> NbtType:
-    if not len(value):
-        return list[Any]
-
-    options = tuple(infer_type(element) for element in value)
-
-    return list[Union[options]]  # type: ignore
-
-
-def infer_type(value: NbtValue) -> NbtType | None:
-    if isinstance(value, dict):
-        return infer_dict(value)
-
-    if isinstance(value, list):
-        return infer_list(value)
-
-    return convert_type(type(value))
 
 
 NUMERIC_ORDER = (Byte, Short, Int, Long, Float, Double)

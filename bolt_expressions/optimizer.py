@@ -21,6 +21,7 @@ from typing import (
     ParamSpec,
     cast,
 )
+from beet import Context
 from mecha import AbstractChildren, AbstractNode, AstNode
 from bolt.utils import internal
 
@@ -34,12 +35,22 @@ from nbtlib import (  # type:ignore
     Path,
     NamedKey,
     CompoundMatch,
+    List,
+    ListIndex
 )
 
 from .typing import (
     Accessor,
     NbtType,
     NbtValue,
+    access_type_by_path,
+    convert_tag,
+    infer_type,
+    is_array_type,
+    is_compound_type,
+    is_list_type,
+    is_numeric_type,
+    is_string_type,
     literal_types,
     unwrap_optional_type,
 )
@@ -154,6 +165,16 @@ class IrDataString(IrData):
 @dataclass(frozen=True, kw_only=True)
 class IrLiteral(IrNode):
     value: NbtValue
+
+CompositeNbtValue = Union[
+    NbtValue,
+    list[Union["CompositeNbtValue", IrSource]],
+    dict[str, Union["CompositeNbtValue", IrSource]],
+]
+
+@dataclass(frozen=True, kw_only=True)
+class IrCompositeLiteral(IrNode):
+    value: CompositeNbtValue
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -574,7 +595,7 @@ class Optimizer:
                 if not active_rules.get(name):
                     continue
 
-                nodes = rule(nodes)
+                nodes = tuple(rule(nodes))
 
             return tuple(nodes), temporaries
 
@@ -941,6 +962,45 @@ def get_source_usage(nodes: Iterable[IrNode]) -> dict[SourceTuple, list[Location
     return map
 
 
+def replace_source(value: IrSource, replace_map: dict[IrSource, IrSource]) -> IrSource:
+    if isinstance(value, IrData):
+        value_path = cast(tuple[Accessor, ...], tuple(value.path))
+
+        nodes = [
+            replace(
+                value,
+                path=Path.from_accessors(value_path[:i]) # type: ignore
+            )
+            for i in range(len(value_path), 0, -1)
+        ]
+
+        for parent_node in nodes:
+            replaced = False
+            node = parent_node
+
+            while new_node := replace_map.get(node):
+                node = cast(IrData, new_node)
+                replaced = True
+            
+            if replaced:
+                path = cast(
+                    tuple[Accessor, ...],
+                    tuple(node.path) + value_path[len(parent_node.path):]
+                )
+                return replace(
+                    node,
+                    path=Path.from_accessors(path), # type: ignore
+                    nbt_type=value.nbt_type
+                )
+        
+        return value
+
+    while new_node := replace_map.get(value):
+        value = new_node
+
+    return value
+
+
 def apply_temp_source_reuse(
     opt: Optimizer, nodes: Iterable[IrOperation]
 ) -> Iterable[IrOperation]:
@@ -949,19 +1009,16 @@ def apply_temp_source_reuse(
     usage_map = get_source_usage(all_nodes)
     replace_map: dict[IrSource, IrSource] = {}
 
-    def replace_operand(value: Any) -> Any:
-        if isinstance(value, IrUnaryCondition):
-            return replace(value, target=replace_operand(value.target))
-
-        if isinstance(value, IrBinaryCondition):
-            return replace(
+    def replace_operand(value: OperandType) -> OperandType:
+        if isinstance(value, IrOperation):
+            return replace_operation(
                 value,
-                left=replace_operand(value.left),
-                right=replace_operand(value.right),
+                operands=[replace_operand(operand) for operand in value.operands],
+                store=IrChildren(replace(s, value=replace_operand(s.value)) for s in value.store)
             )
-
-        if replaced := replace_map.get(value):
-            return replace_operand(replaced)
+        
+        if isinstance(value, IrSource):
+            return replace_source(value, replace_map)
 
         return value
 
@@ -1028,6 +1085,19 @@ def discard_casting(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
         else:
             yield node
 
+def discard_non_numerical_casting(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+    for node in nodes:
+        if (
+            isinstance(node, IrCast)
+            and isinstance(node.left, IrData)
+            and isinstance(node.right, IrData)
+            and node.scale == 1
+            and not is_numeric_type(unwrap_optional_type(node.cast_type))
+        ):
+            yield IrSet(left=node.left, right=node.right)
+        else:
+            yield node
+
 
 def set_to_self_removal(nodes: Iterable[IrOperation]):
     """Removes Set operations that have the same former and latter source.
@@ -1036,7 +1106,11 @@ def set_to_self_removal(nodes: Iterable[IrOperation]):
     """
     for node in nodes:
         if is_copy_op(node):
-            if node.left != node.right:
+            if (
+                not isinstance(node.right, IrSource)
+                or type(node.left) is not type(node.right)
+                or node.left.to_tuple() != node.right.to_tuple()
+            ):
                 yield node
         else:
             yield node
@@ -1128,12 +1202,9 @@ def rename_temp_scores(
         opt.temp_score.override(format=lambda n: f"$i{n}", reset=True),
         opt.temp_data.override(format=lambda n: f"i{n}", reset=True),
     ):
-        source_map: dict[IrSource, IrSource] = {}
+        replace_map: dict[IrSource, IrSource] = {}
 
         def replace_node(node: Any) -> Any:
-            if node in ignored_sources:
-                return node
-
             if is_op(node):
                 store = IrChildren(
                     replace(s, value=replace_node(s.value)) for s in node.store
@@ -1166,18 +1237,25 @@ def rename_temp_scores(
                 )
 
             if isinstance(node, IrSource):
+                if node in ignored_sources:
+                    return node
+
+                replaced_node = replace_source(node, replace_map)
+
+                if replaced_node != node:
+                    return replaced_node
+
                 if not opt.is_temp(node):
                     return node
 
-                if node not in source_map:
-                    if isinstance(node, IrScore):
-                        source_map[node] = opt.generate_score()
-                    elif isinstance(node, IrData):
-                        source_map[node] = opt.generate_data()
-                    else:
-                        source_map[node] = node
+                if isinstance(node, IrScore):
+                    replace_map[node] = opt.generate_score()
+                elif isinstance(node, IrData):
+                    replace_map[node] = opt.generate_data()
+                else:
+                    replace_map[node] = node
 
-                return source_map[node]
+                return replace_map[node]
 
             return node
 
@@ -1589,3 +1667,137 @@ def store_result_inlining(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]
 
         if i not in removed:
             yield node
+
+
+def get_default_value(type: NbtType) -> NbtValue:
+    type = unwrap_optional_type(type)
+
+    if is_numeric_type(type):
+        return type(0)
+    
+    if is_string_type(type):
+        return String("")
+    
+    if is_list_type(type):
+        return List([])
+
+    if is_array_type(type):
+        return type([])
+    
+    if is_compound_type(type):
+        return Compound({})
+
+    return Int(0)
+
+
+def traverse_composite_literal(
+    value: CompositeNbtValue,
+    result: IrData,
+    type: NbtType,
+    ctx: Context,
+    operations: list[IrOperation],
+) -> NbtValue:    
+    literal: Any
+
+    if isinstance(value, dict):
+        value = cast(dict[str, CompositeNbtValue | IrSource], value)
+
+        literal = {}
+
+        for key, val in value.items():
+            val_result = replace(result, path=result.path[key])
+
+            if isinstance(val, IrSource):
+                accessors = cast(tuple[Accessor, ...], tuple(val_result.path))
+                cast_type = access_type_by_path(type, accessors[1:], ctx)
+
+                if cast_type in (None, Any):
+                    cast_type = val.nbt_type if isinstance(val, IrData) else Any
+
+                operations.append(
+                    IrCast(left=val_result, right=val, cast_type=cast_type or Any)
+                )
+                nbt_val = get_default_value(cast_type)
+            else:
+                nbt_val = traverse_composite_literal(val, val_result, type, ctx, operations)
+
+            literal[key] = nbt_val
+
+    elif isinstance(value, list):
+        value = cast(list[CompositeNbtValue | IrSource], value)
+
+        literal = []
+
+        accessors = cast(tuple[Accessor, ...], tuple(result.path[0]))
+        cast_type = access_type_by_path(type, accessors[1:], ctx)
+
+        if cast_type in (None, Any):
+            literals = [el for el in value if not isinstance(el, IrSource)]
+
+            if literals:
+                cast_type = infer_type(literals[0])
+            
+            if cast_type in (None, Any):
+                data_source_types = [
+                    el.nbt_type
+                    for el in value
+                    if isinstance(el, IrData) and el.nbt_type is not Any
+                ]
+                cast_type = data_source_types[0] if data_source_types else Int
+                
+        for i, val in enumerate(value):
+            val_result = replace(result, path=result.path[i])
+
+            if isinstance(val, IrSource):
+                operations.append(
+                    IrCast(left=val_result, right=val, cast_type=cast_type)
+                )
+                nbt_val = get_default_value(cast_type)
+            else:
+                nbt_val = traverse_composite_literal(val, val_result, type, ctx, operations)
+
+            literal.append(nbt_val)
+    else:
+        literal = value
+    
+    nbt = convert_tag(literal)
+
+    if nbt is None:
+        raise ValueError("Invalid nbt.")
+    
+    return nbt
+
+
+def composite_literal_expansion(nodes: Iterable[IrOperation], opt: Optimizer, ctx: Context) -> Iterable[IrOperation]:
+    for node in nodes:
+        if not any(isinstance(operand, IrCompositeLiteral) for operand in node.operands):
+            yield node
+            continue
+
+        operands: list[OperandType] = []
+
+        for operand in node.operands:
+            if isinstance(operand, IrCompositeLiteral):
+                result = opt.generate_data()
+
+                if isinstance(node, IrCast):
+                    type = node.cast_type
+                elif (
+                    is_binary(node, ("append", "prepend", "insert"))
+                    and isinstance(node.left, IrData)
+                ):
+                    type = access_type_by_path(node.left.nbt_type, (ListIndex(0),)) or Any
+                else:
+                    type = Any
+
+                operations: list[IrOperation] = []
+                nbt_value = traverse_composite_literal(operand.value, result, type, ctx, operations)
+
+                yield IrCast(left=result, right=IrLiteral(value=nbt_value), cast_type=type)
+                yield from operations
+
+                operand = result
+
+            operands.append(operand)
+
+        yield replace_operation(node, operands)

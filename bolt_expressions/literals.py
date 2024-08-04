@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterable, cast
 from beet import Context
 
 from beet.core.utils import required_field
 
-from .optimizer import IrLiteral
+from .optimizer import CompositeNbtValue, IrCompositeLiteral, IrLiteral, IrOperation, IrSource
 from .typing import NbtValue, convert_tag
 from .node import Expression, ExpressionNode, UnrollHelper
 from .utils import type_name
@@ -17,21 +17,49 @@ __all__ = [
 
 @dataclass(unsafe_hash=True, order=False)
 class Literal(ExpressionNode):
-    value: Any = required_field(repr=False)
-    nbt: NbtValue = field(init=False)
+    value: Any = required_field()
+    nbt: NbtValue | None = field(init=False)
 
     def __post_init__(self):
-        value = convert_tag(self.value)
+        self.nbt = convert_tag(self.value)
 
-        if value is None:
-            raise ValueError(f'Invalid literal of type {type_name(value)} "{value}".')
+    def unroll(self, helper: UnrollHelper) -> tuple[Iterable[IrOperation], Any]:
+        operations: list[IrOperation] = []
 
-        self.nbt = value
+        def nested_unroll(obj: Any) -> CompositeNbtValue | IrSource:
+            if isinstance(obj, dict):
+                obj = cast(dict[str, Any], obj)
+                return {
+                    key: nested_unroll(value)
+                    for key, value in obj.items()
+                }
 
-    def __str__(self):
-        return self.nbt.snbt()  # type: ignore
+            if isinstance(obj, list):
+                obj = cast(list[Any], obj)
+                return [nested_unroll(value) for value in obj]
+            
+            if isinstance(obj, ExpressionNode):
+                ops, value = obj.unroll(helper)
+                operations.extend(ops)
+                
+                return value.value if isinstance(value, IrLiteral) else value
+        
+            value = convert_tag(obj)
 
-    def unroll(self, helper: UnrollHelper):
+            if value is None:
+                raise ValueError(f'Invalid literal of type {type_name(obj)} "{self.value}"')
+
+            return value
+
+
+        if self.nbt is None:
+            value = nested_unroll(self.value)
+
+            if isinstance(value, IrSource):
+                return tuple(operations), value
+
+            return tuple(operations), IrCompositeLiteral(value=value)
+
         return (), IrLiteral(value=self.nbt)
 
 

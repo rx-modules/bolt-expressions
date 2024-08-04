@@ -105,15 +105,22 @@ def format_type(t: Any, *, __refs: list[Any] | None = None) -> str:
 
     return format_name(t)
 
-
 def convert_tag(value: Any) -> NbtValue | None:
     match value:
         case Byte() | Short() | Int() | Float() | Double() | String() | List() | Array() | Compound():
             return value
         case list():
-            return List([convert_tag(x) for x in value])  # type: ignore
+            value = cast(list[Any], value)
+            elements = [convert_tag(v) for v in value]
+            if any(el is None for el in elements):
+                return None
+            return List(elements)
         case dict(dict_value):  # type: ignore
-            return Compound({key: convert_tag(value) for key, value in value.items()})  # type: ignore
+            dict_value = cast(dict[str, Any], dict_value)
+            items = [(key, convert_tag(value)) for key, value in dict_value.items()]
+            if any(value is None for _, value in items):
+                return None
+            return Compound(items)  # type: ignore
         case bool():
             return Byte(value)
         case float():
@@ -323,6 +330,31 @@ def access_type_by_path(
 class A(TypedDict):
     a: str
     b: int
+
+
+def infer_dict(value: dict[str, NbtValue]) -> NbtType | None:
+    return convert_type({key: infer_type(val) for key, val in value.items()})
+
+
+def infer_list(value: list[NbtValue]) -> NbtType:
+    if not len(value):
+        return list[Any]
+
+    options = tuple(infer_type(element) for element in value)
+
+    return list[Union[options]]  # type: ignore
+
+
+def infer_type(value: Any) -> NbtType | None:
+    if isinstance(value, dict):
+        value = cast(dict[str, Any], value)
+        return infer_dict(value)
+
+    if isinstance(value, list):
+        value = cast(list[Any], value)
+        return infer_list(value)
+
+    return convert_type(type(value))
 
 
 def access_typeddict(
