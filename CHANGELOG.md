@@ -2,6 +2,20 @@
 
 <!--next-version-placeholder-->
 
+## v0.17.0 (2024-08-10)
+
+### Feature
+
+* Make Data.cast lazy ([`4d4e739`](https://github.com/rx-modules/bolt-expressions/commit/4d4e739e64c1542f62f5cb3350717913beb35fa4))
+* Add composite literals ([`ae424a1`](https://github.com/rx-modules/bolt-expressions/commit/ae424a157322090ecd244065e554ef4c83e43dee))
+
+### Fix
+
+* Contrib.commands failed to parse data sources with empty path ([`3663d96`](https://github.com/rx-modules/bolt-expressions/commit/3663d9613e9cc4f5ad9b145859c82de332d47f06))
+* Make nbt_type argument of Data.cast optional ([`beca595`](https://github.com/rx-modules/bolt-expressions/commit/beca595b0c37a9d7c427b3fe22160fd86e640baa))
+* Type checking failing for expandable compound types ([`3b8c57e`](https://github.com/rx-modules/bolt-expressions/commit/3b8c57edd4a6a444109f89acbc01d2862e224e84))
+* Improve source reuse optimization ([`6f1aef7`](https://github.com/rx-modules/bolt-expressions/commit/6f1aef79f6356015b7f20edabdb60fa0d6c542a3))
+
 ## v0.16.1 (2024-06-23)
 
 ### Fix
