@@ -21,3 +21,4 @@ scoreboard players operation $i0 bolt.expr.temp = $delta obj.temp
 scoreboard players add $i0 bolt.expr.temp 10
 execute store result score $i1 bolt.expr.temp run data get storage example:main value 1
 execute store result storage example:main value int 1 run scoreboard players operation $i0 bolt.expr.temp += $i1 bolt.expr.temp
+function test:main/nested_macro_0 with storage example:main

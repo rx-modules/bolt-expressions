@@ -60,3 +60,6 @@ macro add source1=bolt_expressions:source source2=bolt:expression:
 
 add temp["$foo"] 10
 add strg.value temp["$delta"] + 10
+
+with var strg:
+    say $(value)

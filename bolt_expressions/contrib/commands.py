@@ -259,6 +259,9 @@ class SourceTransformer(MutatingReducer):
                     arg_parent, parser if ":" in parser else f"minecraft:{parser}"
                 )
 
+                if not value:
+                    continue
+                
                 arg_ast = self.mc.parse(
                     value, using=parser, provide={"properties": arg_node.properties}
                 )
