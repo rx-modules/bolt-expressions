@@ -26,7 +26,7 @@ python = ">=3.10,<4.0"
 beet = ">=0.55.0"
 mecha = ">=0.59.2"
 nbtlib = "1.12.1"
-bolt = ">=0.17.7"
+bolt = ">=0.38"
 frozendict = "^2.4.0"
 bolt-control-flow = ">=0.2.0"
 
