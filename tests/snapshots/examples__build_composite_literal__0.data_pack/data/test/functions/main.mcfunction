@@ -31,3 +31,21 @@ execute store result storage bolt.expr:temp 2384k242hd495_34.x int 1 run scorebo
 execute store result storage bolt.expr:temp 2384k242hd495_34.y int 1 run scoreboard players get $y obj.main
 execute store result storage bolt.expr:temp 2384k242hd495_34.z int 1 run scoreboard players get $z obj.main
 function test:main/nested_macro_0 with storage bolt.expr:temp 2384k242hd495_34
+say ---
+data modify storage name:path config set value {pack_name: "", version: [], data: {flag0: 0b, flag1: 0b}}
+data modify storage name:path config.version set value [0s, 0s, 0s]
+execute store result storage name:path config.version[0] short 1 run scoreboard players get $major obj.main
+execute store result storage name:path config.version[1] short 1 run scoreboard players get $minor obj.main
+execute store result storage name:path config.version[2] short 1 run scoreboard players get $patch obj.main
+execute store result storage name:path config.data.flag0 byte 1 run scoreboard players get $flag0 obj.main
+execute store result storage name:path config.data.flag1 byte 1 run scoreboard players get $flag1 obj.main
+data modify storage name:path config.pack_name set from storage name:path pack_name
+data modify storage bolt.expr:temp i0 set value {id: "", Count: 0b}
+data modify storage bolt.expr:temp i0.id set from storage name:path selected_item
+execute store result storage bolt.expr:temp i0.Count byte 1 run scoreboard players get $count obj.main
+data modify storage name:path items append from storage bolt.expr:temp i0
+data modify storage bolt.expr:temp 2384k242hd495_43 set value {x: 0, y: 0, z: 0}
+execute store result storage bolt.expr:temp 2384k242hd495_43.x int 1 run scoreboard players get $x obj.main
+execute store result storage bolt.expr:temp 2384k242hd495_43.y int 1 run scoreboard players get $y obj.main
+execute store result storage bolt.expr:temp 2384k242hd495_43.z int 1 run scoreboard players get $z obj.main
+function test:main/nested_macro_1 with storage bolt.expr:temp 2384k242hd495_43
