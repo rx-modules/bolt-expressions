@@ -105,6 +105,7 @@ def format_type(t: Any, *, __refs: list[Any] | None = None) -> str:
 
     return format_name(t)
 
+
 def convert_tag(value: Any) -> NbtValue | None:
     match value:
         case Byte() | Short() | Int() | Float() | Double() | String() | List() | Array() | Compound():
@@ -349,14 +350,14 @@ def infer_type(value: Any, shallow: bool = False) -> NbtType | None:
     if isinstance(value, dict):
         if shallow:
             return dict[str, Any]
-            
+
         value = cast(dict[str, Any], value)
         return infer_dict(value)
 
     if isinstance(value, list):
         if shallow:
             return list[Any]
-        
+
         value = cast(list[Any], value)
         return infer_list(value)
 

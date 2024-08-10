@@ -257,11 +257,9 @@ class Expression:
                 convert_data_order_operation, opt=self.optimizer
             ),
             discard_casting=discard_casting,
-
             # features
             data_set_scaling=partial(data_set_scaling, opt=self.optimizer),
             data_get_scaling=data_get_scaling,
-
             # cleanup
             multiply_divide_by_fraction=multiply_divide_by_fraction,
             multiply_divide_by_one_removal=multiply_divide_by_one_removal,
@@ -277,11 +275,9 @@ class Expression:
             convert_defined_boolean_condition=partial(
                 convert_defined_boolean_condition, opt=self.optimizer
             ),
-
             # typing
             type_caster=self.type_caster,
             type_checker=self.type_checker,
-
             # post type-checking cleanup
             discard_non_numerical_casting=discard_non_numerical_casting,
             source_copy_elision_post=partial(source_copy_elision, opt=self.optimizer),
@@ -289,7 +285,6 @@ class Expression:
             set_and_get_cleanup=set_and_get_cleanup,
             store_result_inlining=store_result_inlining,
             deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
-
             init_score_boolean_result=init_score_boolean_result,
             rename_temp_scores=partial(rename_temp_scores, self.optimizer),
         )

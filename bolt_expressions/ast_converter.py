@@ -4,7 +4,12 @@ from mecha import AstChildren, AstCommand, Mecha, Visitor, rule, AstRoot
 from mecha.utils import number_to_string
 from nbtlib import Byte, Short, Int, Long, Float, Double  # type: ignore
 
-from .typing import NBT_TYPE_STRING, NbtTypeString, NumericNbtValue, unwrap_optional_type
+from .typing import (
+    NBT_TYPE_STRING,
+    NbtTypeString,
+    NumericNbtValue,
+    unwrap_optional_type,
+)
 from .utils import insert_nested_commands, type_name
 
 from .optimizer import (
@@ -412,7 +417,7 @@ class AstConverter(Visitor):
 
     def serialize_nbt_type(self, value: Any) -> NbtTypeString:
         value = unwrap_optional_type(value)
-        
+
         if isinstance(value, str) and value in NBT_TYPE_STRING:
             return value
 

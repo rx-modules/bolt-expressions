@@ -261,7 +261,7 @@ class SourceTransformer(MutatingReducer):
 
                 if not value:
                     continue
-                
+
                 arg_ast = self.mc.parse(
                     value, using=parser, provide={"properties": arg_node.properties}
                 )

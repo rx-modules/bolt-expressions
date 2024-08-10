@@ -36,7 +36,7 @@ from nbtlib import (  # type:ignore
     NamedKey,
     CompoundMatch,
     List,
-    ListIndex
+    ListIndex,
 )
 
 from .typing import (
@@ -141,7 +141,7 @@ class IrData(IrSource):
 
     def to_tuple(self) -> "DataTuple":
         return DataTuple(self.type, self.target, self.path)
-    
+
 
 @dataclass(frozen=True, kw_only=True)
 class IrDataString(IrData):
@@ -160,7 +160,7 @@ class IrDataString(IrData):
 
         return (start, end)
 
-    def to_tuple(self) -> "StringDataTuple": # type: ignore
+    def to_tuple(self) -> "StringDataTuple":  # type: ignore
         return StringDataTuple(self.type, self.target, self.path, self.normalized_range)
 
 
@@ -168,11 +168,13 @@ class IrDataString(IrData):
 class IrLiteral(IrNode):
     value: NbtValue
 
+
 CompositeNbtValue = Union[
     NbtValue,
     list[Union["CompositeNbtValue", IrSource]],
     dict[str, Union["CompositeNbtValue", IrSource]],
 ]
+
 
 @dataclass(frozen=True, kw_only=True)
 class IrCompositeLiteral(IrNode):
@@ -678,15 +680,14 @@ def get_data_source_parents(node: IrData) -> tuple[IrData, ...]:
     path = cast(tuple[Accessor, ...], tuple(node.path))
 
     return tuple(
-        replace(
-            node,
-            path=Path.from_accessors(path[:i]) # type: ignore
-        )
+        replace(node, path=Path.from_accessors(path[:i]))  # type: ignore
         for i in range(len(path), 0, -1)
     )
 
 
-def replace_source(value: IrSource, replace_map: dict[SourceTuple, IrSource]) -> IrSource:
+def replace_source(
+    value: IrSource, replace_map: dict[SourceTuple, IrSource]
+) -> IrSource:
     if isinstance(value, IrData):
         value_path = cast(tuple[Accessor, ...], tuple(value.path))
 
@@ -699,18 +700,18 @@ def replace_source(value: IrSource, replace_map: dict[SourceTuple, IrSource]) ->
             while new_node := replace_map.get(node.to_tuple()):
                 node = cast(IrData, new_node)
                 replaced = True
-            
+
             if replaced:
                 path = cast(
                     tuple[Accessor, ...],
-                    tuple(node.path) + value_path[len(parent_node.path):]
+                    tuple(node.path) + value_path[len(parent_node.path) :],
                 )
                 return replace(
                     node,
-                    path=Path.from_accessors(path), # type: ignore
-                    nbt_type=value.nbt_type
+                    path=Path.from_accessors(path),  # type: ignore
+                    nbt_type=value.nbt_type,
                 )
-        
+
         return value
 
     while new_node := replace_map.get(value.to_tuple()):
@@ -732,7 +733,9 @@ def map_node_sources(node: Any, func: Callable[[IrSource], IrSource]) -> Any:
                 children=IrChildren(map_node_sources(ch, func) for ch in node.children),
             )
         if is_unary(node):
-            return replace(node, store=store, target=map_node_sources(node.target, func))
+            return replace(
+                node, store=store, target=map_node_sources(node.target, func)
+            )
         if is_binary(node):
             return replace(
                 node,
@@ -756,8 +759,10 @@ def map_node_sources(node: Any, func: Callable[[IrSource], IrSource]) -> Any:
 
     return node
 
+
 def path_accessors(path: Path) -> tuple[Accessor, ...]:
     return cast(tuple[Accessor, ...], tuple(path))
+
 
 def is_path_child_of(child: Path, parent: Path) -> bool:
     child_accessors = [
@@ -773,16 +778,18 @@ def is_path_child_of(child: Path, parent: Path) -> bool:
     for child_accessor, parent_accessor in zip(child_accessors, parent_accessors):
         if child_accessor != parent_accessor:
             return False
-    
+
     return True
+
 
 def get_parent_paths(path: Path) -> Iterable[Path]:
     accessors = path_accessors(path)
 
     return tuple(
-        Path.from_accessors(accessors[:i]) # type: ignore
+        Path.from_accessors(accessors[:i])  # type: ignore
         for i in range(len(accessors) - 1, 0, -1)
     )
+
 
 def get_source_definitions(
     nodes: Iterable[IrOperation],
@@ -795,10 +802,10 @@ def get_source_definitions(
         for target in node.targets:
             defs = direct_definitions.setdefault(target.to_tuple(), [])
             defs.append(i)
-    
+
     if ignore_parent and ignore_children:
         return direct_definitions
-    
+
     definitions = {source: list(defs) for source, defs in direct_definitions.items()}
 
     if not ignore_children:
@@ -813,7 +820,7 @@ def get_source_definitions(
                 parent_defs.extend(
                     i for i in definitions[source] if i not in parent_defs
                 )
-    
+
     if not ignore_parent:
         # modifying parent path implies in modifying child paths
         for parent_source, parent_defs in direct_definitions.items():
@@ -821,14 +828,17 @@ def get_source_definitions(
                 continue
 
             children_sources = [
-                source for source in direct_definitions
+                source
+                for source in direct_definitions
                 if isinstance(source, DataTuple)
                 and is_path_child_of(source.path, parent_source.path)
             ]
             for source in children_sources:
-                definitions[source].extend(i for i in parent_defs if i not in definitions[source])
+                definitions[source].extend(
+                    i for i in parent_defs if i not in definitions[source]
+                )
 
-    return definitions        
+    return definitions
 
 
 def get_reaching_definition(
@@ -858,6 +868,7 @@ def get_node_operand_dependencies(node: IrNode) -> tuple[IrSource, ...]:
 
     return tuple(result)
 
+
 def get_node_target_dependencies(node: IrOperation) -> set[SourceTuple]:
     dependencies: set[SourceTuple] = set()
 
@@ -867,8 +878,9 @@ def get_node_target_dependencies(node: IrOperation) -> set[SourceTuple]:
                 DataTuple(target.type, target.target, path)
                 for path in get_parent_paths(target.path)
             )
-    
+
     return dependencies
+
 
 def get_node_dependencies(node: IrOperation) -> set[SourceTuple]:
     dependencies = set(
@@ -878,6 +890,7 @@ def get_node_dependencies(node: IrOperation) -> set[SourceTuple]:
 
 
 DependencyGraph = tuple[dict[SourceTuple, set[int]], ...]
+
 
 def get_dependency_graph(nodes: Iterable[IrOperation]) -> DependencyGraph:
     nodes = tuple(nodes)
@@ -895,11 +908,11 @@ def get_dependency_graph(nodes: Iterable[IrOperation]) -> DependencyGraph:
             def_i = node_i
 
             while True:
-                def_i = get_reaching_definition(defs, source_tuple,  def_i)
+                def_i = get_reaching_definition(defs, source_tuple, def_i)
 
                 if def_i is None:
                     break
-                
+
                 dependency_set.add(def_i)
                 def_node_dependencies = get_node_dependencies(nodes[def_i])
 
@@ -920,13 +933,13 @@ def get_dependency_graph(nodes: Iterable[IrOperation]) -> DependencyGraph:
                 if source_tuple not in def_node_dependencies:
                     break
 
-                def_i = get_reaching_definition(defs, source_tuple,  def_i)
+                def_i = get_reaching_definition(defs, source_tuple, def_i)
 
                 if def_i is None:
                     break
-                
+
         result.append(dependencies)
-    
+
     return tuple(result)
 
 
@@ -934,14 +947,14 @@ Location = tuple[int, ...]
 
 
 def get_source_usage(nodes: Iterable[IrOperation]) -> dict[SourceTuple, set[int]]:
-    nodes = tuple(nodes)    
+    nodes = tuple(nodes)
     usage: dict[SourceTuple, set[int]] = {}
 
     for i, node in enumerate(nodes):
         for source in get_node_operand_dependencies(node):
             uses = usage.setdefault(source.to_tuple(), set())
             uses.add(i)
-        
+
         if isinstance(node, IrBranch):
             inner_usage = get_source_usage(node.children)
 
@@ -949,7 +962,7 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[SourceTuple, set[int]
                 if inner_uses:
                     uses = usage.setdefault(source, set())
                     uses.add(i)
-            
+
     for node in nodes:
         for target in (*node.targets, *node.operands):
             if not isinstance(target, IrSource):
@@ -959,7 +972,7 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[SourceTuple, set[int]
 
             if not isinstance(target, IrData):
                 continue
-            
+
             for path in get_parent_paths(target.path):
                 parent = DataTuple(target.type, target.target, path)
 
@@ -970,14 +983,16 @@ def get_source_usage(nodes: Iterable[IrOperation]) -> dict[SourceTuple, set[int]
         for source in get_node_target_dependencies(node):
             if uses := usage.get(source):
                 uses.add(i)
-        
+
     return usage
 
 
-def get_source_usage_of_parent(usage: dict[SourceTuple, set[int]], parent: SourceTuple) -> set[int]:
+def get_source_usage_of_parent(
+    usage: dict[SourceTuple, set[int]], parent: SourceTuple
+) -> set[int]:
     if not isinstance(parent, (DataTuple, StringDataTuple)):
         return usage.get(parent, set())
-    
+
     uses: set[int] = set()
 
     for source in usage:
@@ -989,7 +1004,7 @@ def get_source_usage_of_parent(usage: dict[SourceTuple, set[int]], parent: Sourc
 
         source_uses = usage.get(source, set())
         uses.update(source_uses)
-    
+
     return uses
 
 
@@ -1314,7 +1329,10 @@ def discard_casting(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
         else:
             yield node
 
-def discard_non_numerical_casting(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
+
+def discard_non_numerical_casting(
+    nodes: Iterable[IrOperation],
+) -> Iterable[IrOperation]:
     for node in nodes:
         if (
             isinstance(node, IrCast)
@@ -1426,10 +1444,8 @@ def set_and_get_cleanup(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
 
             operands[-1] = def_node.right
 
-        operations.append(
-            replace_operation(node, operands=operands)
-        )
-    
+        operations.append(replace_operation(node, operands=operands))
+
     yield from convert_cast(operations)
 
 
@@ -1466,7 +1482,7 @@ def rename_temp_scores(
 
             if not opt.is_temp(node):
                 return node
-            
+
             node_tuple = node.to_tuple()
 
             if isinstance(node, IrScore):
@@ -1837,10 +1853,7 @@ def store_result_inlining(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]
 
         source_def_i = get_reaching_definition(defs, node.right.to_tuple(), i)
 
-        if (
-            source_def_i is None
-            or source_def_i != (i - 1)
-        ):
+        if source_def_i is None or source_def_i != (i - 1):
             continue
 
         def_node = nodes[source_def_i]
@@ -1871,16 +1884,16 @@ def get_default_value(type: NbtType) -> NbtValue:
 
     if is_numeric_type(type):
         return type(0)
-    
+
     if is_string_type(type):
         return String("")
-    
+
     if is_list_type(type):
         return List([])
 
     if is_array_type(type):
         return type([])
-    
+
     if is_compound_type(type):
         return Compound({})
 
@@ -1893,7 +1906,7 @@ def traverse_composite_literal(
     type: NbtType,
     ctx: Context,
     operations: list[IrOperation],
-) -> NbtValue:    
+) -> NbtValue:
     literal: Any
 
     if isinstance(value, dict):
@@ -1916,7 +1929,9 @@ def traverse_composite_literal(
                 )
                 nbt_val = get_default_value(cast_type)
             else:
-                nbt_val = traverse_composite_literal(val, val_result, type, ctx, operations)
+                nbt_val = traverse_composite_literal(
+                    val, val_result, type, ctx, operations
+                )
 
             literal[key] = nbt_val
 
@@ -1933,7 +1948,7 @@ def traverse_composite_literal(
 
             if literals:
                 cast_type = infer_type(literals[0], shallow=True)
-            
+
             if cast_type in (None, Any):
                 data_source_types = [
                     el.nbt_type
@@ -1941,7 +1956,7 @@ def traverse_composite_literal(
                     if isinstance(el, IrData) and el.nbt_type is not Any
                 ]
                 cast_type = data_source_types[0] if data_source_types else Int
-                
+
         for i, val in enumerate(value):
             val_result = replace(result, path=result.path[i])
 
@@ -1951,23 +1966,29 @@ def traverse_composite_literal(
                 )
                 nbt_val = get_default_value(cast_type)
             else:
-                nbt_val = traverse_composite_literal(val, val_result, type, ctx, operations)
+                nbt_val = traverse_composite_literal(
+                    val, val_result, type, ctx, operations
+                )
 
             literal.append(nbt_val)
     else:
         literal = value
-    
+
     nbt = convert_tag(literal)
 
     if nbt is None:
         raise ValueError("Invalid nbt.")
-    
+
     return nbt
 
 
-def composite_literal_expansion(nodes: Iterable[IrOperation], opt: Optimizer, ctx: Context) -> Iterable[IrOperation]:
+def composite_literal_expansion(
+    nodes: Iterable[IrOperation], opt: Optimizer, ctx: Context
+) -> Iterable[IrOperation]:
     for node in nodes:
-        if not any(isinstance(operand, IrCompositeLiteral) for operand in node.operands):
+        if not any(
+            isinstance(operand, IrCompositeLiteral) for operand in node.operands
+        ):
             yield node
             continue
 
@@ -1979,18 +2000,23 @@ def composite_literal_expansion(nodes: Iterable[IrOperation], opt: Optimizer, ct
 
                 if isinstance(node, IrCast):
                     type = node.cast_type
-                elif (
-                    is_binary(node, ("append", "prepend", "insert"))
-                    and isinstance(node.left, IrData)
+                elif is_binary(node, ("append", "prepend", "insert")) and isinstance(
+                    node.left, IrData
                 ):
-                    type = access_type_by_path(node.left.nbt_type, (ListIndex(0),)) or Any
+                    type = (
+                        access_type_by_path(node.left.nbt_type, (ListIndex(0),)) or Any
+                    )
                 else:
                     type = Any
 
                 operations: list[IrOperation] = []
-                nbt_value = traverse_composite_literal(operand.value, result, type, ctx, operations)
+                nbt_value = traverse_composite_literal(
+                    operand.value, result, type, ctx, operations
+                )
 
-                yield IrCast(left=result, right=IrLiteral(value=nbt_value), cast_type=type)
+                yield IrCast(
+                    left=result, right=IrLiteral(value=nbt_value), cast_type=type
+                )
                 yield from operations
 
                 operand = result
@@ -2000,7 +2026,9 @@ def composite_literal_expansion(nodes: Iterable[IrOperation], opt: Optimizer, ct
         yield replace_operation(node, operands)
 
 
-def source_copy_elision(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+def source_copy_elision(
+    nodes: Iterable[IrOperation], opt: Optimizer
+) -> Iterable[IrOperation]:
     nodes = list(nodes)
     active = True
 
@@ -2024,7 +2052,9 @@ def source_copy_elision(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterabl
             target_source = node.left
             source = node.right.to_tuple()
 
-            if any(use_i > node_i for use_i in get_source_usage_of_parent(usage, source)):
+            if any(
+                use_i > node_i for use_i in get_source_usage_of_parent(usage, source)
+            ):
                 continue
 
             node_dependencies = dependency[node_i]
@@ -2032,7 +2062,7 @@ def source_copy_elision(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterabl
 
             if not deps:
                 continue
-            
+
             if any(
                 deps[0] < target_use_i < node_i
                 for target_use_i in get_source_usage_of_parent(usage, target)
@@ -2047,7 +2077,9 @@ def source_copy_elision(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterabl
             if conflicting_defs:
                 def_i = conflicting_defs[0]
 
-                def_deps = tuple(s for source_deps in dependency[def_i].values() for s in source_deps)
+                def_deps = tuple(
+                    s for source_deps in dependency[def_i].values() for s in source_deps
+                )
                 if any(deps[0] < dep_i for dep_i in def_deps):
                     continue
 
@@ -2059,13 +2091,12 @@ def source_copy_elision(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterabl
 
             for i in deps:
                 nodes[i] = map_node_sources(
-                    nodes[i],
-                    lambda s: replace_source(s, {source: target_source})
+                    nodes[i], lambda s: replace_source(s, {source: target_source})
                 )
 
             nodes.pop(node_i)
-            
+
             active = True
             break
-    
+
     return nodes
