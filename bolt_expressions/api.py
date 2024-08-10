@@ -159,7 +159,7 @@ class Data:
         target_type, target, path = self.expr.temp_data()
         return DataSource(target_type, target, path, ctx=self.expr)[type]
 
-    def cast(self, value: Any, nbt_type: NbtType | str):
+    def cast(self, value: Any, nbt_type: Any = Any):
         if isinstance(nbt_type, str):
             nbt_type = literal_types[nbt_type]
 
