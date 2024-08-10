@@ -156,7 +156,7 @@ def check_expandable_compound_type(
 
     child_type = access_type(write, NamedKey(""))
 
-    if is_alias(read, Compound):
+    if is_alias(read, dict):
         read_child_type = access_type(read, NamedKey(""))
 
         try:
