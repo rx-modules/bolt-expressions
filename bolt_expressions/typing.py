@@ -345,12 +345,18 @@ def infer_list(value: list[NbtValue]) -> NbtType:
     return list[Union[options]]  # type: ignore
 
 
-def infer_type(value: Any) -> NbtType | None:
+def infer_type(value: Any, shallow: bool = False) -> NbtType | None:
     if isinstance(value, dict):
+        if shallow:
+            return dict[str, Any]
+            
         value = cast(dict[str, Any], value)
         return infer_dict(value)
 
     if isinstance(value, list):
+        if shallow:
+            return list[Any]
+        
         value = cast(list[Any], value)
         return infer_list(value)
 

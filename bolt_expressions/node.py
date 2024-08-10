@@ -52,11 +52,11 @@ from .optimizer import (
     multiply_divide_by_fraction,
     multiply_divide_by_one_removal,
     noncommutative_set_collapsing,
-    apply_temp_source_reuse,
     boolean_condition_propagation,
     rename_temp_scores,
     set_and_get_cleanup,
     set_to_self_removal,
+    source_copy_elision,
     store_set_data_compare,
     store_result_inlining,
 )
@@ -257,9 +257,6 @@ class Expression:
                 convert_data_order_operation, opt=self.optimizer
             ),
             discard_casting=discard_casting,
-            init_score_boolean_result=init_score_boolean_result,
-            apply_temp_source_reuse=partial(apply_temp_source_reuse, self.optimizer),
-            set_to_self_removal=set_to_self_removal,
 
             # features
             data_set_scaling=partial(data_set_scaling, opt=self.optimizer),
@@ -269,11 +266,8 @@ class Expression:
             multiply_divide_by_fraction=multiply_divide_by_fraction,
             multiply_divide_by_one_removal=multiply_divide_by_one_removal,
             add_subtract_by_zero_removal=add_subtract_by_zero_removal,
-            set_to_self_removal_post=set_to_self_removal,
-            set_and_get_cleanup=set_and_get_cleanup,
             noncommutative_set_collapsing=noncommutative_set_collapsing,
             commutative_set_collapsing=commutative_set_collapsing,
-            store_result_inlining=store_result_inlining,
             data_string_propagation=data_string_propagation,
             literal_to_constant_replacement=partial(
                 literal_to_constant_replacement, self.optimizer
@@ -283,7 +277,6 @@ class Expression:
             convert_defined_boolean_condition=partial(
                 convert_defined_boolean_condition, opt=self.optimizer
             ),
-            deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
 
             # typing
             type_caster=self.type_caster,
@@ -291,10 +284,14 @@ class Expression:
 
             # post type-checking cleanup
             discard_non_numerical_casting=discard_non_numerical_casting,
-            apply_temp_source_reuse2=partial(apply_temp_source_reuse, self.optimizer),
-            set_to_self_removal2=set_to_self_removal,
-            rename_temp_scores=partial(rename_temp_scores, self.optimizer),
+            source_copy_elision_post=partial(source_copy_elision, opt=self.optimizer),
+            set_to_self_removal=set_to_self_removal,
+            set_and_get_cleanup=set_and_get_cleanup,
+            store_result_inlining=store_result_inlining,
+            deadcode_elimination=partial(deadcode_elimination, opt=self.optimizer),
 
+            init_score_boolean_result=init_score_boolean_result,
+            rename_temp_scores=partial(rename_temp_scores, self.optimizer),
         )
 
         self.ast_converter = AstConverter(

@@ -5,10 +5,9 @@ execute store success score $r obj if score $a obj matches -2147483648.. unless 
 execute store success score $r obj if score $a obj matches 0
 execute store success score $r obj unless score $a obj matches 0
 execute store success score $r obj if score $a obj = $b obj
-scoreboard players set $i0 bolt.expr.temp 0
-execute store success score $i0 bolt.expr.temp unless score $r obj matches ..-1 unless score $r obj matches 1..
-scoreboard players add $i0 bolt.expr.temp 1
-scoreboard players operation $r obj = $i0 bolt.expr.temp
+scoreboard players set $r obj 0
+execute store success score $r obj unless score $r obj matches ..-1 unless score $r obj matches 1..
+scoreboard players add $r obj 1
 say "a > b > c"
 say using addition
 execute store success score $i0 bolt.expr.temp if score $a obj > $b obj

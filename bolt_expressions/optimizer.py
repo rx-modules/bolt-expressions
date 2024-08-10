@@ -68,7 +68,6 @@ __all__ = [
     "data_set_scaling",
     "data_get_scaling",
     "multiply_divide_by_fraction",
-    "apply_temp_source_reuse",
     "multiply_divide_by_one_removal",
     "add_subtract_by_zero_removal",
     "set_to_self_removal",
@@ -142,7 +141,7 @@ class IrData(IrSource):
 
     def to_tuple(self) -> "DataTuple":
         return DataTuple(self.type, self.target, self.path)
-
+    
 
 @dataclass(frozen=True, kw_only=True)
 class IrDataString(IrData):
@@ -160,6 +159,9 @@ class IrDataString(IrData):
             start = 0
 
         return (start, end)
+
+    def to_tuple(self) -> "StringDataTuple": # type: ignore
+        return StringDataTuple(self.type, self.target, self.path, self.normalized_range)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -464,7 +466,14 @@ class DataTuple(NamedTuple):
     path: Path
 
 
-SourceTuple = ScoreTuple | DataTuple
+class StringDataTuple(NamedTuple):
+    type: DataTargetType
+    target: str
+    path: Path
+    range: tuple[int, int | None]
+
+
+SourceTuple = ScoreTuple | DataTuple | StringDataTuple
 
 
 @dataclass
@@ -663,6 +672,363 @@ class Optimizer:
             self.add_temp(source)
 
         return IrData(type=source.type, target=source.target, path=source.path)
+
+
+def get_data_source_parents(node: IrData) -> tuple[IrData, ...]:
+    path = cast(tuple[Accessor, ...], tuple(node.path))
+
+    return tuple(
+        replace(
+            node,
+            path=Path.from_accessors(path[:i]) # type: ignore
+        )
+        for i in range(len(path), 0, -1)
+    )
+
+
+def replace_source(value: IrSource, replace_map: dict[SourceTuple, IrSource]) -> IrSource:
+    if isinstance(value, IrData):
+        value_path = cast(tuple[Accessor, ...], tuple(value.path))
+
+        nodes = get_data_source_parents(value)
+
+        for parent_node in nodes:
+            replaced = False
+            node = parent_node
+
+            while new_node := replace_map.get(node.to_tuple()):
+                node = cast(IrData, new_node)
+                replaced = True
+            
+            if replaced:
+                path = cast(
+                    tuple[Accessor, ...],
+                    tuple(node.path) + value_path[len(parent_node.path):]
+                )
+                return replace(
+                    node,
+                    path=Path.from_accessors(path), # type: ignore
+                    nbt_type=value.nbt_type
+                )
+        
+        return value
+
+    while new_node := replace_map.get(value.to_tuple()):
+        value = new_node
+
+    return value
+
+
+def map_node_sources(node: Any, func: Callable[[IrSource], IrSource]) -> Any:
+    if is_op(node):
+        store = IrChildren(
+            replace(s, value=map_node_sources(s.value, func)) for s in node.store
+        )
+        if isinstance(node, IrBranch):
+            return replace(
+                node,
+                target=map_node_sources(node.target, func),
+                store=store,
+                children=IrChildren(map_node_sources(ch, func) for ch in node.children),
+            )
+        if is_unary(node):
+            return replace(node, store=store, target=map_node_sources(node.target, func))
+        if is_binary(node):
+            return replace(
+                node,
+                store=store,
+                left=map_node_sources(node.left, func),
+                right=map_node_sources(node.right, func),
+            )
+
+    if isinstance(node, IrUnaryCondition):
+        return replace(node, target=map_node_sources(node.target, func))
+
+    if isinstance(node, IrBinaryCondition):
+        return replace(
+            node,
+            left=map_node_sources(node.left, func),
+            right=map_node_sources(node.right, func),
+        )
+
+    if isinstance(node, IrSource):
+        return func(node)
+
+    return node
+
+def path_accessors(path: Path) -> tuple[Accessor, ...]:
+    return cast(tuple[Accessor, ...], tuple(path))
+
+def is_path_child_of(child: Path, parent: Path) -> bool:
+    child_accessors = [
+        ac for ac in path_accessors(child) if not isinstance(ac, CompoundMatch)
+    ]
+    parent_accessors = [
+        ac for ac in path_accessors(parent) if not isinstance(ac, CompoundMatch)
+    ]
+
+    if len(parent_accessors) > len(child_accessors):
+        return False
+
+    for child_accessor, parent_accessor in zip(child_accessors, parent_accessors):
+        if child_accessor != parent_accessor:
+            return False
+    
+    return True
+
+def get_parent_paths(path: Path) -> Iterable[Path]:
+    accessors = path_accessors(path)
+
+    return tuple(
+        Path.from_accessors(accessors[:i]) # type: ignore
+        for i in range(len(accessors) - 1, 0, -1)
+    )
+
+def get_source_definitions(
+    nodes: Iterable[IrOperation],
+    ignore_parent: bool = False,
+    ignore_children: bool = False,
+) -> dict[SourceTuple, list[int]]:
+    direct_definitions: dict[SourceTuple, list[int]] = {}
+
+    for i, node in enumerate(nodes):
+        for target in node.targets:
+            defs = direct_definitions.setdefault(target.to_tuple(), [])
+            defs.append(i)
+    
+    if ignore_parent and ignore_children:
+        return direct_definitions
+    
+    definitions = {source: list(defs) for source, defs in direct_definitions.items()}
+
+    if not ignore_children:
+        # modifying child path implies in modifying the parent path
+        for source in direct_definitions:
+            if not isinstance(source, (DataTuple, StringDataTuple)):
+                continue
+
+            for parent_path in get_parent_paths(source.path):
+                parent_source = DataTuple(source.type, source.target, parent_path)
+                parent_defs = definitions.setdefault(parent_source, [])
+                parent_defs.extend(
+                    i for i in definitions[source] if i not in parent_defs
+                )
+    
+    if not ignore_parent:
+        # modifying parent path implies in modifying child paths
+        for parent_source, parent_defs in direct_definitions.items():
+            if not isinstance(parent_source, DataTuple):
+                continue
+
+            children_sources = [
+                source for source in direct_definitions
+                if isinstance(source, DataTuple)
+                and is_path_child_of(source.path, parent_source.path)
+            ]
+            for source in children_sources:
+                definitions[source].extend(i for i in parent_defs if i not in definitions[source])
+
+    return definitions        
+
+
+def get_reaching_definition(
+    defs: dict[SourceTuple, list[int]], source: SourceTuple, i: int
+) -> int | None:
+    source_defs = defs.get(source)
+    if source_defs is None:
+        return None
+
+    value = bisect_left(source_defs, i) - 1
+    return source_defs[value] if value >= 0 else None
+
+
+def get_node_operand_dependencies(node: IrNode) -> tuple[IrSource, ...]:
+    result: list[IrSource] = []
+
+    if is_op(node):
+        for operand in node.operands:
+            result.extend(get_node_operand_dependencies(operand))
+    elif is_unary_condition(node):
+        result.extend(get_node_operand_dependencies(node.target))
+    elif is_binary_condition(node):
+        result.extend(get_node_operand_dependencies(node.left))
+        result.extend(get_node_operand_dependencies(node.right))
+    elif isinstance(node, IrSource):
+        result.append(node)
+
+    return tuple(result)
+
+def get_node_target_dependencies(node: IrOperation) -> set[SourceTuple]:
+    dependencies: set[SourceTuple] = set()
+
+    for target in node.targets:
+        if isinstance(target, IrData):
+            dependencies.update(
+                DataTuple(target.type, target.target, path)
+                for path in get_parent_paths(target.path)
+            )
+    
+    return dependencies
+
+def get_node_dependencies(node: IrOperation) -> set[SourceTuple]:
+    dependencies = set(
+        source.to_tuple() for source in get_node_operand_dependencies(node)
+    )
+    return dependencies | get_node_target_dependencies(node)
+
+
+DependencyGraph = tuple[dict[SourceTuple, set[int]], ...]
+
+def get_dependency_graph(nodes: Iterable[IrOperation]) -> DependencyGraph:
+    nodes = tuple(nodes)
+    result: list[dict[SourceTuple, set[int]]] = []
+
+    defs = get_source_definitions(nodes)
+    outward_defs = get_source_definitions(nodes, ignore_children=True)
+
+    for node_i, node in enumerate(nodes):
+        dependencies: dict[SourceTuple, set[int]] = {}
+
+        for source in get_node_operand_dependencies(node):
+            source_tuple = source.to_tuple()
+            dependency_set = dependencies.setdefault(source_tuple, set())
+            def_i = node_i
+
+            while True:
+                def_i = get_reaching_definition(defs, source_tuple,  def_i)
+
+                if def_i is None:
+                    break
+                
+                dependency_set.add(def_i)
+                def_node_dependencies = get_node_dependencies(nodes[def_i])
+
+                if source_tuple not in def_node_dependencies:
+                    break
+
+        for source_tuple in get_node_target_dependencies(node):
+            def_i = get_reaching_definition(outward_defs, source_tuple, node_i)
+            dependency_set = dependencies.setdefault(source_tuple, set())
+
+            if def_i is None:
+                continue
+
+            while True:
+                dependency_set.add(def_i)
+                def_node_dependencies = get_node_dependencies(nodes[def_i])
+
+                if source_tuple not in def_node_dependencies:
+                    break
+
+                def_i = get_reaching_definition(defs, source_tuple,  def_i)
+
+                if def_i is None:
+                    break
+                
+        result.append(dependencies)
+    
+    return tuple(result)
+
+
+Location = tuple[int, ...]
+
+
+def get_source_usage(nodes: Iterable[IrOperation]) -> dict[SourceTuple, set[int]]:
+    nodes = tuple(nodes)    
+    usage: dict[SourceTuple, set[int]] = {}
+
+    for i, node in enumerate(nodes):
+        for source in get_node_operand_dependencies(node):
+            uses = usage.setdefault(source.to_tuple(), set())
+            uses.add(i)
+        
+        if isinstance(node, IrBranch):
+            inner_usage = get_source_usage(node.children)
+
+            for source, inner_uses in inner_usage.items():
+                if inner_uses:
+                    uses = usage.setdefault(source, set())
+                    uses.add(i)
+            
+    for node in nodes:
+        for target in (*node.targets, *node.operands):
+            if not isinstance(target, IrSource):
+                continue
+
+            uses = usage.setdefault(target.to_tuple(), set())
+
+            if not isinstance(target, IrData):
+                continue
+            
+            for path in get_parent_paths(target.path):
+                parent = DataTuple(target.type, target.target, path)
+
+                if parent_uses := usage.get(parent):
+                    uses.update(parent_uses)
+
+    for i, node in enumerate(nodes):
+        for source in get_node_target_dependencies(node):
+            if uses := usage.get(source):
+                uses.add(i)
+        
+    return usage
+
+
+def get_source_usage_of_parent(usage: dict[SourceTuple, set[int]], parent: SourceTuple) -> set[int]:
+    if not isinstance(parent, (DataTuple, StringDataTuple)):
+        return usage.get(parent, set())
+    
+    uses: set[int] = set()
+
+    for source in usage:
+        if not isinstance(source, (DataTuple, StringDataTuple)):
+            continue
+
+        if not is_path_child_of(source.path, parent.path):
+            continue
+
+        source_uses = usage.get(source, set())
+        uses.update(source_uses)
+    
+    return uses
+
+
+def get_source_usage_old(nodes: Iterable[IrNode]) -> dict[SourceTuple, list[Location]]:
+    map: dict[SourceTuple, list[Location]] = {}
+
+    def add(source: Any, i: Location):
+        if isinstance(source, (IrSource, SourceTuple)):
+            if isinstance(source, IrSource):
+                source = source.to_tuple()
+
+            indexes = map.setdefault(source, [])
+            indexes.append(i)
+        elif isinstance(source, IrUnaryCondition):
+            add(source.target, i)
+        elif isinstance(source, IrBinaryCondition):
+            add(source.left, i)
+            add(source.right, i)
+
+    for i, node in enumerate(nodes):
+        if not is_op(node):
+            continue
+
+        for s in node.store:
+            add(s.value, (i,))
+
+        if is_binary(node) and node.store:
+            add(node.left, (i,))
+
+        for operand in node.operands:
+            add(operand, (i,))
+
+        if isinstance(node, IrBranch):
+            children_usage = get_source_usage_old(node.children)
+            for source, usage in children_usage.items():
+                for u in usage:
+                    add(source, (i, *u))
+
+    return map
 
 
 def data_insert_score(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
@@ -921,143 +1287,6 @@ def multiply_divide_by_fraction(nodes: Iterable[IrOperation]):
             yield node
 
 
-Location = tuple[int, ...]
-
-
-def get_source_usage(nodes: Iterable[IrNode]) -> dict[SourceTuple, list[Location]]:
-    map: dict[SourceTuple, list[Location]] = {}
-
-    def add(source: Any, i: Location):
-        if isinstance(source, (IrSource, SourceTuple)):
-            if isinstance(source, IrSource):
-                source = source.to_tuple()
-
-            indexes = map.setdefault(source, [])
-            indexes.append(i)
-        elif isinstance(source, IrUnaryCondition):
-            add(source.target, i)
-        elif isinstance(source, IrBinaryCondition):
-            add(source.left, i)
-            add(source.right, i)
-
-    for i, node in enumerate(nodes):
-        if not is_op(node):
-            continue
-
-        for s in node.store:
-            add(s.value, (i,))
-
-        if is_binary(node) and node.store:
-            add(node.left, (i,))
-
-        for operand in node.operands:
-            add(operand, (i,))
-
-        if isinstance(node, IrBranch):
-            children_usage = get_source_usage(node.children)
-            for source, usage in children_usage.items():
-                for u in usage:
-                    add(source, (i, *u))
-
-    return map
-
-
-def replace_source(value: IrSource, replace_map: dict[IrSource, IrSource]) -> IrSource:
-    if isinstance(value, IrData):
-        value_path = cast(tuple[Accessor, ...], tuple(value.path))
-
-        nodes = [
-            replace(
-                value,
-                path=Path.from_accessors(value_path[:i]) # type: ignore
-            )
-            for i in range(len(value_path), 0, -1)
-        ]
-
-        for parent_node in nodes:
-            replaced = False
-            node = parent_node
-
-            while new_node := replace_map.get(node):
-                node = cast(IrData, new_node)
-                replaced = True
-            
-            if replaced:
-                path = cast(
-                    tuple[Accessor, ...],
-                    tuple(node.path) + value_path[len(parent_node.path):]
-                )
-                return replace(
-                    node,
-                    path=Path.from_accessors(path), # type: ignore
-                    nbt_type=value.nbt_type
-                )
-        
-        return value
-
-    while new_node := replace_map.get(value):
-        value = new_node
-
-    return value
-
-
-def apply_temp_source_reuse(
-    opt: Optimizer, nodes: Iterable[IrOperation]
-) -> Iterable[IrOperation]:
-    all_nodes = list(nodes)
-
-    usage_map = get_source_usage(all_nodes)
-    replace_map: dict[IrSource, IrSource] = {}
-
-    def replace_operand(value: OperandType) -> OperandType:
-        if isinstance(value, IrOperation):
-            return replace_operation(
-                value,
-                operands=[replace_operand(operand) for operand in value.operands],
-                store=IrChildren(replace(s, value=replace_operand(s.value)) for s in value.store)
-            )
-        
-        if isinstance(value, IrSource):
-            return replace_source(value, replace_map)
-
-        return value
-
-    for i, node in enumerate(all_nodes):
-        if (
-            is_binary(node, "set")
-            and isinstance(node.right, IrSource)
-            and opt.is_temp(node.right)
-            and type(node.left) is type(node.right)
-        ):
-            left_usage = usage_map.get(node.left.to_tuple())
-            right_usage = usage_map.get(node.right.to_tuple())
-
-            if right_usage is None:
-                continue
-
-            if left_usage is None or left_usage[0] > (i,) and right_usage[-1] == (i,):
-                replace_map[node.right] = node.left
-
-    for node in all_nodes:
-        store = IrChildren(
-            replace(s, value=replace_operand(s.value)) for s in node.store
-        )
-
-        if is_unary(node):
-            yield replace(node, store=store, target=replace_operand(node.target))
-        elif is_binary(node):
-            yield replace(
-                node,
-                store=store,
-                left=replace_operand(node.left),
-                right=replace_operand(node.right)
-                if isinstance(node.right, IrSource)
-                else node.right,
-            )
-        else:
-            yield node
-
-
 def multiply_divide_by_one_removal(nodes: Iterable[IrOperation]):
     for node in nodes:
         if not (
@@ -1134,8 +1363,7 @@ def literal_to_constant_replacement(
             yield node
 
 
-@use_smart_generator
-def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]) -> Iterable[IrOperation]:
+def set_and_get_cleanup(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
     """
     Removes unnecessary temp vars possibly originated from previous
     optimizations.
@@ -1151,35 +1379,58 @@ def set_and_get_cleanup(nodes: SmartGenerator[IrOperation]) -> Iterable[IrOperat
     >>> temp.out = obj["$value"] / 100
     >>> temp.out = temp.value * 100 / 100
     """
-    for node in nodes:
-        next_node = next(nodes, None)
-        if (
-            is_binary(node, ("set", "cast"))
-            and is_binary(next_node, ("set", "cast"))
-            and node.left == next_node.right
-        ):
-            scale = 1
-            if isinstance(next_node, IrCast):
-                scale = next_node.scale
 
-            if isinstance(node, IrCast):
-                if node.cast_type is not Any and not isinstance(node.left, IrScore):
-                    nodes.push(next_node)
-                    yield node
-                    continue
+    nodes = tuple(nodes)
+    usage = get_source_usage(nodes)
+    definitions = get_source_definitions(nodes)
 
-                scale *= node.scale
+    operations: list[IrOperation] = []
 
-            if isinstance(next_node, IrCast):
-                out = replace(next_node, right=node.right, scale=scale)
-            else:
-                out = replace(next_node, right=node.right)
+    for node_i, node in enumerate(nodes):
+        operands: list[OperandType] = []
 
-            yield out
-            continue
+        for operand in node.operands:
+            operands.append(operand)
 
-        nodes.push(next_node)
-        yield node
+            if not isinstance(operand, IrSource):
+                continue
+
+            source = operand.to_tuple()
+            def_i = get_reaching_definition(definitions, source, node_i)
+
+            if def_i is None:
+                continue
+
+            def_node = nodes[def_i]
+
+            if (
+                not isinstance(def_node, (IrSet, IrCast))
+                or not isinstance(def_node.right, IrSource)
+                or def_node.left.to_tuple() != source
+                or operand in node.targets
+            ):
+                continue
+
+            if isinstance(def_node, IrCast) and (
+                def_node.scale != 1.0
+                or not isinstance(def_node.left, IrScore)
+                or not isinstance(node, (IrSet, IrCast))
+            ):
+                continue
+
+            if any(
+                def_i < use_i < node_i
+                for use_i in get_source_usage_of_parent(usage, source)
+            ):
+                continue
+
+            operands[-1] = def_node.right
+
+        operations.append(
+            replace_operation(node, operands=operands)
+        )
+    
+    yield from convert_cast(operations)
 
 
 def rename_temp_scores(
@@ -1190,10 +1441,10 @@ def rename_temp_scores(
 
     ignored_sources: set[IrSource] = set()
 
-    defs = get_source_definitions(nodes)
+    defs = get_source_definitions(nodes, ignore_parent=True, ignore_children=True)
     for i, node in enumerate(nodes):
-        for source in get_node_dependencies(node):
-            source_defs = defs.get(source, [])
+        for source in get_node_operand_dependencies(node):
+            source_defs = defs.get(source.to_tuple(), [])
 
             if not any(def_i < i for def_i in source_defs):
                 ignored_sources.add(source)
@@ -1202,105 +1453,34 @@ def rename_temp_scores(
         opt.temp_score.override(format=lambda n: f"$i{n}", reset=True),
         opt.temp_data.override(format=lambda n: f"i{n}", reset=True),
     ):
-        replace_map: dict[IrSource, IrSource] = {}
+        replace_map: dict[SourceTuple, IrSource] = {}
 
-        def replace_node(node: Any) -> Any:
-            if is_op(node):
-                store = IrChildren(
-                    replace(s, value=replace_node(s.value)) for s in node.store
-                )
-                if isinstance(node, IrBranch):
-                    return replace(
-                        node,
-                        target=replace_node(node.target),
-                        store=store,
-                        children=IrChildren(replace_node(ch) for ch in node.children),
-                    )
-                if is_unary(node):
-                    return replace(node, store=store, target=replace_node(node.target))
-                if is_binary(node):
-                    return replace(
-                        node,
-                        store=store,
-                        left=replace_node(node.left),
-                        right=replace_node(node.right),
-                    )
+        def map_source(node: IrSource) -> IrSource:
+            if node in ignored_sources:
+                return node
 
-            if isinstance(node, IrUnaryCondition):
-                return replace(node, target=replace_node(node.target))
+            replaced_node = replace_source(node, replace_map)
 
-            if isinstance(node, IrBinaryCondition):
-                return replace(
-                    node,
-                    left=replace_node(node.left),
-                    right=replace_node(node.right),
-                )
+            if replaced_node != node:
+                return replaced_node
 
-            if isinstance(node, IrSource):
-                if node in ignored_sources:
-                    return node
+            if not opt.is_temp(node):
+                return node
+            
+            node_tuple = node.to_tuple()
 
-                replaced_node = replace_source(node, replace_map)
+            if isinstance(node, IrScore):
+                replace_map[node_tuple] = opt.generate_score()
+            elif isinstance(node, IrData):
+                replace_map[node_tuple] = opt.generate_data()
+            else:
+                replace_map[node_tuple] = node
 
-                if replaced_node != node:
-                    return replaced_node
+            return replace_map[node_tuple]
 
-                if not opt.is_temp(node):
-                    return node
-
-                if isinstance(node, IrScore):
-                    replace_map[node] = opt.generate_score()
-                elif isinstance(node, IrData):
-                    replace_map[node] = opt.generate_data()
-                else:
-                    replace_map[node] = node
-
-                return replace_map[node]
-
-            return node
-
-        nodes = [replace_node(node) for node in nodes]
+        nodes = [map_node_sources(node, map_source) for node in nodes]
 
     yield from nodes
-
-
-def get_source_definitions(nodes: Iterable[IrOperation]) -> dict[IrSource, list[int]]:
-    definitions: dict[IrSource, list[int]] = {}
-
-    for i, node in enumerate(nodes):
-        for target in node.targets:
-            defs = definitions.setdefault(target, [])
-            defs.append(i)
-
-    return definitions
-
-
-def get_reaching_definition(
-    defs: dict[IrSource, list[int]], source: IrSource, i: int
-) -> int | None:
-    source_defs = defs.get(source)
-    if source_defs is None:
-        return None
-
-    value = bisect_left(source_defs, i) - 1
-    return source_defs[value] if value >= 0 else None
-
-
-def get_node_dependencies(node: IrNode) -> tuple[IrSource, ...]:
-    result: list[IrSource] = []
-
-    if is_op(node):
-        for operand in node.operands:
-            result.extend(get_node_dependencies(operand))
-    elif is_unary_condition(node):
-        result.extend(get_node_dependencies(node.target))
-    elif is_binary_condition(node):
-        result.extend(get_node_dependencies(node.left))
-        result.extend(get_node_dependencies(node.right))
-    elif isinstance(node, IrSource):
-        result.append(node)
-
-    return tuple(result)
 
 
 def data_string_propagation(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]:
@@ -1314,14 +1494,18 @@ def data_string_propagation(nodes: Iterable[IrOperation]) -> Iterable[IrOperatio
             yield node
             continue
 
-        cond_def_i = get_reaching_definition(defs, node.right, i)
+        cond_def_i = get_reaching_definition(defs, node.right.to_tuple(), i)
         if cond_def_i is None:
             yield node
             continue
 
         cond_def = all_nodes[cond_def_i]
 
-        if is_binary(cond_def, "set") and isinstance(cond_def.right, IrDataString):
+        if (
+            is_binary(cond_def, "set")
+            and isinstance(cond_def.right, IrDataString)
+            and cond_def.left.to_tuple() == node.right.to_tuple()
+        ):
             yield replace(node, right=cond_def.right)
             continue
 
@@ -1345,13 +1529,17 @@ def boolean_condition_propagation(
         if is_binary(node, "set") and is_unary_condition(node.right, "boolean"):
             bool_cond = node.right
 
-            cond_def_i = get_reaching_definition(defs, bool_cond.target, i)
+            cond_def_i = get_reaching_definition(defs, bool_cond.target.to_tuple(), i)
             if cond_def_i is None:
                 continue
 
             cond_node = all_nodes[cond_def_i]
 
-            if is_binary(cond_node, "set") and is_condition(cond_node.right):
+            if (
+                is_binary(cond_node, "set")
+                and is_condition(cond_node.right)
+                and cond_node.left.to_tuple() == bool_cond.target.to_tuple()
+            ):
                 right = (
                     negate_condition(cond_node.right)
                     if bool_cond.negated
@@ -1371,14 +1559,18 @@ def branch_condition_propagation(nodes: Iterable[IrOperation]) -> Iterable[IrOpe
             yield node
             continue
 
-        cond_def_i = get_reaching_definition(defs, node.target, i)
+        cond_def_i = get_reaching_definition(defs, node.target.to_tuple(), i)
         if cond_def_i is None:
             yield node
             continue
 
         cond_def = all_nodes[cond_def_i]
 
-        if is_binary(cond_def, "set") and is_condition(cond_def.right):
+        if (
+            is_binary(cond_def, "set")
+            and is_condition(cond_def.right)
+            and node.target.to_tuple() == cond_def.left.to_tuple()
+        ):
             yield replace(node, target=cond_def.right)
             continue
 
@@ -1389,7 +1581,7 @@ def deadcode_elimination(
     nodes: Iterable[IrOperation], opt: Optimizer
 ) -> Iterable[IrOperation]:
     all_nodes = tuple(nodes)
-    usage = get_source_usage(all_nodes)
+    usage = get_source_usage_old(all_nodes)
 
     for node_i, node in enumerate(all_nodes):
         if isinstance(node, IrBranch):
@@ -1573,7 +1765,7 @@ def init_score_boolean_result(nodes: Iterable[IrOperation]) -> Iterable[IrOperat
             is_binary(node, "set")
             and is_unary_condition(node.right, "boolean")
             and isinstance(node.right.target, IrScore)
-            and not any(x < i for x in defs.get(node.left, []))
+            and not any(x < i for x in defs.get(node.left.to_tuple(), []))
         ):
             yield IrSet(left=node.left, right=IrLiteral(value=Int(0)))
 
@@ -1643,12 +1835,17 @@ def store_result_inlining(nodes: Iterable[IrOperation]) -> Iterable[IrOperation]
         if not isinstance(node, IrCast) or not isinstance(node.right, IrSource):
             continue
 
-        source_def_i = get_reaching_definition(defs, node.right, i)
+        source_def_i = get_reaching_definition(defs, node.right.to_tuple(), i)
 
-        if source_def_i is None:
+        if (
+            source_def_i is None
+            or source_def_i != (i - 1)
+        ):
             continue
 
-        if source_def_i != (i - 1):
+        def_node = nodes[source_def_i]
+
+        if isinstance(def_node, (IrSet, IrCast)):
             continue
 
         store = IrStore(
@@ -1735,7 +1932,7 @@ def traverse_composite_literal(
             literals = [el for el in value if not isinstance(el, IrSource)]
 
             if literals:
-                cast_type = infer_type(literals[0])
+                cast_type = infer_type(literals[0], shallow=True)
             
             if cast_type in (None, Any):
                 data_source_types = [
@@ -1801,3 +1998,74 @@ def composite_literal_expansion(nodes: Iterable[IrOperation], opt: Optimizer, ct
             operands.append(operand)
 
         yield replace_operation(node, operands)
+
+
+def source_copy_elision(nodes: Iterable[IrOperation], opt: Optimizer) -> Iterable[IrOperation]:
+    nodes = list(nodes)
+    active = True
+
+    while active:
+        active = False
+
+        definitions = get_source_definitions(nodes)
+        dependency = get_dependency_graph(nodes)
+        usage = get_source_usage(nodes)
+
+        for node_i in range(len(nodes)):
+            node = nodes[node_i]
+            if not (
+                is_binary(node, "set")
+                and isinstance(node.right, IrSource)
+                and opt.is_temp(node.right)
+            ):
+                continue
+
+            target = node.left.to_tuple()
+            target_source = node.left
+            source = node.right.to_tuple()
+
+            if any(use_i > node_i for use_i in get_source_usage_of_parent(usage, source)):
+                continue
+
+            node_dependencies = dependency[node_i]
+            deps = sorted(node_dependencies.get(source, set()))
+
+            if not deps:
+                continue
+            
+            if any(
+                deps[0] < target_use_i < node_i
+                for target_use_i in get_source_usage_of_parent(usage, target)
+            ):
+                continue
+
+            conflicting_defs = sorted(
+                def_i
+                for def_i in definitions.get(target, [])
+                if deps[0] < def_i < node_i
+            )
+            if conflicting_defs:
+                def_i = conflicting_defs[0]
+
+                def_deps = tuple(s for source_deps in dependency[def_i].values() for s in source_deps)
+                if any(deps[0] < dep_i for dep_i in def_deps):
+                    continue
+
+                def_node = nodes.pop(def_i)
+                nodes.insert(deps[0], def_node)
+
+                active = True
+                break
+
+            for i in deps:
+                nodes[i] = map_node_sources(
+                    nodes[i],
+                    lambda s: replace_source(s, {source: target_source})
+                )
+
+            nodes.pop(node_i)
+            
+            active = True
+            break
+    
+    return nodes
