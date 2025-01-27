@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.17.1 (2025-01-27)
+
+### Fix
+
+* Set rich as normal dependency ([`7f39b2a`](https://github.com/rx-modules/bolt-expressions/commit/7f39b2a36067dca27f9a7d29c8d038e4ab225fdc))
+
 ## v0.17.0 (2024-08-10)
 
 ### Feature
