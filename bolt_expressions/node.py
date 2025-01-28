@@ -86,6 +86,8 @@ class ExpressionOptions(BaseModel):
     temp_storage: str = "bolt.expr:temp"
     init_path: str = "init_expressions"
     objective_prefix: str = ""
+    const_score_prefix: str = "$"
+    temp_score_prefix: str = "$"
     default_nbt_type: NbtTypeString = "int"
     default_floating_nbt_type: str = "double"
 
@@ -226,12 +228,16 @@ class Expression:
         self.generator = self.ctx.generate
 
         self.temp_score = TempScoreManager(
-            self.opts.temp_objective, format=lambda _: "$" + next(self.identifiers)
+            objective=self.opts.temp_objective,
+            prefix=self.opts.temp_score_prefix,
+            format=lambda _: self.opts.temp_score_prefix + next(self.identifiers),
         )
         self.temp_data = TempDataManager(
             "storage", self.opts.temp_storage, format=lambda _: next(self.identifiers)
         )
-        self.const_score = ConstScoreManager(self.opts.const_objective)
+        self.const_score = ConstScoreManager(
+            self.opts.const_objective, self.opts.const_score_prefix
+        )
 
         self.type_caster = TypeCaster(ctx=self.ctx)
         self.type_checker = TypeChecker(ctx=self.ctx)

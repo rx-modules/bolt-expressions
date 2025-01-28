@@ -481,9 +481,18 @@ SourceTuple = ScoreTuple | DataTuple | StringDataTuple
 @dataclass
 class TempScoreManager:
     objective: str
+    prefix: str
 
-    counter: int = field(default=0, init=False)
-    format: Callable[[int], str] = field(default=lambda n: f"$s{n}")  # type: ignore
+    counter: int
+    format: Callable[[int], str]
+
+    def __init__(
+        self, objective: str, prefix: str, format: Callable[[int], str] | None = None
+    ):
+        self.objective = objective
+        self.prefix = prefix
+        self.format = format if format is not None else lambda n: f"{self.prefix}{n}"
+        self.counter = 0
 
     def __call__(self) -> ScoreTuple:
         name = self.format(self.counter)
@@ -540,11 +549,12 @@ class TempDataManager:
 @dataclass
 class ConstScoreManager:
     objective: str
+    prefix: str
 
     constants: set[int] = field(default_factory=set, init=False)
 
     def format(self, value: int) -> str:
-        return f"${value}"
+        return f"{self.prefix}{value}"
 
     def create(self, value: int) -> ScoreTuple:
         self.constants.add(value)
@@ -1466,7 +1476,9 @@ def rename_temp_scores(
                 ignored_sources.add(source)
 
     with (
-        opt.temp_score.override(format=lambda n: f"$i{n}", reset=True),
+        opt.temp_score.override(
+            format=lambda n: f"{opt.temp_score.prefix}i{n}", reset=True
+        ),
         opt.temp_data.override(format=lambda n: f"i{n}", reset=True),
     ):
         replace_map: dict[SourceTuple, IrSource] = {}

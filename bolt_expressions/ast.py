@@ -38,7 +38,7 @@ class RunExecuteTransformer(MutatingReducer):
 class ConstantScoreChecker(Reducer):
     objective: str = required_field()
     callback: Callable[[int], None] = required_field()
-    pattern: re.Pattern[str] = re.compile(r"^\$([-+]?\d+)\b")
+    pattern: re.Pattern[str] = re.compile(r"^[$#]([-+]?\d+)\b")
 
     @cached_property
     def objective_node(self):

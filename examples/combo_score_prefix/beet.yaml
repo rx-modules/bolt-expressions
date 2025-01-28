@@ -1,0 +1,21 @@
+name: bolt-expressions-score-prefix
+
+data_pack:
+  load: [src]
+  pack_format: 10
+
+require:
+  - bolt
+  - bolt_expressions
+
+pipeline:
+  - mecha
+
+output: dist
+
+meta:
+  generate_namespace: test
+  bolt_expressions:
+    const_score_prefix: "#"
+    temp_score_prefix: "__"
+
