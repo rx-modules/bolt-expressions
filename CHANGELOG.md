@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.18.0 (2025-01-28)
+
+### Feature
+
+* Add temp_score_prefix and const_score_prefix options ([`32a0ab6`](https://github.com/rx-modules/bolt-expressions/commit/32a0ab64d4f1b4971e4a4913c60ad14e49319e4e))
+
 ## v0.17.1 (2025-01-27)
 
 ### Fix
