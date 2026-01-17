@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Any, Iterable, cast
-from beet import Context
 
+from beet import Context
 from beet.core.utils import required_field
 
+from .node import Expression, ExpressionNode, UnrollHelper
 from .optimizer import (
     CompositeNbtValue,
     IrCompositeLiteral,
@@ -12,7 +13,6 @@ from .optimizer import (
     IrSource,
 )
 from .typing import NbtValue, convert_tag
-from .node import Expression, ExpressionNode, UnrollHelper
 from .utils import type_name
 
 __all__ = [

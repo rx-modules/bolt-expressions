@@ -4,14 +4,13 @@ from typing import Any, overload
 from beet import Context
 from bolt.utils import internal
 
-from .typing import NbtType, literal_types
 from .node import Expression
 from .sources import (
     DataSource,
     ScoreSource,
     resolve,
 )
-
+from .typing import NbtType, literal_types
 
 __all__ = [
     "Scoreboard",

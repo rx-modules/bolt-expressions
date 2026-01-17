@@ -1,3 +1,4 @@
+import typing as t
 from abc import ABC, abstractmethod
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field, replace
@@ -17,29 +18,15 @@ from typing import (
     cast,
     overload,
 )
-import typing as t
+
 from bolt import Runtime
 from bolt.utils import internal
-from mecha import AstChildren, AstRoot, Mecha
-
-from nbtlib import Compound, Path, ListIndex, CompoundMatch, NamedKey  # type: ignore
 from bolt_control_flow import BranchInfo, BranchType, Case, CaseResult, WrappedCases
+from mecha import AstChildren, AstRoot, Mecha
+from nbtlib import Compound, CompoundMatch, ListIndex, NamedKey, Path  # type: ignore
 
-from .node import Expression, UnrollHelper, Unrolled
-from .typing import NbtType, is_compound_type, format_type
-from .utils import insert_nested_commands, type_name
-
-from .optimizer import (
-    DataTuple,
-    IrData,
-    IrDataString,
-    IrScore,
-    DataTargetType,
-    ScoreTuple,
-    SourceTuple,
-)
 from .literals import Literal, convert_node
-from .node import Expression, ExpressionNode
+from .node import Expression, ExpressionNode, Unrolled, UnrollHelper
 from .operations import (
     Add,
     Append,
@@ -49,6 +36,7 @@ from .operations import (
     Divide,
     Enable,
     Equal,
+    GetLength,
     GreaterThan,
     GreaterThanOrEqualTo,
     InPlaceMerge,
@@ -66,24 +54,34 @@ from .operations import (
     Reset,
     ResultType,
     Set,
-    GetLength,
     Subtract,
     UnaryOperation,
 )
+from .optimizer import (
+    DataTargetType,
+    DataTuple,
+    IrData,
+    IrDataString,
+    IrScore,
+    ScoreTuple,
+    SourceTuple,
+)
 from .typing import (
-    NbtType,
     Accessor,
+    NbtType,
     access_type,
-    convert_type,
     convert_tag,
+    convert_type,
+    format_type,
     is_array_type,
+    is_compound_type,
     is_list_type,
     is_numeric_type,
     is_string_type,
     is_type,
     literal_types,
 )
-
+from .utils import insert_nested_commands, type_name
 
 __all__ = [
     "Source",

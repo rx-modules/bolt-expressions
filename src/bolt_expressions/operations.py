@@ -4,7 +4,8 @@ from typing import Any, ClassVar, Iterable
 
 from bolt_expressions.optimizer import IrOperation, IrSource
 
-from .typing import NbtType
+from .literals import convert_node
+from .node import ExpressionNode, ResultType, UnrollHelper
 from .optimizer import (
     IrBinary,
     IrBinaryCondition,
@@ -25,9 +26,7 @@ from .optimizer import (
     IrUnaryCondition,
     StoreType,
 )
-from .node import ExpressionNode, ResultType, UnrollHelper
-from .literals import convert_node
-
+from .typing import NbtType
 
 __all__ = [
     "ResultType",

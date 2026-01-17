@@ -1,21 +1,24 @@
+import typing as t
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial
 from typing import Any, Iterable, Union
-import typing as t
 
-from beet import Context, Generator, Function
+from beet import Context, Function, Generator
 from bolt import Runtime
-from bolt.utils import internal
 from bolt.contrib.defer import Defer
+from bolt.utils import internal
 from mecha import AstChildren, AstCommand, AstRoot, Mecha
 from mecha.contrib.nested_location import NestedLocationResolver
-from pydantic import BaseModel
 from nbtlib import Path  # type: ignore
+from pydantic import BaseModel
+from rich.pretty import pprint
 
-
+from .ast_converter import AstConverter
+from .casting import TypeCaster
+from .check import TypeChecker
 from .optimizer import (
     ConstScoreManager,
     IrBranch,
@@ -32,11 +35,13 @@ from .optimizer import (
     TempDataManager,
     TempScoreManager,
     add_subtract_by_zero_removal,
-    commutative_set_collapsing,
+    boolean_condition_propagation,
     branch_condition_propagation,
-    convert_data_arithmetic,
-    convert_cast,
+    commutative_set_collapsing,
+    composite_literal_expansion,
     compound_match_data_compare,
+    convert_cast,
+    convert_data_arithmetic,
     convert_data_order_operation,
     convert_defined_boolean_condition,
     data_get_scaling,
@@ -46,27 +51,20 @@ from .optimizer import (
     deadcode_elimination,
     discard_casting,
     discard_non_numerical_casting,
-    composite_literal_expansion,
     init_score_boolean_result,
     literal_to_constant_replacement,
     multiply_divide_by_fraction,
     multiply_divide_by_one_removal,
     noncommutative_set_collapsing,
-    boolean_condition_propagation,
     rename_temp_scores,
     set_and_get_cleanup,
     set_to_self_removal,
     source_copy_elision,
-    store_set_data_compare,
     store_result_inlining,
+    store_set_data_compare,
 )
 from .typing import NbtTypeString
-from .casting import TypeCaster
-from .check import TypeChecker
-from .ast_converter import AstConverter
 from .utils import identifier_generator, insert_nested_commands
-
-from rich.pretty import pprint
 
 __all__ = [
     "ExpressionOptions",

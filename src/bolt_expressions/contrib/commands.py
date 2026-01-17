@@ -19,8 +19,8 @@ from mecha import (
 from mecha.contrib.implicit_execute import ImplicitExecuteParser
 from tokenstream import set_location
 
-from bolt_expressions.sources import DataSource, ScoreSource, Source
 from bolt_expressions.node import Expression
+from bolt_expressions.sources import DataSource, ScoreSource, Source
 
 DEFAULT_PREFIX = "var"
 

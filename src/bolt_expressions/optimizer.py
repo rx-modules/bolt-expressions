@@ -8,36 +8,37 @@ from types import TracebackType
 from typing import (
     Any,
     Callable,
+    Concatenate,
     Generator,
     Generic,
     Iterable,
     Iterator,
     Literal,
     NamedTuple,
+    ParamSpec,
     TypeGuard,
     TypeVar,
     Union,
-    Concatenate,
-    ParamSpec,
     cast,
 )
-from beet import Context
-from mecha import AbstractChildren, AbstractNode, AstNode
-from bolt.utils import internal
 
+from beet import Context
+from bolt.utils import internal
+from mecha import AbstractChildren, AbstractNode, AstNode
 from nbtlib import (  # type:ignore
-    Int,
+    Compound,
+    CompoundMatch,
     Double,
     Float,
-    Numeric,
-    String,
-    Compound,
-    Path,
-    NamedKey,
-    CompoundMatch,
+    Int,
     List,
     ListIndex,
+    NamedKey,
+    Numeric,
+    Path,
+    String,
 )
+from rich.pretty import pprint
 
 from .typing import (
     Accessor,
@@ -54,7 +55,6 @@ from .typing import (
     literal_types,
     unwrap_optional_type,
 )
-from rich.pretty import pprint
 
 __all__ = [
     "Rule",

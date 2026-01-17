@@ -9,32 +9,41 @@ from typing import (
     get_type_hints,
     is_typeddict,
 )
-from beet import Context
-from mecha import Visitor, rule
-from bolt.utils import internal
 
+from beet import Context
+from bolt.utils import internal
+from mecha import Visitor, rule
 from nbtlib import (
+    Array,
+    Byte,
     Compound,
+    Double,
     Float,
     Int,
-    Byte,
-    Short,
-    Long,
-    Double,
-    Array,
     ListIndex,
-    Numeric,
+    Long,
     NamedKey,
+    Numeric,
+    Short,
 )  # type: ignore
 
-
+from .exceptions import TypeCheckDiagnostic, TypeCheckError, get_exception_chain
+from .optimizer import (
+    IrBinary,
+    IrCast,
+    IrData,
+    IrLiteral,
+    IrOperation,
+    IrScore,
+    IrSource,
+)
 from .typing import (
     NbtType,
-    NumericNbtValue,
     NbtValue,
-    format_type,
+    NumericNbtValue,
     access_type,
     convert_type,
+    format_type,
     get_dict_fields,
     infer_type,
     is_alias,
@@ -49,18 +58,7 @@ from .typing import (
     is_union,
     unwrap_optional_type,
 )
-from .optimizer import (
-    IrBinary,
-    IrCast,
-    IrData,
-    IrLiteral,
-    IrOperation,
-    IrScore,
-    IrSource,
-)
-from .exceptions import TypeCheckDiagnostic, TypeCheckError, get_exception_chain
 from .utils import get_globals
-
 
 __all__ = [
     "TypeCheckFlags",

@@ -1,11 +1,10 @@
 from types import GenericAlias, NoneType, UnionType
-from frozendict import frozendict
 from typing import (
     Any,
     Iterable,
     Literal,
-    TypeGuard,
     TypedDict,
+    TypeGuard,
     Union,
     _UnionGenericAlias,  # type: ignore
     cast,
@@ -14,27 +13,27 @@ from typing import (
     get_type_hints,
     is_typeddict,
 )
-from beet import Context
 
+from beet import Context
+from frozendict import frozendict
 from nbtlib import (
-    End,
+    Array,
+    Byte,
     Compound,
+    CompoundMatch,
+    Double,
+    End,
     Float,
     Int,
     List,
-    String,
-    Byte,
-    Short,
-    Long,
-    Double,
-    Array,
-    NamedKey,
     ListIndex,
-    CompoundMatch,
+    Long,
+    NamedKey,
+    Short,
+    String,
 )  # type: ignore
 
 from .utils import format_name, get_globals, type_name  # type: ignore
-
 
 __all__ = ["is_type", "convert_type", "literal_types"]
 

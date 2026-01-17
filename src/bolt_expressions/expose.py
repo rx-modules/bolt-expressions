@@ -1,9 +1,8 @@
 from typing import Any, Iterable, TypeVar, Union
 
-from .sources import Source, binary_operator, length, operator_method
-from .operations import Min, Max
-
 from .node import ExpressionNode
+from .operations import Max, Min
+from .sources import Source, binary_operator, length, operator_method
 
 T = TypeVar("T")
 

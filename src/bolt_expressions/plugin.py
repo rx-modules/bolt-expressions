@@ -1,21 +1,23 @@
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Any
+
 from beet import Context
 from bolt import Runtime
 from bolt.utils import internal
 from mecha import Mecha
 
 import bolt_expressions as bolt_expressions_module
+
+from .api import Data, Scoreboard
 from .ast import (
     ConstantScoreChecker,
     ObjectiveChecker,
     RunExecuteTransformer,
     SourceJsonConverter,
 )
+from .expose import wrapped_len, wrapped_max, wrapped_min
 from .node import Expression
-from .expose import wrapped_len, wrapped_min, wrapped_max
-from .api import Scoreboard, Data
 
 __all__ = [
     "beet_default",
