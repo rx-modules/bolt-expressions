@@ -64,8 +64,7 @@ class Operation(ExpressionNode, ABC):
 
     @property
     @abstractmethod
-    def in_place_target(self) -> ExpressionNode | None:
-        ...
+    def in_place_target(self) -> ExpressionNode | None: ...
 
 
 @dataclass(unsafe_hash=False, order=False)

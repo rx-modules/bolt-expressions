@@ -99,12 +99,10 @@ class Objective:
     ctx: Context | Expression = field(kw_only=True)
 
     @overload
-    def __getitem__(self, scoreholder: str) -> ScoreSource:
-        ...
+    def __getitem__(self, scoreholder: str) -> ScoreSource: ...
 
     @overload
-    def __getitem__(self, scoreholder: tuple[str, ...]) -> tuple[ScoreSource, ...]:
-        ...
+    def __getitem__(self, scoreholder: tuple[str, ...]) -> tuple[ScoreSource, ...]: ...
 
     def __getitem__(
         self, scoreholder: str | tuple[str, ...]

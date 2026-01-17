@@ -16,7 +16,22 @@ from typing import (
 )
 from beet import Context
 
-from nbtlib import End, Compound, Float, Int, List, String, Byte, Short, Long, Double, Array, NamedKey, ListIndex, CompoundMatch  # type: ignore
+from nbtlib import (
+    End,
+    Compound,
+    Float,
+    Int,
+    List,
+    String,
+    Byte,
+    Short,
+    Long,
+    Double,
+    Array,
+    NamedKey,
+    ListIndex,
+    CompoundMatch,
+)  # type: ignore
 
 from .utils import format_name, get_globals, type_name  # type: ignore
 
@@ -108,7 +123,17 @@ def format_type(t: Any, *, __refs: list[Any] | None = None) -> str:
 
 def convert_tag(value: Any) -> NbtValue | None:
     match value:
-        case Byte() | Short() | Int() | Float() | Double() | String() | List() | Array() | Compound():
+        case (
+            Byte()
+            | Short()
+            | Int()
+            | Float()
+            | Double()
+            | String()
+            | List()
+            | Array()
+            | Compound()
+        ):
             return value
         case list():
             value = cast(list[Any], value)

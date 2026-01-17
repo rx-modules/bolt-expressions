@@ -162,8 +162,7 @@ class ExpressionNode(ABC):
     @abstractmethod
     def unroll(
         self, helper: UnrollHelper
-    ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral]:
-        ...
+    ) -> tuple[Iterable[IrOperation], IrSource | IrLiteral]: ...
 
 
 @dataclass(order=False, eq=False, kw_only=True)

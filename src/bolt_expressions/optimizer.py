@@ -89,8 +89,7 @@ __all__ = [
 T = TypeVar("T")
 
 
-class IrNode(AbstractNode):
-    ...
+class IrNode(AbstractNode): ...
 
 
 IrNodeType = TypeVar("IrNodeType", bound=IrNode, covariant=True)
@@ -111,8 +110,7 @@ class IrChildren(AbstractChildren[IrNodeType]):
 
 
 class IrSource(IrNode, ABC):
-    def to_tuple(self) -> "SourceTuple":
-        ...
+    def to_tuple(self) -> "SourceTuple": ...
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -124,8 +122,7 @@ class IrScore(IrSource):
         return ScoreTuple(self.holder, self.obj)
 
 
-class IrBoolScore(IrScore):
-    ...
+class IrBoolScore(IrScore): ...
 
 
 DataTargetType = Literal["storage", "entity", "block"]
@@ -420,16 +417,14 @@ class SmartGenerator(Generator[T, None, None]):
         if val is not None:
             self._pre.append(val)
 
-    def send(self, __value: None) -> T:
-        ...
+    def send(self, __value: None) -> T: ...
 
     def throw(
         self,
         __typ: BaseException | type[BaseException],
         __val: BaseException | object = None,
         __tb: TracebackType | None = None,
-    ) -> T:
-        ...
+    ) -> T: ...
 
 
 P = ParamSpec("P")

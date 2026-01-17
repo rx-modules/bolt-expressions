@@ -5,7 +5,7 @@ from typing import Any, Iterable
 from beet import Context
 
 from mecha import Visitor, rule
-from nbtlib import String, Compound, List, Array, List, NamedKey, ListIndex, OutOfRange  # type: ignore
+from nbtlib import String, Compound, List, Array, NamedKey, ListIndex, OutOfRange  # type: ignore
 
 from .typing import (
     NbtType,

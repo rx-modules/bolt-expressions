@@ -144,15 +144,13 @@ def get_source_from_tuple(expr: Expression, t: SourceTuple) -> "Source":
 @overload
 def create_result(
     expr: Expression, result_type: t.Literal[ResultType.data]
-) -> "DataSource":
-    ...
+) -> "DataSource": ...
 
 
 @overload
 def create_result(
     expr: Expression, result_type: t.Literal[ResultType.score]
-) -> "ScoreSource":
-    ...
+) -> "ScoreSource": ...
 
 
 def create_result(expr: Expression, result_type: ResultType) -> "Source":
@@ -284,13 +282,11 @@ class OperatorMethod(Generic[P, T]):
 @overload
 def operator_method(
     *, lazy: bool = False, is_internal: bool = True, returns: bool = True
-) -> Callable[[Callable[P, T]], OperatorMethod[P, T]]:
-    ...
+) -> Callable[[Callable[P, T]], OperatorMethod[P, T]]: ...
 
 
 @overload
-def operator_method(func: Callable[P, T]) -> OperatorMethod[P, T]:
-    ...
+def operator_method(func: Callable[P, T]) -> OperatorMethod[P, T]: ...
 
 
 @overload
@@ -300,8 +296,7 @@ def operator_method(
     lazy: bool = False,
     is_internal: bool = True,
     returns: bool = True,
-) -> OperatorMethod[P, T]:
-    ...
+) -> OperatorMethod[P, T]: ...
 
 
 def operator_method(
@@ -381,8 +376,7 @@ def sanitized(f: SanitizedBinaryOpFunction[T]) -> BinaryOpFunction[T]:
 @overload
 def binary_operator(
     cls: type[BinOp],
-) -> BinaryOpFunction[BinOp]:
-    ...
+) -> BinaryOpFunction[BinOp]: ...
 
 
 @overload
@@ -390,8 +384,7 @@ def binary_operator(
     cls: type[BinOp],
     *,
     reverse: t.Literal[True],
-) -> tuple[BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]]:
-    ...
+) -> tuple[BinaryOpFunction[BinOp], BinaryOpFunction[BinOp]]: ...
 
 
 def binary_operator(
@@ -425,20 +418,16 @@ class Source(ExpressionNode, ABC):
         return self
 
     @abstractmethod
-    def __rebind__(self, value: Any) -> "Source":
-        ...
+    def __rebind__(self, value: Any) -> "Source": ...
 
     @abstractmethod
-    def __branch__(self) -> ContextManager[bool]:
-        ...
+    def __branch__(self) -> ContextManager[bool]: ...
 
     @abstractmethod
-    def __dup__(self) -> "Source":
-        ...
+    def __dup__(self) -> "Source": ...
 
     @abstractmethod
-    def __not__(self, /) -> "Source":
-        ...
+    def __not__(self, /) -> "Source": ...
 
     def __logical_and__(self, other: Callable[[], Any]):
         t = self.__dup__()
@@ -458,12 +447,10 @@ class Source(ExpressionNode, ABC):
 
     @abstractmethod
     @operator_method
-    def component(self) -> Any:
-        ...
+    def component(self) -> Any: ...
 
     @abstractmethod
-    def to_tuple(self) -> SourceTuple:
-        ...
+    def to_tuple(self) -> SourceTuple: ...
 
 
 @dataclass(unsafe_hash=True, order=False, eq=False)
@@ -897,8 +884,7 @@ class DataSource(Source):
         return source._access(rest_path)
 
     @overload
-    def __call__(self, matching: str | Path | Compound, /) -> Any:
-        ...
+    def __call__(self, matching: str | Path | Compound, /) -> Any: ...
 
     @overload
     def __call__(
@@ -907,8 +893,7 @@ class DataSource(Source):
         *,
         scale: float | None = None,
         type: str | None = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     def __call__(
         self,

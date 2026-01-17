@@ -13,7 +13,19 @@ from beet import Context
 from mecha import Visitor, rule
 from bolt.utils import internal
 
-from nbtlib import Compound, Float, Int, Byte, Short, Long, Double, Array, ListIndex, Numeric, NamedKey  # type: ignore
+from nbtlib import (
+    Compound,
+    Float,
+    Int,
+    Byte,
+    Short,
+    Long,
+    Double,
+    Array,
+    ListIndex,
+    Numeric,
+    NamedKey,
+)  # type: ignore
 
 
 from .typing import (
@@ -384,8 +396,7 @@ class TypeChecker(Visitor):
         return TypeCheckDiagnostic(msg)
 
     @rule(IrOperation)
-    def fallback(self, node: IrOperation) -> None:
-        ...
+    def fallback(self, node: IrOperation) -> None: ...
 
     @rule(IrCast)
     def set(self, node: IrCast) -> TypeCheckDiagnostic | None:

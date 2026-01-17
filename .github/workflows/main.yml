@@ -12,34 +12,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
       - name: Set up Python 3.10
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.10"
-      - name: Install Poetry
-        uses: snok/install-poetry@v1.2.1
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          virtualenvs-in-project: true
-      - name: Install Pyright
-        run: npm install
-      - name: Setup cache
-        id: cached-poetry-dependencies
-        uses: actions/cache@v2
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          enable-cache: true
+
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install
+        run: uv sync
+
       - name: Run tests
-        run: poetry run pytest -v
-      # - name: Run type-checking
-      #   run: npm run check
+        run: uv run pytest -v
+
       - name: Check formatting
-        run: poetry run black --check bolt_expressions examples tests
+        run: uv run ruff format --check src/bolt_expressions examples tests
+
+      - name: Check imports
+        run: uv run ruff check --select I src/bolt_expressions examples tests
+
       - name: Release
         if: |
           github.repository == 'rx-modules/bolt-expressions'
@@ -51,4 +49,4 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "action@github.com"
-          poetry run semantic-release publish -v DEBUG -D commit_author="github-actions <action@github.com>"
+          uv run semantic-release publish -v DEBUG -D commit_author="github-actions <action@github.com>"
