@@ -1,16 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Any, Generator, Iterable, cast
-from mecha import AstChildren, AstCommand, Mecha, Visitor, rule, AstRoot
-from mecha.utils import number_to_string
-from nbtlib import Byte, Short, Int, Long, Float, Double  # type: ignore
 
-from .typing import (
-    NBT_TYPE_STRING,
-    NbtTypeString,
-    NumericNbtValue,
-    unwrap_optional_type,
-)
-from .utils import insert_nested_commands, type_name
+from mecha import AstChildren, AstCommand, AstRoot, Mecha, Visitor, rule
+from mecha.utils import number_to_string
+from nbtlib import Byte, Double, Float, Int, Long, Short  # type: ignore
 
 from .optimizer import (
     IrBinary,
@@ -18,22 +11,29 @@ from .optimizer import (
     IrBoolScore,
     IrBranch,
     IrCast,
+    IrChildren,
     IrCondition,
     IrData,
     IrDataString,
     IrInsert,
     IrLiteral,
     IrNode,
+    IrOperation,
     IrRaw,
     IrScore,
     IrSet,
     IrSource,
-    IrOperation,
     IrStore,
-    IrChildren,
     IrUnary,
     IrUnaryCondition,
 )
+from .typing import (
+    NBT_TYPE_STRING,
+    NbtTypeString,
+    NumericNbtValue,
+    unwrap_optional_type,
+)
+from .utils import insert_nested_commands, type_name
 
 __all__ = [
     "InvalidOperand",

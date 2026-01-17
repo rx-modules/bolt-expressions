@@ -8,36 +8,37 @@ from types import TracebackType
 from typing import (
     Any,
     Callable,
+    Concatenate,
     Generator,
     Generic,
     Iterable,
     Iterator,
     Literal,
     NamedTuple,
+    ParamSpec,
     TypeGuard,
     TypeVar,
     Union,
-    Concatenate,
-    ParamSpec,
     cast,
 )
-from beet import Context
-from mecha import AbstractChildren, AbstractNode, AstNode
-from bolt.utils import internal
 
+from beet import Context
+from bolt.utils import internal
+from mecha import AbstractChildren, AbstractNode, AstNode
 from nbtlib import (  # type:ignore
-    Int,
+    Compound,
+    CompoundMatch,
     Double,
     Float,
-    Numeric,
-    String,
-    Compound,
-    Path,
-    NamedKey,
-    CompoundMatch,
+    Int,
     List,
     ListIndex,
+    NamedKey,
+    Numeric,
+    Path,
+    String,
 )
+from rich.pretty import pprint
 
 from .typing import (
     Accessor,
@@ -54,7 +55,6 @@ from .typing import (
     literal_types,
     unwrap_optional_type,
 )
-from rich.pretty import pprint
 
 __all__ = [
     "Rule",
@@ -89,8 +89,7 @@ __all__ = [
 T = TypeVar("T")
 
 
-class IrNode(AbstractNode):
-    ...
+class IrNode(AbstractNode): ...
 
 
 IrNodeType = TypeVar("IrNodeType", bound=IrNode, covariant=True)
@@ -111,8 +110,7 @@ class IrChildren(AbstractChildren[IrNodeType]):
 
 
 class IrSource(IrNode, ABC):
-    def to_tuple(self) -> "SourceTuple":
-        ...
+    def to_tuple(self) -> "SourceTuple": ...
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -124,8 +122,7 @@ class IrScore(IrSource):
         return ScoreTuple(self.holder, self.obj)
 
 
-class IrBoolScore(IrScore):
-    ...
+class IrBoolScore(IrScore): ...
 
 
 DataTargetType = Literal["storage", "entity", "block"]
@@ -420,16 +417,14 @@ class SmartGenerator(Generator[T, None, None]):
         if val is not None:
             self._pre.append(val)
 
-    def send(self, __value: None) -> T:
-        ...
+    def send(self, __value: None) -> T: ...
 
     def throw(
         self,
         __typ: BaseException | type[BaseException],
         __val: BaseException | object = None,
         __tb: TracebackType | None = None,
-    ) -> T:
-        ...
+    ) -> T: ...
 
 
 P = ParamSpec("P")

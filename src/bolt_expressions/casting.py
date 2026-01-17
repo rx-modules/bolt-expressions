@@ -2,11 +2,20 @@ from contextlib import suppress
 from dataclasses import dataclass, replace
 from types import NoneType
 from typing import Any, Iterable
+
 from beet import Context
-
 from mecha import Visitor, rule
-from nbtlib import String, Compound, List, Array, List, NamedKey, ListIndex, OutOfRange  # type: ignore
+from nbtlib import (  # type: ignore
+    Array,
+    Compound,
+    List,
+    ListIndex,
+    NamedKey,
+    OutOfRange,
+    String,
+)
 
+from .optimizer import IrBinary, IrCast, IrData, IrLiteral, IrOperation
 from .typing import (
     NbtType,
     NbtValue,
@@ -21,8 +30,6 @@ from .typing import (
     is_union,
     unwrap_optional_type,
 )
-from .optimizer import IrBinary, IrCast, IrData, IrLiteral, IrOperation
-
 
 __all__ = [
     "TypeCaster",

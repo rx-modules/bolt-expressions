@@ -1,11 +1,10 @@
 from types import GenericAlias, NoneType, UnionType
-from frozendict import frozendict
 from typing import (
     Any,
     Iterable,
     Literal,
-    TypeGuard,
     TypedDict,
+    TypeGuard,
     Union,
     _UnionGenericAlias,  # type: ignore
     cast,
@@ -14,12 +13,27 @@ from typing import (
     get_type_hints,
     is_typeddict,
 )
-from beet import Context
 
-from nbtlib import End, Compound, Float, Int, List, String, Byte, Short, Long, Double, Array, NamedKey, ListIndex, CompoundMatch  # type: ignore
+from beet import Context
+from frozendict import frozendict
+from nbtlib import (
+    Array,
+    Byte,
+    Compound,
+    CompoundMatch,
+    Double,
+    End,
+    Float,
+    Int,
+    List,
+    ListIndex,
+    Long,
+    NamedKey,
+    Short,
+    String,
+)  # type: ignore
 
 from .utils import format_name, get_globals, type_name  # type: ignore
-
 
 __all__ = ["is_type", "convert_type", "literal_types"]
 
@@ -108,7 +122,17 @@ def format_type(t: Any, *, __refs: list[Any] | None = None) -> str:
 
 def convert_tag(value: Any) -> NbtValue | None:
     match value:
-        case Byte() | Short() | Int() | Float() | Double() | String() | List() | Array() | Compound():
+        case (
+            Byte()
+            | Short()
+            | Int()
+            | Float()
+            | Double()
+            | String()
+            | List()
+            | Array()
+            | Compound()
+        ):
             return value
         case list():
             value = cast(list[Any], value)

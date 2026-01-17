@@ -1,12 +1,13 @@
+import sys
 from contextlib import contextmanager
 from dataclasses import replace
-import sys
 from types import NoneType
 from typing import Any, Dict, _UnionGenericAlias, is_typeddict  # type: ignore
+
+from beet import Context
 from bolt import Runtime
 from mecha import AstChildren, AstCommand, AstRoot
 from nbtlib import Base  # type: ignore
-from beet import Context
 
 __all__ = [
     "type_name",

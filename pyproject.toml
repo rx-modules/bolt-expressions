@@ -1,62 +1,79 @@
-[tool.poetry]
-name = "bolt-expressions"
-version = "0.18.0"
+[project]
+authors = [
+  {name = "rx97"},
+  {name = "TheWii"},
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "beet>=0.55.0",
+  "mecha>=0.59.2",
+  "nbtlib==1.12.1",
+  "bolt>=0.38",
+  "frozendict>=2.4.0,<3",
+  "bolt-control-flow>=0.2.0",
+  "rich>=12.4.4,<13",
+]
 description = "Provides pandas-like expressions capabilities to the bolt extension of mecha"
-authors = ["rx97", "TheWii"]
-license = "MIT"
-
-homepage = "https://github.com/rx-modules/bolt-expressions"
-repository = "https://github.com/rx-modules/bolt-expressions"
-documentation = "https://rx-modules.github.io/bolt-expressions/"
-
-readme = "README.md"
-
 keywords = [
   "beet",
   "minecraft",
   "bolt",
   "mecha",
-  "expressions"
+  "expressions",
+]
+license = "MIT"
+name = "bolt-expressions"
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+version = "0.18.0"
+
+[project.urls]
+Documentation = "https://rx-modules.github.io/bolt-expressions/"
+Homepage = "https://github.com/rx-modules/bolt-expressions"
+Repository = "https://github.com/rx-modules/bolt-expressions"
+
+[dependency-groups]
+dev = [
+  "python-semantic-release>=7.27.0,<8",
+  "mudkip>=0.5.1",
+  "pytest-insta>=0.1.11",
+  "pygments",
+  "ruff>=0.14.13",
 ]
 
-# include = ["FIXME/py.typed"]
+[tool.uv]
 
-[tool.poetry.dependencies]
-python = ">=3.10,<4.0"
-beet = ">=0.55.0"
-mecha = ">=0.59.2"
-nbtlib = "1.12.1"
-bolt = ">=0.38"
-frozendict = "^2.4.0"
-bolt-control-flow = ">=0.2.0"
-rich = "^12.4.4"
-
-[tool.poetry.dev-dependencies]
-black = "^22.12.0"
-isort = "^5.11.4"
-python-semantic-release = "^7.27.0"
-mudkip = ">=0.5.1"
-pytest-insta = ">=0.1.11"
+[tool.uv.sources]
 pygments = {git = "https://github.com/rx-modules/pygments"}
 
+[build-system]
+build-backend = "uv_build"
+requires = ["uv_build>=0.9.26,<0.10.0"]
+
 [tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "tests bolt_expressions"# --doctest-modules"
+addopts = "tests src/bolt_expressions" # --doctest-modules"
+minversion = "6.0" 
 # doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
 
 [tool.black]
-target-version = ["py310"]
 include = '\.pyi?$'
+target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
 
 [tool.semantic_release]
 branch = "main"
-version_variable = ["bolt_expressions/__init__.py:__version__"]
-version_toml = "pyproject.toml:tool.poetry.version"
+build_command = "uv run mudkip build --update-gh-pages --repository https://x-access-token:${GH_TOKEN}@github.com/rx-modules/bolt-expressions"
 major_on_zero = false
-build_command = "poetry build && poetry run mudkip build --update-gh-pages --repository https://x-access-token:${GH_TOKEN}@github.com/rx-modules/bolt-expressions"
+version_toml = "pyproject.toml:project.version"
+version_variable = ["bolt_expressions/__init__.py:__version__"]
 
 [tool.mudkip]
 preset = "furo"
@@ -64,7 +81,3 @@ preset = "furo"
 [tool.mudkip.override]
 html_title = "bolt-expressions"
 suppress_warnings = ["myst.header"]
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"

@@ -4,14 +4,13 @@ from typing import Any, overload
 from beet import Context
 from bolt.utils import internal
 
-from .typing import NbtType, literal_types
 from .node import Expression
 from .sources import (
     DataSource,
     ScoreSource,
     resolve,
 )
-
+from .typing import NbtType, literal_types
 
 __all__ = [
     "Scoreboard",
@@ -99,12 +98,10 @@ class Objective:
     ctx: Context | Expression = field(kw_only=True)
 
     @overload
-    def __getitem__(self, scoreholder: str) -> ScoreSource:
-        ...
+    def __getitem__(self, scoreholder: str) -> ScoreSource: ...
 
     @overload
-    def __getitem__(self, scoreholder: tuple[str, ...]) -> tuple[ScoreSource, ...]:
-        ...
+    def __getitem__(self, scoreholder: tuple[str, ...]) -> tuple[ScoreSource, ...]: ...
 
     def __getitem__(
         self, scoreholder: str | tuple[str, ...]
