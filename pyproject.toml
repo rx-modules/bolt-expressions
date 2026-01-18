@@ -17,7 +17,7 @@ dependencies = [
   "bolt>=0.38",
   "frozendict>=2.4.0,<3",
   "bolt-control-flow>=0.2.0",
-  "rich>=12.4.4,<13",
+  "rich>=13.2.0",
 ]
 description = "Provides pandas-like expressions capabilities to the bolt extension of mecha"
 keywords = [
