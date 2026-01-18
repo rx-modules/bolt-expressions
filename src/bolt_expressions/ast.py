@@ -13,7 +13,6 @@ from mecha import (
     Reducer,
     rule,
 )
-import nbtlib
 
 from .sources import Source
 
@@ -86,15 +85,15 @@ class SourceNBTConverter:
 
     def convert(self, obj: Any) -> Any:
         if isinstance(obj, Source):
-            return self.convert(obj.component())
+            return obj.component()
 
         if isinstance(obj, (list, tuple)):
             list_value = cast(list[Any], obj)
-            return nbtlib.List([self.convert(value) for value in list_value])
+            return [self.convert(value) for value in list_value]
 
         if isinstance(obj, dict):
             dict_value = cast(dict[str, Any], obj)
-            return nbtlib.Compound({key: self.convert(value) for key, value in dict_value.items()})
+            return {key: self.convert(value) for key, value in dict_value.items()}
 
         return obj
 

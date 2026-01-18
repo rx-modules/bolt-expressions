@@ -443,7 +443,7 @@ class Source(ExpressionNode, ABC):
 
     @abstractmethod
     @operator_method
-    def component(self) -> Any: ...
+    def component(self) -> dict[str, Any]: ...
 
     @abstractmethod
     def to_tuple(self) -> SourceTuple: ...
@@ -485,6 +485,9 @@ class ScoreSource(Source):
 
     def __str__(self):
         return f"{self.scoreholder} {self.objective}"
+    
+    def __repr__(self):
+        return f'{self.__class__.__name__}("{str(self)}")'
 
     @operator_method
     def component(self, **tags: Any):
@@ -920,7 +923,7 @@ class DataSource(Source):
         return f"{self._type} {self._target} {self._path}"
 
     def __repr__(self):
-        return f'"{str(self)}"'
+        return f'{self.__class__.__name__}("{str(self)}")'
 
     @operator_method
     def component(self, **tags: Any):

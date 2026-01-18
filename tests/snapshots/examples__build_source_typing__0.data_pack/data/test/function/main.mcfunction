@@ -33,24 +33,24 @@ say <class 'bolt_expressions.sources.DataSource'>
 say <class 'bolt_expressions.sources.DataSource'>
 say <class 'bolt_expressions.sources.DataSource'>
 say <class 'test:main.Item'>
-say ("storage name:path item", <class 'test:main.Item'>)
-say ("storage name:path item.id", <class 'nbtlib.tag.String'>)
-say ("storage name:path item.Count", <class 'nbtlib.tag.Byte'>)
-say ("storage name:path item.tag", <class 'test:main.ItemTag'>)
-say ("storage name:path item.tag.a", typing.Any)
-say ("storage name:path item.tag{}", <class 'test:main.ItemTag'>)
-say ("storage name:path item.tag.Items", list[test:main.Item])
-say ("storage name:path item.tag.Items[1]", <class 'test:main.Item'>)
-say ("storage name:path item.tag.Items[1].id", <class 'nbtlib.tag.String'>)
-say ("storage name:path item.tag.Items[1].tag.CustomModelData", <class 'nbtlib.tag.Int'>)
+say (DataSource("storage name:path item"), <class 'test:main.Item'>)
+say (DataSource("storage name:path item.id"), <class 'nbtlib.tag.String'>)
+say (DataSource("storage name:path item.Count"), <class 'nbtlib.tag.Byte'>)
+say (DataSource("storage name:path item.tag"), <class 'test:main.ItemTag'>)
+say (DataSource("storage name:path item.tag.a"), typing.Any)
+say (DataSource("storage name:path item.tag{}"), <class 'test:main.ItemTag'>)
+say (DataSource("storage name:path item.tag.Items"), list[test:main.Item])
+say (DataSource("storage name:path item.tag.Items[1]"), <class 'test:main.Item'>)
+say (DataSource("storage name:path item.tag.Items[1].id"), <class 'nbtlib.tag.String'>)
+say (DataSource("storage name:path item.tag.Items[1].tag.CustomModelData"), <class 'nbtlib.tag.Int'>)
 execute store result storage name:path item.tag.Items[0].Count byte 1 run data get storage name:path value 1
-say ("storage name:path item", <class 'bolt_expressions.sources.DataSource'>)
-say ("storage name:path item.id", <class 'bolt_expressions.sources.DataSource'>)
-say ("storage name:path item.idd", <class 'bolt_expressions.sources.DataSource'>)
-say ("storage name:path item.Count", <class 'bolt_expressions.sources.DataSource'>)
-say ("storage name:path item.tag", <class 'bolt_expressions.sources.DataSource'>)
-say ("storage name:path item.tag.Items", <class 'bolt_expressions.sources.DataSource'>)
-say ("storage name:path item.tag.Items[0]", <class 'bolt_expressions.sources.DataSource'>)
+say (DataSource("storage name:path item"), <class 'bolt_expressions.sources.DataSource'>)
+say (DataSource("storage name:path item.id"), <class 'bolt_expressions.sources.DataSource'>)
+say (DataSource("storage name:path item.idd"), <class 'bolt_expressions.sources.DataSource'>)
+say (DataSource("storage name:path item.Count"), <class 'bolt_expressions.sources.DataSource'>)
+say (DataSource("storage name:path item.tag"), <class 'bolt_expressions.sources.DataSource'>)
+say (DataSource("storage name:path item.tag.Items"), <class 'bolt_expressions.sources.DataSource'>)
+say (DataSource("storage name:path item.tag.Items[0]"), <class 'bolt_expressions.sources.DataSource'>)
 data modify storage name:path value set value [0.0d, 1.0d, 3.0d, 1.0d, 127.0d]
 data modify storage name:path value append value 3.0d
 data modify storage name:path value prepend value 0.0d
