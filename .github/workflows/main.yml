@@ -38,6 +38,7 @@ jobs:
 
       - name: Action | Semantic Version Release
         id: release
+        if: github.ref == 'refs/heads/main'
         run: |
           # 1. Run the versioning logic
           uv run semantic-release version
