@@ -7,10 +7,10 @@ on:
     branches: [main]
 
 env:
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.14"
 
 jobs:
-  main:
+  release:
     name: Test and release
     runs-on: ubuntu-latest
 
@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.10
+      - name: Set up Python 3.14
         uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -63,6 +63,7 @@ jobs:
 
       - name: Upload | Distribution Artifacts
         uses: actions/upload-artifact@v4
+        if: steps.release.outputs.released == 'true'
         with:
           name: distribution-artifacts
           path: dist
