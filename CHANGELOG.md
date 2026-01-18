@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.19.1 (2026-01-18)
+
+
 ## v0.19.0 (2026-01-18)
+
+### Bug Fixes
+
+- Refactor `return run execute: ...` -> `return: ...`
+  ([`ea87153`](https://github.com/rx-modules/bolt-expressions/commit/ea8715367814c839815e04d2b985af5b1fa44bcf))
 
 ### Chores
 
