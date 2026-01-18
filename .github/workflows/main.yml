@@ -46,7 +46,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           # 1. Run the versioning logic
-          uv run semantic-release -vv version
+          uv run semantic-release version
 
           # 2. Extract version info for subsequent steps
           echo "tag=$(uv run semantic-release version --print-tag)" >> $GITHUB_OUTPUT
