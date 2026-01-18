@@ -228,7 +228,7 @@ class MultiBranchCase(WrappedCases):
                 with self.runtime.scope() as cmds:
                     yield CaseResult.maybe()
 
-                cmd = self.mecha.parse("return run execute:\n  ...", using="command")
+                cmd = self.mecha.parse("return:\n  ...", using="command")
                 root = AstRoot(commands=AstChildren(cmds))
                 self.runtime.commands.append(insert_nested_commands(cmd, root))
         else:
