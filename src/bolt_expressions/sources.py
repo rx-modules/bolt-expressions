@@ -8,7 +8,6 @@ from typing import (
     Any,
     Callable,
     ClassVar,
-    Concatenate,
     ContextManager,
     Generator,
     Generic,
@@ -25,13 +24,12 @@ from bolt_control_flow import BranchInfo, BranchType, Case, CaseResult, WrappedC
 from mecha import AstChildren, AstRoot, Mecha
 from nbtlib import Compound, CompoundMatch, ListIndex, NamedKey, Path  # type: ignore
 
-from .literals import Literal, convert_node
+from .literals import convert_node
 from .node import Expression, ExpressionNode, Unrolled, UnrollHelper
 from .operations import (
     Add,
     Append,
     BinaryOperation,
-    Boolean,
     Cast,
     Divide,
     Enable,
@@ -268,7 +266,7 @@ class OperatorMethod(Generic[P, T]):
         elif obj is None:
             target = None
         else:
-            raise TypeError(f"Operator method is bound on an invalid object.")
+            raise TypeError("Operator method is bound on an invalid object.")
 
         return replace(self, target=target, func=self.func.__get__(obj, objtype))
 
@@ -603,7 +601,7 @@ class StringOperatorHandler(OperatorHandler):
     def set_item(self, key: Any, value: Any):
         if isinstance(key, (int, slice)):
             raise TypeError(
-                f"String data source does not support index/slice assignment."
+                "String data source does not support index/slice assignment."
             )
 
         return super().set_item(key, value)

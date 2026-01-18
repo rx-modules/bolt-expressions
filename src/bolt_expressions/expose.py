@@ -2,7 +2,7 @@ from typing import Any, Iterable, TypeVar, Union
 
 from .node import ExpressionNode
 from .operations import Max, Min
-from .sources import Source, binary_operator, length, operator_method
+from .sources import Source, binary_operator, length
 
 T = TypeVar("T")
 

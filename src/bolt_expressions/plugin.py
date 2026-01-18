@@ -14,7 +14,7 @@ from .ast import (
     ConstantScoreChecker,
     ObjectiveChecker,
     RunExecuteTransformer,
-    SourceJsonConverter,
+    SourceNBTConverter,
 )
 from .expose import wrapped_len, wrapped_max, wrapped_min
 from .node import Expression
@@ -54,9 +54,9 @@ def bolt_expressions(ctx: Context):
     handler = module_attribute_handler(
         ctx, runtime.helpers["get_attribute_handler"], api
     )
-    json_converter = SourceJsonConverter(runtime.helpers["interpolate_json"])
+    nbt_converter = SourceNBTConverter(runtime.helpers["interpolate_nbt"])
     runtime.helpers["get_attribute_handler"] = handler
-    runtime.helpers["interpolate_json"] = json_converter
+    runtime.helpers["interpolate_nbt"] = nbt_converter
 
     runtime.expose("min", partial(wrapped_min, runtime.globals.get("min", min)))
     runtime.expose("max", partial(wrapped_max, runtime.globals.get("max", max)))

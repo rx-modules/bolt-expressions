@@ -4,10 +4,8 @@ from typing import (
     Any,
     Iterable,
     TypedDict,
-    Union,
     get_args,
     get_type_hints,
-    is_typeddict,
 )
 
 from beet import Context
@@ -16,7 +14,6 @@ from mecha import Visitor, rule
 from nbtlib import (
     Array,
     Byte,
-    Compound,
     Double,
     Float,
     Int,
@@ -39,7 +36,6 @@ from .optimizer import (
 )
 from .typing import (
     NbtType,
-    NbtValue,
     NumericNbtValue,
     access_type,
     convert_type,

@@ -17,7 +17,7 @@ dependencies = [
   "bolt>=0.38",
   "frozendict>=2.4.0,<3",
   "bolt-control-flow>=0.2.0",
-  "rich>=12.4.4,<13",
+  "rich>=13.2.0",
 ]
 description = "Provides pandas-like expressions capabilities to the bolt extension of mecha"
 keywords = [
@@ -30,7 +30,7 @@ keywords = [
 license = "MIT"
 name = "bolt-expressions"
 readme = "README.md"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.14,<4.0"
 version = "0.18.0"
 
 [project.urls]
@@ -40,7 +40,7 @@ Repository = "https://github.com/rx-modules/bolt-expressions"
 
 [dependency-groups]
 dev = [
-  "python-semantic-release>=7.27.0,<8",
+  "python-semantic-release>=9.21.0",
   "mudkip>=0.5.1",
   "pytest-insta>=0.1.11",
   "pygments",
@@ -50,6 +50,7 @@ dev = [
 [tool.uv]
 
 [tool.uv.sources]
+bolt-control-flow = {git = "https://github.com/rx-modules/bolt-control-flow", rev = "chore/update-to-uv-py-3-14"}
 pygments = {git = "https://github.com/rx-modules/pygments"}
 
 [build-system]
@@ -59,21 +60,17 @@ requires = ["uv_build>=0.9.26,<0.10.0"]
 [tool.pytest.ini_options]
 addopts = "tests src/bolt_expressions" # --doctest-modules"
 minversion = "6.0" 
-# doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
 
-[tool.black]
-include = '\.pyi?$'
-target-version = ["py310"]
-
-[tool.isort]
-profile = "black"
+[tool.ruff.lint]
+ignore = ["F403"] # allows "*" imports
 
 [tool.semantic_release]
-branch = "main"
-build_command = "uv run mudkip build --update-gh-pages --repository https://x-access-token:${GH_TOKEN}@github.com/rx-modules/bolt-expressions"
+build_command = "uv build"
 major_on_zero = false
-version_toml = "pyproject.toml:project.version"
-version_variable = ["bolt_expressions/__init__.py:__version__"]
+
+commit_author = "github-actions <action@github.com>"
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/bolt_expressions/__init__.py:__version__"]
 
 [tool.mudkip]
 preset = "furo"

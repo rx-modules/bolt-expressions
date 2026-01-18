@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from typing import Any, ClassVar, Iterable
 
-from bolt_expressions.optimizer import IrOperation, IrSource
-
 from .literals import convert_node
 from .node import ExpressionNode, ResultType, UnrollHelper
 from .optimizer import (

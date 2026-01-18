@@ -38,7 +38,6 @@ from nbtlib import (  # type:ignore
     Path,
     String,
 )
-from rich.pretty import pprint
 
 from .typing import (
     Accessor,

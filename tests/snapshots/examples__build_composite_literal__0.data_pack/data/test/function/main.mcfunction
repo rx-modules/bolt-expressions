@@ -22,7 +22,7 @@ execute store result storage name:path vec2[2] long 1 run scoreboard players get
 data modify storage name:path vec3 set value [0b, 0b, 5b]
 execute store result storage name:path vec3[0] byte 1 run scoreboard players get $a obj.main
 execute store result storage name:path vec3[1] byte 1 run scoreboard players get $b obj.main
-data modify storage name:path vec4 set value [B; 0B, 0B, 0B]
+data modify storage name:path vec4 set value [B; 0b, 0b, 0b]
 execute store result storage name:path vec4[0] byte 1 run scoreboard players get $a obj.main
 execute store result storage name:path vec4[1] byte 1 run scoreboard players get $b obj.main
 execute store result storage name:path vec4[2] byte 1 run scoreboard players get $c obj.main

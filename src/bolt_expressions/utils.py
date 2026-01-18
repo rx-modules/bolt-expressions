@@ -2,7 +2,7 @@ import sys
 from contextlib import contextmanager
 from dataclasses import replace
 from types import NoneType
-from typing import Any, Dict, _UnionGenericAlias, is_typeddict  # type: ignore
+from typing import Any, Dict, is_typeddict  # type: ignore
 
 from beet import Context
 from bolt import Runtime

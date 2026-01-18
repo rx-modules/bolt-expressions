@@ -5,9 +5,6 @@ __all__ = [
 ]
 
 
-from typing import Any
-
-
 class TypeCheckError(Exception):
     """Type incompatibility during type checking"""
 

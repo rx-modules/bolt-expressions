@@ -1,5 +1,4 @@
 name: bolt-expressions-operation-condition
-minecraft: "1.20"
 
 data_pack:
   load: [src]

@@ -13,6 +13,7 @@ from mecha import (
     Reducer,
     rule,
 )
+import nbtlib
 
 from .sources import Source
 
@@ -20,7 +21,7 @@ __all__ = [
     "RunExecuteTransformer",
     "ConstantScoreChecker",
     "ObjectiveChecker",
-    "SourceJsonConverter",
+    "SourceNBTConverter",
 ]
 
 
@@ -80,20 +81,20 @@ class ObjectiveChecker(Reducer):
 
 
 @dataclass
-class SourceJsonConverter:
+class SourceNBTConverter:
     converter: Callable[[Any, AstNode], AstNode]
 
     def convert(self, obj: Any) -> Any:
         if isinstance(obj, Source):
-            return obj.component()
+            return self.convert(obj.component())
 
         if isinstance(obj, (list, tuple)):
             list_value = cast(list[Any], obj)
-            return [self.convert(value) for value in list_value]
+            return nbtlib.List([self.convert(value) for value in list_value])
 
         if isinstance(obj, dict):
             dict_value = cast(dict[str, Any], obj)
-            return {key: self.convert(value) for key, value in dict_value.items()}
+            return nbtlib.Compound({key: self.convert(value) for key, value in dict_value.items()})
 
         return obj
 
