@@ -40,7 +40,7 @@ Repository = "https://github.com/rx-modules/bolt-expressions"
 
 [dependency-groups]
 dev = [
-  "python-semantic-release>=7.27.0,<8",
+  "python-semantic-release>=9.21.0",
   "mudkip>=0.5.1",
   "pytest-insta>=0.1.11",
   "pygments",
@@ -65,11 +65,12 @@ minversion = "6.0"
 ignore = ["F403"] # allows "*" imports
 
 [tool.semantic_release]
-branch = "main"
-build_command = "uv run mudkip build --update-gh-pages --repository https://x-access-token:${GH_TOKEN}@github.com/rx-modules/bolt-expressions"
+build_command = "uv build"
 major_on_zero = false
-version_toml = "pyproject.toml:project.version"
-version_variable = ["src/bolt_expressions/__init__.py:__version__"]
+
+commit_author = "github-actions <action@github.com>"
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/bolt_expressions/__init__.py:__version__"]
 
 [tool.mudkip]
 preset = "furo"
