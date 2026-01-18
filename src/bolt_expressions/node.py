@@ -12,9 +12,7 @@ from bolt.contrib.defer import Defer
 from bolt.utils import internal
 from mecha import AstChildren, AstCommand, AstRoot, Mecha
 from mecha.contrib.nested_location import NestedLocationResolver
-from nbtlib import Path  # type: ignore
 from pydantic import BaseModel
-from rich.pretty import pprint
 
 from .ast_converter import AstConverter
 from .casting import TypeCaster

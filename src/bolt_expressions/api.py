@@ -65,7 +65,7 @@ class Scoreboard:
     def add_constant(self, value: int):
         holder, obj = self.expr.const_score(value)
 
-        if not value in self.constants:
+        if value not in self.constants:
             self.constants.add(value)
             self.expr.init_commands.append(
                 f"scoreboard players set {holder} {obj} {value}"

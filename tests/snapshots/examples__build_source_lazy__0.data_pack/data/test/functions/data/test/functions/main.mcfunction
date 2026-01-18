@@ -40,7 +40,7 @@ scoreboard players operation $a1 obj.temp = $5ws9foxn8m17m_24 bolt.expr.temp
 scoreboard players operation $a2 obj.temp = $5ws9foxn8m17m_24 bolt.expr.temp
 scoreboard players operation $5ws9foxn8m17m_27 bolt.expr.temp = @s obj.temp
 scoreboard players operation $5ws9foxn8m17m_27 bolt.expr.temp *= $5 bolt.expr.const
-tellraw @a {"score": {"name": "$5ws9foxn8m17m_27", "objective": "bolt.expr.temp"}}
+tellraw @a {score: {name: "$5ws9foxn8m17m_27", objective: "bolt.expr.temp"}}
 scoreboard players operation $5ws9foxn8m17m_30 bolt.expr.temp = $v obj.temp
 scoreboard players operation $5ws9foxn8m17m_30 bolt.expr.temp *= $5 bolt.expr.const
 scoreboard players operation $5ws9foxn8m17m_30 bolt.expr.temp /= $w obj.temp

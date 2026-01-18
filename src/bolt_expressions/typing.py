@@ -15,7 +15,6 @@ from typing import (
 )
 
 from beet import Context
-from frozendict import frozendict
 from nbtlib import (
     Array,
     Byte,

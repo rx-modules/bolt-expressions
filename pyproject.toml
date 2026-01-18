@@ -30,7 +30,7 @@ keywords = [
 license = "MIT"
 name = "bolt-expressions"
 readme = "README.md"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.14,<4.0"
 version = "0.18.0"
 
 [project.urls]
@@ -51,6 +51,7 @@ dev = [
 
 [tool.uv.sources]
 pygments = {git = "https://github.com/rx-modules/pygments"}
+bolt-control-flow = { git = "https://github.com/rx-modules/bolt-control-flow", rev = "chore/update-to-uv-py-3-14" }
 
 [build-system]
 build-backend = "uv_build"
@@ -59,14 +60,9 @@ requires = ["uv_build>=0.9.26,<0.10.0"]
 [tool.pytest.ini_options]
 addopts = "tests src/bolt_expressions" # --doctest-modules"
 minversion = "6.0" 
-# doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
 
-[tool.black]
-include = '\.pyi?$'
-target-version = ["py310"]
-
-[tool.isort]
-profile = "black"
+[tool.ruff.lint]
+ignore = ["F403"] # allows "*" imports
 
 [tool.semantic_release]
 branch = "main"
