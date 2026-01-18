@@ -50,8 +50,8 @@ dev = [
 [tool.uv]
 
 [tool.uv.sources]
+bolt-control-flow = {git = "https://github.com/rx-modules/bolt-control-flow", rev = "chore/update-to-uv-py-3-14"}
 pygments = {git = "https://github.com/rx-modules/pygments"}
-bolt-control-flow = { git = "https://github.com/rx-modules/bolt-control-flow", rev = "chore/update-to-uv-py-3-14" }
 
 [build-system]
 build-backend = "uv_build"
@@ -69,7 +69,7 @@ branch = "main"
 build_command = "uv run mudkip build --update-gh-pages --repository https://x-access-token:${GH_TOKEN}@github.com/rx-modules/bolt-expressions"
 major_on_zero = false
 version_toml = "pyproject.toml:project.version"
-version_variable = ["bolt_expressions/__init__.py:__version__"]
+version_variable = ["src/bolt_expressions/__init__.py:__version__"]
 
 [tool.mudkip]
 preset = "furo"
