@@ -1,7 +1,20 @@
 # CHANGELOG
 
 
+## v0.19.2 (2026-01-18)
+
+### Bug Fixes
+
+- Bug related to converting source into components for tellraws, etc.
+  ([`d24aeff`](https://github.com/rx-modules/bolt-expressions/commit/d24aeffea9448b4d4f8de820ffb4a7f6dcbd6dd4))
+
+
 ## v0.19.1 (2026-01-18)
+
+### Chores
+
+- Reduce ci debug
+  ([`72d225c`](https://github.com/rx-modules/bolt-expressions/commit/72d225cc1955bf94ae8ec4ecbbf2061966d2df68))
 
 
 ## v0.19.0 (2026-01-18)
