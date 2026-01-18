@@ -28,7 +28,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: uv sync --group dev
 
       - name: Run tests
         run: uv run pytest -v
@@ -41,7 +41,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           # 1. Run the versioning logic
-          uv run semantic-release version
+          uv run semantic-release version -vvv
 
           # 2. Extract version info for subsequent steps
           echo "tag=$(uv run semantic-release version --print-tag)" >> $GITHUB_OUTPUT

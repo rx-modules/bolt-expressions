@@ -41,10 +41,14 @@ Repository = "https://github.com/rx-modules/bolt-expressions"
 [dependency-groups]
 dev = [
   "python-semantic-release>=9.21.0",
-  "mudkip>=0.5.1",
   "pytest-insta>=0.1.11",
-  "pygments",
   "ruff>=0.14.13",
+  "pytest>=9.0.2",
+]
+docs = [
+  "mudkip>=0.5.1",
+  "pygments",
+  "standard-imghdr>=3.13.0",
 ]
 
 [tool.uv]
